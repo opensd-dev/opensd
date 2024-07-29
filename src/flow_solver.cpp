@@ -84,69 +84,73 @@ Eigen::VectorXd insertZerosAtIndices(const Eigen::VectorXd& vec, const std::vect
 // Non-member functions
 //==============================================================================
 
+void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int main_iter, std::shared_ptr<Circuit> circuit) {
+
+  // for (auto& branch : circuit->branches) { // Guess flow rate calculation
+  for (auto& face : circuit->faces) {
+    // branch.choked = false;
+    // for (auto face = branch.faces.rbegin(); face != branch.faces.rend(); ++face) { // Reverse iteration
+      // face.choked = false;
+      // if (circuit->fllib == "CoolProp" && circuit->flname != "Air" && circuit->flname != "Nitrogen") {
+        // face.update_Gcr();
+      // }
+      // if (!branch.choked && face.dnode->spres_gues < face.pcr && dynamic_cast<turbo_comp::Turbine*>(&face) == nullptr) {
+        // branch.choked = true;
+        // face.choked = true;
+        // face.spres_gues = face.pcr;
+        // face.stemp_gues = face.ther_cr.T();
+        // face.ther_gues.update(face.ther_cr);
+        // face.velocity = face.Gcr / face.ther_gues.rhomass();
+        // face.tpres_gues = face.spres_gues + 0.5 * face.ther_gues.rhomass() * std::pow(face.velocity, 2);
+        // face.ttemp_gues = face.stemp_gues + 0.5 * std::pow(face.velocity, 2) / face.ther_gues.cpmass();
+        // for (int i = 0; i < 100; ++i) {
+          // face.unode->update_staticvar();
+          // face.unode->ther_gues.update(CoolProp::HmassP_INPUTS, face.unode->senth_gues, face.unode->spres_gues);
+          // face.dnode->update_staticvar();
+          // face.dnode->ther_gues.update(CoolProp::HmassP_INPUTS, face.dnode->senth_gues, face.dnode->spres_gues);
+        // }
+        // face.G = face.Gcr;
+        // face.vflow_gues = face.G * face.cfarea * face.opening / face.ther_gues.rhomass();
+      // } else {
+  
+        Eigen::VectorXd x(1);
+        x(0) = face->vflow_gues;
+  
+        FaceFunctor functor(time, delt, trans_sim, alpha_mom, face);
+        Eigen::NumericalDiff<FaceFunctor> numDiff(functor);
+        Eigen::LevenbergMarquardt<Eigen::NumericalDiff<FaceFunctor>> lm(numDiff);
+  
+        int info = lm.minimize(x);
+        face->vflow_gues = x(0);
+  
+        // if (face.opening == 0.0) continue;
+        // if (branch.isolated && !trans_sim) {
+          // face.vflow_gues = 0.0;
+          // continue;
+        // }
+        if (std::abs(face->vflow_gues) < 1.E-8 && main_iter == 0) { // Tune the value 1.E-8 as needed
+          face->vflow_gues = 1.E-8 * std::copysign(1.0, face->vflow_gues);
+          if (face->vflow_gues == 0.0) {
+            face->vflow_gues = 1.E-8;
+          }
+        }
+        // std::cout << face.vflow_gues << std::endl;
+        // if (dynamic_cast<PFace*>(&face) != nullptr || dynamic_cast<or_comp::Orifice*>(&face) != nullptr) {
+          // face.G = face.vflow_gues * face.ther_gues.rhomass() / (face.cfarea * face.opening);
+        // }
+      // }
+      face->update_abcoef(time, delt, trans_sim, alpha_mom);
+    
+  }
+}
+  
 void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, int main_iter, int flow_iter) {
   
    for (auto& circuit : model::circuits) {
     // if (!trans_sim && !circuit->solveSS) continue;
     // std::cout << circuit->identifier << std::endl;
-    // for (auto& branch : circuit->branches) { // Guess flow rate calculation
-    for (auto& face : circuit->faces) {
-      // branch.choked = false;
-      // for (auto face = branch.faces.rbegin(); face != branch.faces.rend(); ++face) { // Reverse iteration
-        // face.choked = false;
-        // if (circuit->fllib == "CoolProp" && circuit->flname != "Air" && circuit->flname != "Nitrogen") {
-          // face.update_Gcr();
-        // }
-        // if (!branch.choked && face.dnode->spres_gues < face.pcr && dynamic_cast<turbo_comp::Turbine*>(&face) == nullptr) {
-          // branch.choked = true;
-          // face.choked = true;
-          // face.spres_gues = face.pcr;
-          // face.stemp_gues = face.ther_cr.T();
-          // face.ther_gues.update(face.ther_cr);
-          // face.velocity = face.Gcr / face.ther_gues.rhomass();
-          // face.tpres_gues = face.spres_gues + 0.5 * face.ther_gues.rhomass() * std::pow(face.velocity, 2);
-          // face.ttemp_gues = face.stemp_gues + 0.5 * std::pow(face.velocity, 2) / face.ther_gues.cpmass();
-          // for (int i = 0; i < 100; ++i) {
-            // face.unode->update_staticvar();
-            // face.unode->ther_gues.update(CoolProp::HmassP_INPUTS, face.unode->senth_gues, face.unode->spres_gues);
-            // face.dnode->update_staticvar();
-            // face.dnode->ther_gues.update(CoolProp::HmassP_INPUTS, face.dnode->senth_gues, face.dnode->spres_gues);
-          // }
-          // face.G = face.Gcr;
-          // face.vflow_gues = face.G * face.cfarea * face.opening / face.ther_gues.rhomass();
-        // } else {
-
-          Eigen::VectorXd x(1);
-          x(0) = face->vflow_gues;
-
-          FaceFunctor functor(time, delt, trans_sim, alpha_mom, face);
-          Eigen::NumericalDiff<FaceFunctor> numDiff(functor);
-          Eigen::LevenbergMarquardt<Eigen::NumericalDiff<FaceFunctor>> lm(numDiff);
-
-          int info = lm.minimize(x);
-          face->vflow_gues = x(0);
-
-          // if (face.opening == 0.0) continue;
-          // if (branch.isolated && !trans_sim) {
-            // face.vflow_gues = 0.0;
-            // continue;
-          // }
-          if (std::abs(face->vflow_gues) < 1.E-8 && main_iter == 0) { // Tune the value 1.E-8 as needed
-            face->vflow_gues = 1.E-8 * std::copysign(1.0, face->vflow_gues);
-            if (face->vflow_gues == 0.0) {
-              face->vflow_gues = 1.E-8;
-            }
-          }
-          // std::cout << face.vflow_gues << std::endl;
-          // if (dynamic_cast<PFace*>(&face) != nullptr || dynamic_cast<or_comp::Orifice*>(&face) != nullptr) {
-            // face.G = face.vflow_gues * face.ther_gues.rhomass() / (face.cfarea * face.opening);
-          // }
-        // }
-        face->update_abcoef(time, delt, trans_sim, alpha_mom);
-      
-    }
-
-
+    guess_flow(time, delt, trans_sim, alpha_mom, main_iter, circuit);
+    
     // Pressure corrections
     int n = circuit->nodes.size();
     Eigen::MatrixXd A = Eigen::MatrixXd::Zero(n, n);
