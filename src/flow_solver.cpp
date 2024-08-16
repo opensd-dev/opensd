@@ -56,28 +56,29 @@ private:
 };
 
 
-// Function to insert zeros at specified indices in an Eigen::VectorXd
 Eigen::VectorXd insertZerosAtIndices(const Eigen::VectorXd& vec, const std::vector<int>& indices) {
-  // Create a new vector with the required size
-  Eigen::VectorXd new_vec(vec.size() + indices.size());
+    // Create a new vector with the required size
+    Eigen::VectorXd new_vec(vec.size() + indices.size());
 
-  // Iterate over the original vector and the indices
-  int orig_index = 0; // Index for original vector vec
-  int new_index = 0;  // Index for new vector new_vec
-  int indices_index = 0; // Index for indices
+    // Iterate over the original vector and the indices
+    int orig_index = 0;  // Index for original vector vec
+    int new_index = 0;   // Index for new vector new_vec
+    int indices_index = 0; // Index for indices
 
-  for (int i = 0; i < new_vec.size(); ++i) {
-    if (indices_index < indices.size() && new_index == indices[indices_index] - indices_index) {
-      // Insert 0.0 at the specified index
-      new_vec[new_index++] = 0.0;
-      indices_index++;
-    } else {
-      // Copy from the original vector
-      new_vec[new_index++] = vec[orig_index++];
+    for (int i = 0; i < new_vec.size(); ++i) {
+        if (indices_index < indices.size() && new_index == indices[indices_index]) {
+            // Insert 0.0 at the specified index
+            new_vec[i] = 0.0;
+            indices_index++;
+        } else {
+            if (orig_index < vec.size()) {
+                new_vec[i] = vec[orig_index++]; // Copy element from the original vector
+            }
+        }
+        new_index++;
     }
-  }
 
-  return new_vec;
+    return new_vec;
 }
 
 //==============================================================================
@@ -213,14 +214,18 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       }
     }
     
+    // Create reverse index vector for rows
+    std::vector<int> reverse_ind = circuit->Pbound_ind;
+    std::sort(reverse_ind.begin(), reverse_ind.end(), std::greater<int>());
+
     // Remove rows from A
-    for (int index : circuit->Pbound_ind) {
+    for (int index : reverse_ind) {
       A.row(index).swap(A.row(A.rows() - 1)); // Swap with the last row
       A.conservativeResize(A.rows() - 1, Eigen::NoChange); // Remove last row
     }
 
     // Remove columns from A
-    for (int index : circuit->Pbound_ind) {
+    for (int index : reverse_ind) {
       A.col(index).swap(A.col(A.cols() - 1)); // Swap with the last column
       A.conservativeResize(Eigen::NoChange, A.cols() - 1); // Remove last column
     }
@@ -250,6 +255,9 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     
     // Insert zeros at boundary indices
     pc = insertZerosAtIndices(pc, circuit->Pbound_ind);
+    std::cout << "flag4" << std::endl;
+    std::cout << pc << std::endl;
+    std::exit(0);
 
     // Flow rate corrections
     for (auto& face : circuit->faces) {
