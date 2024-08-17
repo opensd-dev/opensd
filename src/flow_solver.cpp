@@ -255,7 +255,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     
     // Insert zeros at boundary indices
     pc = insertZerosAtIndices(pc, circuit->Pbound_ind);
-    std::cout << "flag4" << std::endl;
+    std::cout << "flag1" << std::endl;
     std::cout << pc << std::endl;
     std::exit(0);
 
@@ -303,7 +303,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         face->ther_gues->update();
         // if (circuit.flag_tp) face->ther_gues->update_sat();
         // face->update_heat_input(time, delt);
-        // face->update_fricfact();
+        face->update_fricfact();
       // } else {
         // face->update_Gcr();
         // face->G = std::copysign(face->Gcr, face->vflow_gues);

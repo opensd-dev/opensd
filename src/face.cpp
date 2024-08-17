@@ -118,8 +118,6 @@ PFace::PFace(int faceno, std::shared_ptr<Pipe> pipe, std::shared_ptr<Node> unode
 }
 
 double PFace::eqn_mom(double x, double time, double delt, bool trans_sim, double alpha_mom) {
-  Re = 1000.*std::abs(x)*diameter/(cfarea*0.001);
-  fricfact_gues = std::min(10.78 * std::pow(M_PI, 2) * 9.81 / 8.0 * std::pow(diameter, 0.13) / (std::pow(roughness, 1.852) * std::pow(std::abs(x), 0.148)),64.);
   double delp_fr = fricfact_gues * delx * ther_gues->rhomass() * x * std::abs(x) / (2. * diameter * cfarea * cfarea);
 /*  if (faceno == 0) {
     delp_fr += pipe.Kforward * ther_gues.rhomass() * x * std::abs(x) / (2. * cfarea * cfarea);
@@ -230,6 +228,60 @@ void PFace::update_gues() {
 
 void PFace::update_velocity() {
   velocity = vflow_gues / cfarea;
+}
+
+void PFace::update_fricfact() {
+  fricfact_gues = 0.03;
+  // if (fricopt == "HW") {
+    // fricfact_gues = 10.78 * M_PI * M_PI * constants::grav / 8.0 * std::pow(diameter, 0.13) /
+                    // (std::pow(roughness, 1.852) * std::pow(std::abs(vflow_gues), 0.148));
+  // } 
+  // else if (fricopt == "DW") {
+    // update_Re();
+    // if (Re < 1.0E-6) {
+      // fricfact_gues = 64.0 / 1.0E-6;
+    // } 
+    // else if (Re < 2300.0) {
+      // fricfact_gues = 64.0 / Re;
+    // } 
+    // else if (Re > 5000.0) {
+      // fricfact_gues = 0.25 / std::pow(0.434294 * std::log(roughness / (3.7 * diameter) + 5.74 / std::pow(Re, 0.9)), 2);
+    // } 
+    // else {
+      // double f1 = 64.0 / 2300.0;
+      // double f2 = 0.25 / std::pow(0.434294 * std::log(roughness / (3.7 * diameter) + 5.74 / std::pow(5000.0, 0.9)), 2);
+      // fricfact_gues = (Re - 2300.0) * (f2 - f1) / (5000.0 - 2300.0) + f1;
+    // }
+  // } 
+  // else if (fricopt == "BL") {
+    // update_Re();
+    // if (Re < 1.0E-6) {
+      // fricfact_gues = 64.0 / 1.0E-6;
+    // } 
+    // else if (Re < 2300.0) {
+      // fricfact_gues = 64.0 / Re;
+    // } 
+    // else if (Re > 5000.0) {
+      // fricfact_gues = 0.316 / std::pow(Re, 0.25);
+    // } 
+    // else {
+      // double f1 = 64.0 / 2300.0;
+      // double f2 = 0.316 / std::pow(5000.0, 0.25);
+      // fricfact_gues = (Re - 2300.0) * (f2 - f1) / (5000.0 - 2300.0) + f1;
+    // }
+  // } 
+  // else if (std::holds_alternative<double>(fricopt)) {
+    // fricfact_gues = std::get<double>(fricopt);
+  // } 
+  // else if (std::holds_alternative<std::function<double(double)>>(fricopt)) {
+    // update_Re();
+    // auto func = std::get<std::function<double(double)>>(fricopt);
+    // fricfact_gues = func(Re);
+  // } 
+  // else {
+    // std::cerr << "Friction factor not defined. Stopping." << std::endl;
+    // std::exit(EXIT_FAILURE);
+  // }
 }
 
 } // namespace opensd
