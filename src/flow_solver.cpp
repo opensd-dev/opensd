@@ -214,21 +214,29 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       }
     }
     
-    // Create reverse index vector for rows
-    std::vector<int> reverse_ind = circuit->Pbound_ind;
-    std::sort(reverse_ind.begin(), reverse_ind.end(), std::greater<int>());
-
-    // Remove rows from A
-    for (int index : reverse_ind) {
-      A.row(index).swap(A.row(A.rows() - 1)); // Swap with the last row
-      A.conservativeResize(A.rows() - 1, Eigen::NoChange); // Remove last row
+    // Collect rows that are not in circuit->Pbound_ind
+    Eigen::MatrixXd A_new(A.rows() - circuit->Pbound_ind.size(), A.cols());
+    int j = 0;
+    for (int i = 0; i < A.rows(); ++i) {
+      if (std::find(circuit->Pbound_ind.begin(), circuit->Pbound_ind.end(), i) == circuit->Pbound_ind.end()) {
+        A_new.row(j++) = A.row(i);
+      }
     }
-
-    // Remove columns from A
-    for (int index : reverse_ind) {
-      A.col(index).swap(A.col(A.cols() - 1)); // Swap with the last column
-      A.conservativeResize(Eigen::NoChange, A.cols() - 1); // Remove last column
+    
+    // Update A to have the new set of rows
+    A = A_new;
+    
+    // Collect columns that are not in circuit->Pbound_ind
+    Eigen::MatrixXd A_new_cols(A.rows(), A.cols() - circuit->Pbound_ind.size());
+    int k = 0;
+    for (int i = 0; i < A.cols(); ++i) {
+      if (std::find(circuit->Pbound_ind.begin(), circuit->Pbound_ind.end(), i) == circuit->Pbound_ind.end()) {
+        A_new_cols.col(k++) = A.col(i);
+      }
     }
+    
+    // Set A to A_new_cols after deletion of columns
+    A = A_new_cols;
     
     // Create a new vector excluding elements at the indices in Pbound_ind
     Eigen::VectorXd b_new(b.size() - circuit->Pbound_ind.size());
@@ -255,9 +263,6 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     
     // Insert zeros at boundary indices
     pc = insertZerosAtIndices(pc, circuit->Pbound_ind);
-    std::cout << "flag1" << std::endl;
-    std::cout << pc << std::endl;
-    std::exit(0);
 
     // Flow rate corrections
     for (auto& face : circuit->faces) {
