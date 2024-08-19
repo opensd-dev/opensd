@@ -61,9 +61,9 @@ def execute_ipynb(file_path):
 
 def _compare_results():
     """Make sure the current results agree with the reference."""
-    compare = filecmp.cmp('output.res', 'tutorial1_true.res')
+    compare = filecmp.cmp('output.res', 'results_true.res')
     if not compare:
-        expected = open('tutorial1_true.res').readlines()
+        expected = open('results_true.res').readlines()
         actual = open('output.res').readlines()
         diff = unified_diff(expected, actual, 'tutorial1_true.dat',
                             'output.res')
