@@ -1,4 +1,4 @@
-import unittest
+
 import sys,os
 import numpy as np
 from scipy import interpolate
@@ -73,7 +73,7 @@ def _compare_results():
     assert compare, 'Results do not agree'
 
 
-class Test(unittest.TestCase):
+class Test():
     def test_case1(self):
         c_path = b_path + "/tutorial1.ipynb"
         execute_ipynb(c_path)
@@ -87,6 +87,4 @@ class Test(unittest.TestCase):
         # np.testing.assert_array_almost_equal(result, data, decimal=4) #bar
 
         
-if __name__ == '__main__':
-    unittest.main()
     
