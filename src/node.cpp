@@ -46,7 +46,7 @@ Node::Node(pugi::xml_node flnode_node)
 }
 
 
-Node::Node(std::string identifier, double volume, double heat_input, double elevation, double tpres_old, double ttemp_old, double tenth_old) //Circuit* circuit, 
+/* Node::Node(std::string identifier, double volume, double heat_input, double elevation, double tpres_old, double ttemp_old, double tenth_old) //Circuit* circuit, 
   : identifier(identifier), volume(volume), heat_input(heat_input), elevation(elevation), tpres_old(tpres_old), ttemp_old(ttemp_old), tenth_old(tenth_old) {
   // node_ind = circuit.size();
   // if (tpres_old != 0.0)
@@ -61,7 +61,7 @@ Node::Node(std::string identifier, double volume, double heat_input, double elev
   msource = 0.0;
   hresidue = 0.0;
   mresidue = 0.0;
-}
+} */
 
 
 

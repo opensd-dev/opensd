@@ -6,15 +6,15 @@ namespace opensd {
 Connection::Connection(std::shared_ptr<Node> node, double frac, double height) : node(node), frac(frac), height(height) {}
 
  void Connection::update_gues() {
-  // if (node->ther_gues.phase() == 6) {
+  if (node->ther_gues->phase() == 6) {
     // if (node instanceof TPTank) {
       // drho_dp_consth = 0.;
     // } else {
-      // drho_dp_consth = node->ther_gues.first_two_phase_deriv(iDmass, iP, iHmass);
+      drho_dp_consth = node->ther_gues->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass);
     // }
-  // } else {
+  } else {
     drho_dp_consth = node->ther_gues->first_partial_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass);
-  // }
+  }
 
   // if (node instanceof TPTank && frac != nullptr && node->ther_gues.phase() == 6) {
     // if (height > node->level) {

@@ -47,7 +47,7 @@ public:
 
   
   Pipe(std::string identifier, std::shared_ptr<Circuit> circuit, double diameter, double length, std::shared_ptr<Node> unode, double ufrac, std::shared_ptr<Node> dnode, double dfrac, double ficopt, double roughness, int ncell, double heat_input, double cfarea, int npar, double qcrit, double Kforward, int flowreg);
-  // void add_wall(double thk, std::string solname, std::string sollib, int restraint);
+  void add_wall(double thk, std::string solname, std::string sollib, int restraint);
   // void update_mflow();
   
   
@@ -55,6 +55,19 @@ protected:
 
 };
 
+//==============================================================================
+//! \class Wall
+//==============================================================================
+
+class Wall {
+public:
+  Wall(double thk, const std::string& solname, const std::string& sollib, const std::string& restraint);
+  
+private:
+  double thk;
+  double c1;
+  // std::unique_ptr<Solid> mech_gues;  // Unique pointer to a Solid object
+};
 
 //==============================================================================
 // Non-member functions

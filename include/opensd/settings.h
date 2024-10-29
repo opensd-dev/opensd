@@ -24,10 +24,12 @@ extern RunMode run_mode;       //!< Run mode ('steady', 'design', 'sensitivity',
 // extern SolverType solver_type; //!< Solver Type (Monte Carlo or Random Ray)
 extern "C" int verbosity;          //!< How verbose to make output
 extern double alpha_mom; //!< relaxation factor
+extern double alpha_ener; //!< relaxation factor
 extern vector<double> tim_slot;
 extern int no_main_iter;
 extern int no_flow_iter;
 extern double conv_crit_flow;
+extern bool temp_solve;
 } // namespace settings
 
 //==============================================================================

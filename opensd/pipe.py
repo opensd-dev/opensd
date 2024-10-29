@@ -1,6 +1,7 @@
 import math
 import numpy as np
 import lxml.etree as ET
+from opensd.face import PFace
 
 class Pipe(object):
 
@@ -66,66 +67,39 @@ class Pipe(object):
         
         self.mflow = 0.
         
-    # def add_wall(self,thk,solname,sollib,restraint):
-        # wall = Wall(thk,solname,sollib,restraint)
-        # for face in self.faces:
-            # face.wall = wall
+    def add_wall(self,thk,solname,sollib,restraint):
+        wall = Wall(thk,solname,sollib,restraint)
+        for face in self.faces:
+            face.wall = wall
 
     def to_xml_element(self,element):
         subelement = ET.SubElement(element, "pipe")
         subelement.set("identifier", self.identifier)
         subelement.set("diameter",   str(self.diameter))
         subelement.set("length",     str(self.length))
+        subelement.set("ncell",      str(self.ncell))
         subelement.set("unode",      str(self.unode.identifier))
         subelement.set("dnode",      str(self.dnode.identifier))
         subelement.set("roughness",  str(self.roughness))
 
-
-class Face(object): #partial class
-    def __init__(self,faceno,unode,ufrac,dnode,dfrac):
-        
-        self.vflow_old=np.array(1.E-8)
-        self.mflow = 0.
-        self.velocity=0.
-
-        self.unode = unode
-        self.ufrac = ufrac
-        if ufrac is not None and isinstance(self.unode,Reservoir): self.uheight = ufrac*self.unode.height
-        self.dnode = dnode
-        self.dfrac = dfrac
-        if dfrac is not None and isinstance(self.dnode,Reservoir): self.dheight = dfrac*self.dnode.height
-        
-        
-        # self.heat_input = self.heat_input_old = 0.
-        self.heat_input_old = 0.
-        self.heat_input = 0.
-        self.heat_hslab = self.heat_hslab_old = []
-        self.choked = False
-        self.presidue = 0.
-        self.Gcr = 1.E8
-        self.pcr = 0.
-
-    def assign_statevar(self):
-        self.tpres_old = 0.5*(self.unode.tpres_old+self.dnode.tpres_old)
-        self.spres_old = 0.5*(self.unode.spres_old+self.dnode.spres_old)
-        self.ttemp_old = 0.5*(self.unode.ttemp_old+self.dnode.ttemp_old)
-        self.stemp_old = 0.5*(self.unode.stemp_old+self.dnode.stemp_old)
-
-class PFace(Face):
-
-    def __init__(self,faceno,pipe,unode,ufrac,dnode,dfrac,diameter,cfarea,delx,delz,fricopt,roughness):
-        super().__init__(faceno,unode,ufrac,dnode,dfrac)
-        self.circuit = pipe.circuit
-        self.faceno=faceno
-        self.pipe=pipe
-        self.diameter=diameter
-        self.cfarea=cfarea
-        self.delx=delx
-        self.delz=delz
-        self.roughness=roughness
-        self.Re = 0. 
-        self.fricopt = fricopt
-        self.fricfact_old = 64. #maximum initial friction factor considered
-        # self.flstate = self.pipe.circuit.flstate
-        self.opening = 1.
-        self.circuit.faces.append(self)
+class Wall(object):
+    def __init__(self,thk,solname,sollib,restraint):
+        if sollib == "User":
+            import sys
+            import os
+            sys.path.insert(0,os.getcwd() + "/")
+            mod = __import__(solname)
+            mat_clas = getattr(mod,'solid')
+            self.mech_gues = mat_clas('mech')
+        elif sollib == "thinmam":
+            import thinmam
+            self.mech_gues = thinmam.state(solname,'mech')
+        else:
+            print ("solid material not found. stopping",solname,sollib)
+            sys.exit()
+        if restraint == "long":
+            self.c1 = 5./4. - self.mech_gues.poissons_ratio()
+        else:
+            print ("restraint option not found. stopping",self.identifier,restraint)
+            sys.exit()
+        self.thk = thk

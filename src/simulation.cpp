@@ -63,48 +63,40 @@ int opensd_run()
         }
       }
       
-      break;
-      
       if (!converged) {
         std::cerr << "massmom not converged. stopping " << eps_m << " " << eps_p << std::endl;
         std::exit(EXIT_FAILURE);
       }
 
-      // vof_solver.update_int(time);
-
-      // if (solver_settings.temp_solve) {
+      if (settings::temp_solve) {
         // HT_solver.exec_energy(time, delt, trans_sim, alpha_heat, main_iter);
-        // if (!trans_sim) {
-          // slug_flow_solver.exec_ss(time, delt, trans_sim, alpha_mom);
-        // }
-        // flow_solver.exec_energy(time, delt, trans_sim, alpha_ener, main_iter);
-        // vof_solver.exec_energy(time, delt, trans_sim, alpha_ener);
+        exec_energy(simulation::current_time, simulation::delt, trans_sim, settings::alpha_ener, main_iter);
+        std::exit(1);
 
         // bool converged;
         // double eps_h, eps_t, eps_hvof;
         // std::tie(converged, std::tie(eps_m, eps_p, eps_h, eps_t, eps_hvof)) = convergence.check_conv(
             // time, delt, trans_sim, alpha_mom, alpha_ener, "all", alpha_heat);
+      }
 
-        if (converged && main_iter > 1) {
-          // if (trans_sim) {
-            // slug_flow_solver.exec_trans(time, delt, trans_sim, alpha_mom, alpha_heat, main_iter);
-          // }
-          // if (solver_settings.temp_solve) {
-            // if (verbosity >= 1 || (verbosity >= 0 && !trans_sim)) {
-              // std::cout << "main converged in " << main_iter + 1 << " iter. " << eps_m << " " << eps_p << " " << eps_h << " " << eps_t << " " << eps_hvof << std::endl;
-            // }
-          // } else {
-            if (settings::verbosity >= 1 || (settings::verbosity >= 0 && !trans_sim)) {
-              std::cout << "main converged in " << main_iter + 1 << " iter. " << eps_m << " " << eps_p << std::endl;
-            }
-          // }
-          // break;
+      if (converged && main_iter > 1) {
+        if (settings::temp_solve) {
+          if (settings::verbosity >= 1 || (settings::verbosity >= 0 && !trans_sim)) {
+              eps_h = 0.;
+              eps_t = 0.;
+            std::cout << "main converged in " << main_iter + 1 << " iter. " << eps_m << " " << eps_p << " " << eps_h << " " << eps_t << std::endl;
+          }
         } else {
-          if (settings::verbosity >= 2 || (settings::verbosity >= 1 && !trans_sim)) {
-            std::cout << "main iteration " << main_iter + 1 << " " << eps_m << " " << eps_p << " " << eps_h << " " << eps_t << std::endl;
+          if (settings::verbosity >= 1 || (settings::verbosity >= 0 && !trans_sim)) {
+            std::cout << "main converged in " << main_iter + 1 << " iter. " << eps_m << " " << eps_p << std::endl;
           }
         }
-      // }
+        break;
+      } else {
+        if (settings::verbosity >= 2 || (settings::verbosity >= 1 && !trans_sim)) {
+          std::cout << "main iteration " << main_iter + 1 << " " << eps_m << " " << eps_p << " " << eps_h << " " << eps_t << std::endl;
+        }
+      }
     }
 
     if (!converged) {

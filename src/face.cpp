@@ -108,6 +108,18 @@ void Face::assign_prop() {
 // PFace implementation
 //==============================================================================
 
+// PFace::PFace(pugi::xml_node pface_xnode)
+// {
+  // if (check_for_node(pface_xnode, "faceno")) {
+    // faceno = get_node_value(pface_xnode, "faceno");
+
+  // } else {
+    // fatal_error("Must specify faceno of flow face in geometry XML file.");
+  // }
+  // mresidue = 0.;
+  // mflow_in = 1.E-4;
+  // volume = 0.;
+// }
 
 PFace::PFace(int faceno, std::shared_ptr<Pipe> pipe, std::shared_ptr<Node> unode, double ufrac, std::shared_ptr<Node> dnode, double dfrac,
             double diameter, double cfarea, double delx, double delz, double fricopt, double roughness)

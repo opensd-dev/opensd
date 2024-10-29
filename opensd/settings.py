@@ -60,7 +60,7 @@ class Settings:
 
         self._alpha_mom = 1.0
         self._alpha_heat = np.array(0.6)
-        self._alpha_ener = np.array(0.6)
+        self._alpha_ener = np.array(1.0)
 
         
         for key, value in kwargs.items():
@@ -107,8 +107,10 @@ class Settings:
         self._create_tim_slot_subelement(element)
         self._create_verbosity_subelement(element)
         self._create_alpha_mom_subelement(element)
+        self._create_alpha_ener_subelement(element)
         self._create_main_iter_subelement(element)
         self._create_flow_iter_subelement(element)
+        self._create_temp_solve_subelement(element)
         
         # Clean the indentation in the file to be user-readable
         clean_indentation(element)
@@ -133,6 +135,10 @@ class Settings:
         elem = ET.SubElement(root, "alpha_mom")
         elem.text = str(self._alpha_mom)
 
+    def _create_alpha_ener_subelement(self, root):
+        elem = ET.SubElement(root, "alpha_ener")
+        elem.text = str(self._alpha_ener)
+
     def _create_main_iter_subelement(self, root):
         elem = ET.SubElement(root, "no_main_iter")
         elem.text = str(self._no_main_iter)
@@ -140,6 +146,10 @@ class Settings:
     def _create_flow_iter_subelement(self, root):
         elem = ET.SubElement(root, "no_flow_iter")
         elem.text = str(self._no_flow_iter)
+
+    def _create_temp_solve_subelement(self, root):
+        elem = ET.SubElement(root, "temp_solve")
+        elem.text = str(self._temp_solve)
 
     def _no_main_iter_from_xml_element(self, root):
         text = get_text(root, 'no_main_iter')
@@ -155,3 +165,12 @@ class Settings:
         cv.check_type('verbosity', verbosity, Integral)
         cv.check_greater_than('verbosity', verbosity, -1, True)
         self._verbosity = verbosity
+
+    @property
+    def temp_solve(self) -> bool:
+        return self._temp_solve
+
+    @temp_solve.setter
+    def temp_solve(self, temp_solve: bool):
+        cv.check_type('temperature solver', temp_solve, bool)
+        self._temp_solve = temp_solve

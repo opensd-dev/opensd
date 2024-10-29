@@ -1,13 +1,15 @@
 //! \file flow_solver.cpp
 #include "opensd/flow_solver.h"
 
-// #include <algorithm>
-// #include <cmath>
+#include <algorithm>
+#include <cmath>         // For std::isinf and other math functions
 #include <iostream>
-// #include <Eigen/Dense>
+#include <Eigen/Dense>   // For matrix manipulations
 #include <cstdlib>
-
+#include "opensd/vector.h"
 #include "opensd/circuit.h"
+// #include <numeric>     // For std::accumulate
+// #include <copy>          // For std::copy in Arow and brow
 
 namespace opensd {
 
@@ -151,25 +153,25 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     // if (!trans_sim && !circuit->solveSS) continue;
     // std::cout << circuit->identifier << std::endl;
     guess_flow(time, delt, trans_sim, alpha_mom, main_iter, circuit);
-    
+
     // Pressure corrections
     int n = circuit->nodes.size();
     Eigen::MatrixXd A = Eigen::MatrixXd::Zero(n, n);
     Eigen::VectorXd b = Eigen::VectorXd::Zero(n);
     for (int i = 0; i < n; ++i) {
       auto& node = circuit->nodes[i];
-      // if (node.flowreg == "Slug") continue;
       double B, D;
-      // if (node.ther_old.phase() == 6) {
+      if (node->ther_old->phase() == 6) {
         // B = node.B1 + node.volume * node.ther_old.first_two_phase_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node.ther_old.rhomass();
-        // A(i, i) = trans_sim * B * node.ther_old.rhomass() / delt;
-        // D = trans_sim * node.volume * node.ther_old.first_two_phase_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
-      // } else {
+        B = node->volume * node->ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node->ther_old->rhomass();
+        A(i, i) = trans_sim * B * node->ther_old->rhomass() / delt;
+        D = trans_sim * node->volume * node->ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
+      } else {
         // B = node.B1 + node.volume * node.ther_old.first_partial_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node.ther_old.rhomass();
         B = node->volume * node->ther_old->first_partial_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node->ther_old->rhomass();
         A(i, i) = trans_sim * B * node->ther_old->rhomass() / delt;
         D = trans_sim * node->volume * node->ther_old->first_partial_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
-      // }
+      }
       b(i) = -trans_sim * B * node->ther_old->rhomass() / delt * (node->tpres_gues - node->ther_gues->rhomass() * std::pow(node->velocity, 2) / 2.0 - node->spres_old)
            - trans_sim * D * (node->senth_gues - node->senth_old) / delt;
 
@@ -317,6 +319,210 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     }
 
   }
+}
+
+
+void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, int main_iter) {
+  
+  for (auto& circuit : model::circuits) {
+    // if (!trans_sim && !circuit.solveSS) continue;
+
+    int n = circuit->nodes.size();
+    Eigen::MatrixXd A = Eigen::MatrixXd::Zero(n, n);
+    Eigen::VectorXd b = Eigen::VectorXd::Zero(n);
+    vector<int> nocal_ind;
+
+
+    for (int i = 0; i < n; ++i) {
+      auto& node = circuit->nodes[i];
+
+      double C = node->volume * node->ther_old->rhomass();
+      double E = node->volume;
+      A(i, i) = trans_sim * C / delt;
+      b(i) = node->tenth_old * (trans_sim * C / delt) 
+             + trans_sim * E * (node->spres_gues - node->spres_old) / delt
+             + node->heat_input; // + std::accumulate(node.heat_hslab.begin(), node.heat_hslab.end(), 0.0);
+      b(i) -= node->tenth_old * node->msource * trans_sim;
+
+      for (auto& iface : node->ifaces) {
+        // if (dynamic_cast<cont::Reservoir*>(iface.dnode) && iface.dfrac != nullptr 
+            // && iface.dnode->ther_gues.phase() == 6) {
+          // b(i) -= alpha_ener * iface.downstream->tenth_gues * std::max(-iface.ther_gues.rhomass() * iface.vflow_gues, 0.0);
+        // } else {
+          A(i, i) += alpha_ener * std::max(-iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
+        // }
+
+        // if (dynamic_cast<cont::Reservoir*>(iface.unode) && iface.ufrac != nullptr 
+            // && iface.unode->ther_gues.phase() == 6) {
+          // b(i) += alpha_ener * iface.upstream->tenth_gues * std::max(iface.ther_gues.rhomass() * iface.vflow_gues, 0.0);
+        // } else {
+          A(i, iface->unode->node_ind) = -alpha_ener * std::max(iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
+        // }
+
+        b[i] = (b[i] 
+                  - iface->downstream->tenth_old * (1.0 - alpha_ener) 
+                    * std::max(-iface->ther_old->rhomass() * iface->vflow_old, 0.0)
+                  + iface->upstream->tenth_old * (1.0 - alpha_ener) 
+                    * std::max(iface->ther_old->rhomass() * iface->vflow_old, 0.0));
+        
+        b[i] = (b[i] 
+                  + alpha_ener * (iface->heat_input) // + sum(iface->heat_hslab)) 
+                    * std::max(static_cast<double>(!std::signbit(iface->vflow_gues)), 0.0)
+                  + (1.0 - alpha_ener) * (iface->heat_input_old ) //+ sum(iface->heat_hslab_old)) 
+                    * std::max(static_cast<double>(!std::signbit(iface->vflow_old)), 0.0));
+        
+        b[i] = (b[i] 
+                  - node->tenth_old * alpha_ener * iface->ther_gues->rhomass() 
+                    * iface->vflow_gues * trans_sim
+                  - node->tenth_old * (1.0 - alpha_ener) 
+                    * iface->ther_old->rhomass() * iface->vflow_old * trans_sim);
+        
+      }
+
+      for (auto& oface : node->ofaces) {
+        // if (dynamic_cast<cont::Reservoir*>(oface.unode) && oface.ufrac != nullptr 
+            // && oface.unode->ther_gues.phase() == 6) {
+          // b(i) -= alpha_ener * oface.upstream->tenth_gues * std::max(oface.ther_gues.rhomass() * oface.vflow_gues, 0.0);
+        // } else {
+          A(i, i) += alpha_ener * std::max(oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
+        // }
+
+        // if (dynamic_cast<cont::Reservoir*>(oface.dnode) && oface.dfrac != nullptr 
+            // && oface.dnode->ther_gues.phase() == 6) {
+          // b(i) += alpha_ener * oface.downstream->tenth_gues * std::max(-oface.ther_gues.rhomass() * oface.vflow_gues, 0.0);
+        // } else {
+          A(i, oface->dnode->node_ind) = -alpha_ener * std::max(-oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
+        // }
+
+        
+        b[i] = (b[i] 
+                  - oface->upstream->tenth_old * (1.0 - alpha_ener) 
+                    * std::max(oface->ther_old->rhomass() * oface->vflow_old, 0.0)
+                  + oface->downstream->tenth_old * (1.0 - alpha_ener) 
+                    * std::max(-oface->ther_old->rhomass() * oface->vflow_old, 0.0));
+        
+        b[i] = (b[i] 
+                  + alpha_ener * (oface->heat_input) // + std::accumulate(oface->heat_hslab.begin(), oface->heat_hslab.end(), 0.0)) 
+                    * std::max(static_cast<double>(!std::signbit(-oface->vflow_gues)), 0.0)
+                  + (1.0 - alpha_ener) * (oface->heat_input_old) // + std::accumulate(oface->heat_hslab_old.begin(), oface->heat_hslab_old.end(), 0.0)) 
+                    * std::max(static_cast<double>(!std::signbit(-oface->vflow_old)), 0.0));
+        
+        b[i] = (b[i] 
+                  + node->tenth_old * alpha_ener * oface->ther_gues->rhomass() 
+                    * oface->vflow_gues * trans_sim
+                  + node->tenth_old * (1.0 - alpha_ener) 
+                    * oface->ther_old->rhomass() * oface->vflow_old * trans_sim);
+        
+      }
+    }
+
+    
+    // using Eigen::MatrixXd;
+    // using Eigen::VectorXd;
+    
+    for (size_t i = 0; i < circuit->nodes.size(); ++i) {
+      auto node = circuit->nodes[i];
+    
+       if (node->fixed_var.find("T") != node->fixed_var.end()) {
+        // node->update_statictemp();
+        // node->ther_gues->update(CoolProp::PT_INPUTS, node->spres_gues, node->stemp_gues);
+        // node->senth_gues = node->ther_gues->hmass();
+        // node->ther_gues->update(CoolProp::HmassP_INPUTS, node->senth_gues, node->spres_gues);
+        // if (circuit->flag_tp || dynamic_cast<TPTank*>(node)) node->ther_gues->update_sat();
+        // node->update_totalenth();
+        // node->Arow = A.row(i);
+        // node->brow = b(i);
+        // b(i) = node->tenth_gues;
+        // A.row(i).setZero();
+        // A(i, i) = 1.0;
+      } 
+      else if (node->fixed_var.find("H") != node->fixed_var.end()) {
+        // node->update_staticenth();
+        // node->ther_gues->update(CoolProp::HmassP_INPUTS, node->senth_gues, node->spres_gues);
+        // node->stemp_gues = node->ther_gues->T();
+        // if (circuit->flag_tp || dynamic_cast<TPTank*>(node)) node->ther_gues->update_sat();
+        // node->update_totaltemp();
+        // node->update_staticpres();
+        // node->Arow = A.row(i);
+        // node->brow = b(i);
+        // b(i) = node->tenth_gues;
+        // A.row(i).setZero();
+        // A(i, i) = 1.0;
+      } 
+      else if (node->fixed_var.find("msource") != node->fixed_var.end() || node->fixed_var.find("P") != node->fixed_var.end()) {
+        // if (node->msource > 0.0) {
+          // if (node->tenth_msrc.has_value()) {
+            // b(i) += node->tenth_msrc.value() * node->msource;
+          // } else {
+            // if (node->msource > 1.E-6) {
+              // std::cout << "warning: positive mass source condition assumed based on previous circuit condition "
+                        // << node->identifier << " tenth=" << node->tenth_gues << " " << node->msource << std::endl;
+            // }
+            // b(i) += node->tenth_old * node->msource;
+          // }
+        // } else {
+          // A(i, i) -= node->msource;
+          // if (A(i, i) < 0.0) {
+            // std::cerr << "negative coef. in energy solver. stopping" << std::endl;
+            // exit(EXIT_FAILURE);
+          // }
+        // }
+      }
+    }
+    
+/*     for (size_t i = 0; i < circuit->nodes.size(); ++i) {
+      auto node = circuit->nodes[i];
+      if (node->flowreg == "Homogeneous") {
+        for (size_t j = 0; j < circuit->nodes.size(); ++j) {
+          auto node1 = circuit->nodes[j];
+          if (node1->flowreg == "Slug") {
+            b(i) -= A(i, j) * node1->senth_gues;
+          }
+        }
+      }
+    }
+ */    
+/*     std::vector<int> nocal_ind;
+    for (int i = 0; i < A.cols(); ++i) {
+      if (A.col(i).sum() == 0.0) {
+        nocal_ind.push_back(i);
+      }
+    }
+ */    
+/*     // Removing disconnected nodes
+    for (auto it = nocal_ind.rbegin(); it != nocal_ind.rend(); ++it) {
+      A = removeRowCol(A, *it);  // removeRowCol is a custom function to remove row and column
+      b = removeElement(b, *it); // removeElement is a custom function to remove elements from b
+    }
+ */    
+    // double cond = A.fullPivLu().rcond();
+    // if (cond < 1.E8) {
+      // VectorXd enth = A.colPivHouseholderQr().solve(b);
+    // } else if (std::isinf(cond)) {
+      // std::cerr << "infinite condition number. check boundary conditions" << std::endl;
+      // exit(EXIT_FAILURE);
+    // } else {
+      // VectorXd enth_old = VectorXd::Zero(circuit->nodes.size());
+      // for (size_t i = 0; i < circuit->nodes.size(); ++i) {
+        // enth_old[i] = circuit->nodes[i]->tenth_gues;
+      // }
+      // removeElements(enth_old, nocal_ind);
+      // VectorXd enth = sor_solver(A, b, 0.8, enth_old, 1.E-8, 25);  // sor_solver is assumed to be defined
+    // }
+
+/*
+    // Remaining logic to handle matrix operations, boundary conditions, nocal_ind, energy update, etc.
+
+    // Solving the system and post-processing the results here...
+    if (A.determinant() != 0 && A.fullPivLu().isInvertible()) {
+      Eigen::VectorXd enth = A.fullPivLu().solve(b);
+      // Further updates and checks for enth values...
+    } else {
+      std::cerr << "Matrix is singular or ill-conditioned, please check boundary conditions.\n";
+      std::exit(EXIT_FAILURE);
+    }
+*/
+    }
 }
 
 }

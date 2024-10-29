@@ -80,6 +80,10 @@ public:
   
 };
 
+//==============================================================================
+//! \class PFace
+//==============================================================================
+
 class PFace : public Face {
 public:
   std::shared_ptr<Pipe> pipe;
@@ -94,6 +98,7 @@ public:
   double fricfact_gues;
   double opening;
   std::shared_ptr<Circuit> circuit;
+  std::shared_ptr<Wall> wall;
   
   PFace(int faceno, std::shared_ptr<Pipe> pipe, std::shared_ptr<Node> unode, double ufrac, std::shared_ptr<Node> dnode, double dfrac, 
     double diameter, double cfarea, double delx, double delz, double fricopt, double roughness);

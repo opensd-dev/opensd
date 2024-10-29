@@ -66,11 +66,11 @@ std::tuple<bool, std::tuple<double, double>> check_conv(double time, double delt
     
     for (auto& circuit : model::circuits) {
     for (auto& node : circuit->nodes) {
-      std::cout << node->identifier << " " << node->tpres_gues << std::endl;
+      // std::cout << node->identifier << " " << node->tpres_gues/1.E6 << std::endl;
     }
 
     for (auto& face : circuit->faces) {
-      std::cout << face->vflow_gues*face->ther_gues->rhomass() << std::endl;
+      // std::cout << face->vflow_gues*face->ther_gues->rhomass() << std::endl;
     }
 
 

@@ -8,7 +8,6 @@ int main(int argc, char* argv[])
   
   using namespace opensd;
   int err;
-
   err = opensd_init(argc, argv);
   
   opensd_run();

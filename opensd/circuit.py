@@ -319,6 +319,9 @@ class Circuit:
             for pipe in self.pipes:
                 pipe.to_xml_element(element)
 
+        # if self.faces:
+            # for face in self.faces:
+                # face.to_xml_element(element)
                 
         if self.bcs:
             for bc in self.bcs:

@@ -49,6 +49,10 @@ Circuit::Circuit(pugi::xml_node cir_node)
     this->pipes.push_back(std::make_shared<Pipe>(pipe));
   }
 
+  // for (pugi::xml_node face : cir_node.children("face")) {
+    // this->faces.push_back(std::make_shared<Face>(face));
+  // }
+
   for (pugi::xml_node bc : cir_node.children("bc")) {
     this->bcs.push_back(BC(bc));
   }
