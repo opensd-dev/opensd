@@ -65,12 +65,13 @@ kwargs = {
     'python_requires': '>=3.10',
     'install_requires': [
         'numpy', 'scipy', 'ipython',
-        'lxml'
+        'lxml','CoolProp',
     ],
     'extras_require': {
         'docs': ['sphinx', 'jupyter',
                  'sphinx-rtd-theme'],
-        'test': ['pytest'],
+        'test': ['pytest','Colorama',   
+                 'PDSim'],
     },
     # # Cython is used to add resonance reconstruction and fast float_endf
     # 'ext_modules': cythonize('openmc/data/*.pyx'),

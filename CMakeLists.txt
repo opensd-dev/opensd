@@ -42,4 +42,4 @@ target_include_directories(${EXENAME} PUBLIC externals/CoolProp/externals/Eigen)
 target_link_libraries(${EXENAME} CoolProp)
 target_link_libraries(${EXENAME} pugixml)
 
-# install(TARGETS ${EXENAME})
+install(TARGETS ${EXENAME})
