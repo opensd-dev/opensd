@@ -39,6 +39,7 @@ add_executable(${EXENAME} ${SOURCES})
 
 target_include_directories(${EXENAME} PUBLIC include)
 target_include_directories(${EXENAME} PUBLIC externals/CoolProp/externals/Eigen)
+target_include_directories(${EXENAME} PRIVATE ${CMAKE_SOURCE_DIR}/externals/CoolProp/include)
 target_link_libraries(${EXENAME} CoolProp)
 target_link_libraries(${EXENAME} pugixml)
 
