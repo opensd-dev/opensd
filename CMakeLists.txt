@@ -2,6 +2,16 @@ cmake_minimum_required(VERSION 3.10)
 
 project(OpenSD)
 
+# Find MPI
+find_package(MPI REQUIRED)
+
+if (MPI_FOUND)
+  message(STATUS "Found MPI: ${MPI_CXX_COMPILER}")
+else()
+  message(FATAL_ERROR "MPI not found!")
+endif()
+
+
 set(COOLPROP_STATIC_LIBRARY true)
 SET(EXENAME opensd)
 
@@ -37,9 +47,20 @@ add_subdirectory ("${CMAKE_SOURCE_DIR}/externals/CoolProp")
 file(GLOB SOURCES "src/*.cpp")
 add_executable(${EXENAME} ${SOURCES})
 
-target_include_directories(${EXENAME} PUBLIC include)
-target_include_directories(${EXENAME} PUBLIC externals/CoolProp/externals/Eigen)
-target_link_libraries(${EXENAME} CoolProp)
-target_link_libraries(${EXENAME} pugixml)
+target_include_directories(${EXENAME} PUBLIC
+  include
+  externals/CoolProp/externals/Eigen
+  externals/CoolProp/include
+  ${MPI_CXX_INCLUDE_DIRS}
+)
+
+
+target_link_libraries(${EXENAME}
+  PUBLIC
+    CoolProp
+    pugixml
+    MPI::MPI_CXX
+)
+
 
 # install(TARGETS ${EXENAME})

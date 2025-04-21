@@ -6,7 +6,7 @@
 #include <iostream>
 // #include <Eigen/Dense>
 #include <cstdlib>
-
+#include <mpi.h>
 #include "opensd/circuit.h"
 
 namespace opensd {
@@ -155,6 +155,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     int n = circuit->nodes.size();
     Eigen::MatrixXd A = Eigen::MatrixXd::Zero(n, n);
     Eigen::VectorXd b = Eigen::VectorXd::Zero(n);
+    
     for (int i = 0; i < n; ++i) {
       auto& node = circuit->nodes[i];
       // if (node.flowreg == "Slug") continue;

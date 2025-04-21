@@ -7,8 +7,8 @@
 
 #include "opensd/node.h"
 #include "opensd/pipe.h"
-#include "opensd/FaceTher.h"
-#include "opensd/Connection.h"
+#include "opensd/facether.h"
+#include "opensd/connection.h"
 #include "opensd/vector.h"
 
 namespace opensd {
