@@ -7,6 +7,8 @@
 #include <Eigen/Dense>   // For matrix manipulations
 #include <cstdlib>
 #include "opensd/vector.h"
+#include <mpi.h>
+
 #include "opensd/circuit.h"
 // #include <numeric>     // For std::accumulate
 // #include <copy>          // For std::copy in Arow and brow
@@ -158,6 +160,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     int n = circuit->nodes.size();
     Eigen::MatrixXd A = Eigen::MatrixXd::Zero(n, n);
     Eigen::VectorXd b = Eigen::VectorXd::Zero(n);
+    
     for (int i = 0; i < n; ++i) {
       auto& node = circuit->nodes[i];
       double B, D;
