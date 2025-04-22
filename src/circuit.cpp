@@ -86,6 +86,7 @@ void discretize_pipes() {
   for (auto& circuit : model::circuits) {
 	for (auto& pipe : circuit->pipes) {
       pipe->circuit = circuit;
+
 	  for (auto& node : circuit->nodes) {
 	    if (pipe->unode_str == node->identifier) {
 		  pipe->unode = node;
@@ -99,13 +100,13 @@ void discretize_pipes() {
 	    }
       }
 	  
-	  vector<std::shared_ptr<Node>> nodes;
-      for (int i = 0; i < pipe->ncell-1; ++i) {
+      vector<std::shared_ptr<Node>> nodes;
+      //for (int i = 0; i < pipe->ncell-1; ++i) {
         // Node node = Node();
         // node->identifier = identifier + "_node" + std::to_string(i);
         // node->height = unode->height + (dnode->height - unode->height) * (i + 1) / ncell;
         // nodes.push_back(node);
-      }
+      //}
       double ufrac;
       double dfrac;
       double cfarea = PI*std::pow(pipe->diameter,2)/4.;
@@ -117,11 +118,11 @@ void discretize_pipes() {
         if (i == 0 && pipe->ncell == 1) {
           pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->unode, ufrac, pipe->dnode, dfrac, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
         } else if (i == 0) {
-          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->unode, ufrac, nodes[0], -1, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
+          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->unode, ufrac, circuit->nodes[3], -1, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
         } else if (i == pipe->ncell-1) {
-          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, nodes[pipe->ncell-2], -1, pipe->dnode, dfrac, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
+          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, circuit->nodes[pipe->ncell-2+2], -1, pipe->dnode, dfrac, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
         } else {
-          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, nodes[i-1], -1, nodes[i], -1, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
+          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, circuit->nodes[i+2-1], -1, circuit->nodes[i+2], -1, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
         }
         circuit->faces.push_back(pipe->faces.back());
       }
