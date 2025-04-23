@@ -51,6 +51,7 @@ class Node(object):
         subelement.set("ttemp_old", str(self.ttemp_old))
         subelement.set("tenth_old", str(self.tenth_old))
         subelement.set("msource",   str(self.msource))
+        subelement.set("volume",    str(self.volume))
         subelement.set("fixed_var", ','.join(self.fixed_var))
 
 class Reservoir(Node):

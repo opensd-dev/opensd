@@ -102,10 +102,8 @@ Pipe::Pipe(pugi::xml_node pipe_node)
     }
 
     unode.ofaces.push_back(faces[0]);
-    unode.volume += 0.5 * delx * cfarea;
 
     dnode.ifaces.push_back(faces[ncell - 1]);
-    dnode.volume += 0.5 * delx * cfarea;
 
     mflow = 0.0;
  }*/

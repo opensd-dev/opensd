@@ -25,6 +25,7 @@ Node::Node(pugi::xml_node flnode_node)
     tpres_old  = stod(get_node_value(flnode_node, "tpres_old"));
     ttemp_old  = stod(get_node_value(flnode_node, "ttemp_old"));
     tenth_old  = stod(get_node_value(flnode_node, "tenth_old"));
+    volume     = stod(get_node_value(flnode_node, "volume"));
     msource    = stod(get_node_value(flnode_node, "msource"));
 
     pugi::xml_attribute fixed_var_attr = flnode_node.attribute("fixed_var");
@@ -42,7 +43,6 @@ Node::Node(pugi::xml_node flnode_node)
   }
   mresidue = 0.;
   mflow_in = 1.E-4;
-  volume = 0.;
 }
 
 

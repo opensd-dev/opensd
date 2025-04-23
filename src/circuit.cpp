@@ -127,17 +127,15 @@ void discretize_pipes() {
         circuit->faces.push_back(pipe->faces.back());
       }
 
-    /*   for (int i = 0; i < ncell-1; ++i) {
-        nodes[i].ifaces.push_back(&faces[i]);
-        nodes[i].ofaces.push_back(&faces[i+1]);
+      for (int i = 0; i < pipe->ncell-1; ++i) {
+        circuit->nodes[i+2]->ifaces.push_back(pipe->faces[i]);
+        circuit->nodes[i+2]->ofaces.push_back(pipe->faces[i+1]);
       }
-     */
+     
 
       pipe->unode->ofaces.push_back(pipe->faces[0]);
-      pipe->unode->volume += 0.5 * delx * cfarea;
     
       pipe->dnode->ifaces.push_back(pipe->faces[pipe->ncell-1]);
-      pipe->dnode->volume += 0.5 * delx * cfarea;
 	}
   }
 }

@@ -163,6 +163,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     
     for (int i = 0; i < n; ++i) {
       auto& node = circuit->nodes[i];
+      
       double B, D;
       if (node->ther_old->phase() == 6) {
         // B = node.B1 + node.volume * node.ther_old.first_two_phase_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node.ther_old.rhomass();
@@ -188,7 +189,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
           // }
         }
       }
-      
+
       for (auto& oface : node->ofaces) {
         A(i, oface->dnode->node_ind) = -alpha_mom * (oface->aplus * oface->ther_gues->rhomass() - oface->bplus * oface->vflow_gues);
         A(i, i) += alpha_mom * (oface->aminus * oface->ther_gues->rhomass() + oface->bminus * oface->vflow_gues);
@@ -211,6 +212,9 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         // }
       }
     }
+
+    // std::cout << "Matrix A:\n" << A << std::endl;
+    // std::cout << "b = \n" << b << std::endl;
 
     for (int i = 0; i < n; ++i) {
       auto& node = circuit->nodes[i];
