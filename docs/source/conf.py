@@ -17,6 +17,9 @@ extensions = [
     'sphinx.ext.mathjax',
     'nbsphinx', 
     'sphinx.ext.autodoc',
+    'sphinxcontrib.katex',
+    'sphinx_numfig',
+    'sphinxcontrib.bibtex'
 ]
 
 nbsphinx_execute = 'never'
@@ -26,6 +29,7 @@ source_suffix = ['.rst', '.md']
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', '**.ipynb_checkpoints']
+bibtex_bibfiles = ['references.bib']
 
 
 # -- Options for HTML output -------------------------------------------------
