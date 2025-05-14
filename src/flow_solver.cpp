@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>         // For std::isinf and other math functions
 #include <iostream>
+#include <iomanip>
 #include <Eigen/Dense>   // For matrix manipulations
 #include <cstdlib>
 #include "opensd/vector.h"
@@ -126,7 +127,13 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
         Eigen::LevenbergMarquardt<Eigen::NumericalDiff<FaceFunctor>> lm(numDiff);
   
         int info = lm.minimize(x);
+        if (info <= 0) {
+          std::cerr << "LM failed to converge: info = " << info << std::endl;
+        }
+        
         face->vflow_gues = x(0);
+//        auto pface = std::static_pointer_cast<PFace>(face);
+//        std::cout << std::defaultfloat << std::setprecision(10) << "pdnode = "   << pface->dnode->tpres_gues << std::endl;
   
         // if (face.opening == 0.0) continue;
         // if (branch.isolated && !trans_sim) {
@@ -213,8 +220,6 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       }
     }
 
-    // std::cout << "Matrix A:\n" << A << std::endl;
-    // std::cout << "b = \n" << b << std::endl;
 
     for (int i = 0; i < n; ++i) {
       auto& node = circuit->nodes[i];
@@ -263,6 +268,9 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     // Assign the new vector back to b
     b = b_new;
 
+//    std::cout << "Matrix A:\n" << A << std::endl;
+//    std::cout << "b = \n" << b << std::endl;
+
     Eigen::VectorXd pc;
     if (A.fullPivLu().isInvertible()) {
       pc = A.lu().solve(b);
@@ -272,6 +280,13 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     
     // Insert zeros at boundary indices
     pc = insertZerosAtIndices(pc, circuit->Pbound_ind);
+    
+    
+//    std::cout << "pc = \n" << pc << std::endl;
+    
+//    if (flow_iter == 1) {
+//      std::exit(0);
+//    }
 
     // Flow rate corrections
     for (auto& face : circuit->faces) {

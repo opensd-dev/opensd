@@ -118,7 +118,7 @@ void discretize_pipes() {
         if (i == 0 && pipe->ncell == 1) {
           pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->unode, ufrac, pipe->dnode, dfrac, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
         } else if (i == 0) {
-          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->unode, ufrac, circuit->nodes[3], -1, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
+          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->unode, ufrac, circuit->nodes[2], -1, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
         } else if (i == pipe->ncell-1) {
           pipe->faces.push_back(std::make_shared<PFace>(i, pipe, circuit->nodes[pipe->ncell-2+2], -1, pipe->dnode, dfrac, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
         } else {

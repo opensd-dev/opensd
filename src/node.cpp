@@ -119,8 +119,8 @@ void Node::assign_staticvar() {
 }
 
 void Node::assign_prop() {
-  ther_gues = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("BICUBIC&HEOS", "Air"));
-  ther_old = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("BICUBIC&HEOS", "Air"));
+  ther_gues = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("BICUBIC&HEOS", "Water"));
+  ther_old = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("BICUBIC&HEOS", "Water"));
   ther_old->update(CoolProp::HmassP_INPUTS,senth_old,spres_old);
 }
 
