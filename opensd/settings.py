@@ -3,6 +3,7 @@ import numpy as np
 from numbers import Integral
 from pathlib import Path
 import lxml.etree as ET
+from collections import abc
 
 import opensd.checkvalue as cv
 from ._xml import clean_indentation, reorder_attributes
@@ -25,7 +26,7 @@ class Settings:
 
     Attributes
     ----------
-    tim_slot : np.array()
+    tim_slot : list of list of delt,etime
         Time slot.
     run_mode : {'steady', 'design', 'sensitivity', 'optimize', 'transient restart'}
         The type of calculation to perform (default is 'steady')
@@ -38,7 +39,7 @@ class Settings:
     def __init__(self, **kwargs):
         
         self._run_mode = RunMode.STEADY
-        self._tim_slot = [0.]
+        self._tim_slot = [[0.,0.]]
         self._verbosity = 0
 
         self._no_main_iter = 2500
@@ -124,7 +125,8 @@ class Settings:
 
     def _create_tim_slot_subelement(self, root):
         elem = ET.SubElement(root, "tim_slot")
-        elem.text = ' '.join(map(str, self._tim_slot))
+        flat_list = [str(val) for pair in self._tim_slot for val in pair]
+        elem.text = ' '.join(flat_list)
 
     def _create_verbosity_subelement(self, root):
         if self._verbosity is not None:
@@ -174,3 +176,24 @@ class Settings:
     def temp_solve(self, temp_solve: bool):
         cv.check_type('temperature solver', temp_solve, bool)
         self._temp_solve = temp_solve
+
+    @property
+    def tim_slot(self):
+        return self._tim_slot
+
+    @tim_slot.setter
+    def tim_slot(self, tim_slot):
+        # Require a sequence (e.g. list or tuple)
+        cv.check_type('tim_slot', tim_slot, abc.Sequence)
+        if len(tim_slot) == 0:
+            raise TypeError('tim_slot cannot be empty')
+
+        for pair in tim_slot:
+            cv.check_type('tim_slot item', pair, abc.Sequence)
+            if len(pair) != 2:
+                raise TypeError(f'Each "tim_slot" item must be a [dt, t_end] pair, got {pair}')
+            dt, t_end = pair
+            cv.check_type('dt', dt, (int, float))
+            cv.check_type('t_end', t_end, (int, float))
+
+        self._tim_slot = tim_slot
