@@ -11,7 +11,8 @@ essential aspects of using OpenMC to perform simulations.
     :numbered:
     :maxdepth: 1
 
-    data
+    install
+	data
     basics
     geometry
     settings
