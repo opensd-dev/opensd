@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 project(OpenSD)
 
-# Find MPI
+find_package(Boost REQUIRED COMPONENTS serialization)
 find_package(MPI REQUIRED)
 
 if (MPI_FOUND)
@@ -12,7 +12,7 @@ else()
 endif()
 
 
-set(COOLPROP_STATIC_LIBRARY true)
+set(COOLPROP_STATIC_LIBRARY ON CACHE BOOL "" FORCE)
 SET(EXENAME opensd)
 
 
@@ -51,8 +51,9 @@ target_include_directories(${EXENAME} PUBLIC
   include
   externals/CoolProp/externals/Eigen
   externals/CoolProp/include
-  external/fmtlib
+#  externals/fmtlib
   ${MPI_CXX_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIRS}
 )
 
 target_link_libraries(${EXENAME}
@@ -60,6 +61,7 @@ target_link_libraries(${EXENAME}
     CoolProp
     pugixml
     MPI::MPI_CXX
+    Boost::serialization
 )
 
 install(TARGETS ${EXENAME})

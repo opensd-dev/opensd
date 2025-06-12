@@ -11,6 +11,10 @@
 #include "opensd/convergence.h"
 #include "opensd/flow_solver.h"
 #include "opensd/post.h"
+#include "opensd/circuit.h"
+#include <boost/archive/text_oarchive.hpp>
+
+#include <boost/archive/text_iarchive.hpp>
 
 //==============================================================================
 // C API functions
@@ -117,7 +121,25 @@ int opensd_run()
   }
   
   std::cout << "Execution time = " << (std::clock() - start_time) / (double)CLOCKS_PER_SEC << std::endl;
-    
+
+{
+  std::ofstream ofs("data.txt");
+  boost::archive::text_oarchive oa(ofs);
+  oa << model::circuits;
+}
+
+model::circuits.clear();
+
+{
+  std::ifstream ifs("data.txt");
+  boost::archive::text_iarchive ia(ifs);
+  ia >> model::circuits;
+}
+
+  std::cout << "Circuits after load: " << model::circuits.size() << std::endl;
+  if (!model::circuits.empty())
+    std::cout << "First circuit ID: " << model::circuits[0]->identifier << std::endl;
+
   return 0;
 
 }

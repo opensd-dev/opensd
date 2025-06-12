@@ -10,6 +10,15 @@
 #include "opensd/face.h"
 #include "opensd/vector.h"
 
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/shared_ptr.hpp>
+#include <boost/serialization/string.hpp>
+
+#include <boost/serialization/serialization.hpp>
+
+
 namespace opensd {
 
 //==============================================================================
@@ -31,7 +40,7 @@ public:
   std::string identifier; //!< User-defined identifier
   std::string flname;
   explicit Circuit(pugi::xml_node cir_node);
-  // Circuit() = default;
+  Circuit() = default;
   double eps_m;
   double mean_flow;
   double eps_h;
@@ -43,6 +52,24 @@ public:
   vector<int> Pbound_ind;
 
 protected:
+
+private:
+  friend class boost::serialization::access;
+
+  template<class Archive>
+  void serialize(Archive& ar, const unsigned int version) {
+    ar & identifier;
+    ar & flname;
+    ar & eps_m;
+    ar & mean_flow;
+    ar & eps_h;
+    ar & eps_p;
+//    ar & nodes;
+//    ar & pipes;
+//    ar & bcs;
+//    ar & faces;
+    ar & Pbound_ind;
+  }
 
 };
 
