@@ -11,6 +11,14 @@
 #include "AbstractState.h"
 #include "crossplatform_shared_ptr.h"
 
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/shared_ptr.hpp>
+#include <boost/serialization/string.hpp>
+
+#include <boost/serialization/serialization.hpp>
+
 namespace opensd {
 
 //==============================================================================
@@ -74,6 +82,43 @@ public:
   void assign_staticvar();
   void update_staticvar();
   void assign_prop();
+
+private:  
+friend class boost::serialization::access;
+
+  template<class Archive>
+  void serialize(Archive& ar, const unsigned int version) {
+    ar & identifier;
+    ar & mresidue;
+    ar & msource;
+    // ar & ifaces;
+    // ar & ofaces;
+    ar & mflow_in;
+    ar & mflow_out;
+    ar & node_ind;
+
+    ar & tpres_old;
+    ar & ttemp_old;
+    ar & tenth_old;
+    ar & tpres_gues;
+    ar & ttemp_gues;
+    ar & tenth_gues;
+
+    ar & spres_old;
+    ar & stemp_old;
+    ar & senth_old;
+    ar & spres_gues;
+    ar & stemp_gues;
+    ar & senth_gues;
+
+    ar & heat_input;
+    ar & elevation;
+    ar & fixed_var;
+    ar & esource;
+    ar & hresidue;
+    ar & volume;
+  }
+  
 };
 
 //==============================================================================

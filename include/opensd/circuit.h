@@ -18,6 +18,7 @@
 
 #include <boost/serialization/serialization.hpp>
 
+#include <boost/serialization/set.hpp>
 
 namespace opensd {
 
@@ -64,7 +65,7 @@ private:
     ar & mean_flow;
     ar & eps_h;
     ar & eps_p;
-//    ar & nodes;
+    ar & nodes;
 //    ar & pipes;
 //    ar & bcs;
 //    ar & faces;
