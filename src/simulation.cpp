@@ -15,6 +15,8 @@
 #include <boost/archive/text_oarchive.hpp>
 
 #include <boost/archive/text_iarchive.hpp>
+#include <boost/serialization/export.hpp>
+BOOST_CLASS_EXPORT(opensd::PFace)
 
 //==============================================================================
 // C API functions
@@ -127,7 +129,36 @@ int opensd_run()
   boost::archive::text_oarchive oa(ofs);
   oa << model::circuits;
 }
+for (size_t i = 0; i < model::circuits.size(); ++i) {
+  const auto& circuit = model::circuits[i];
+  std::cout << "Circuit [" << i << "] ID: " << circuit->identifier << std::endl;
+  std::cout << "  Nodes in circuit: " << circuit->nodes.size() << std::endl;
 
+  for (size_t j = 0; j < circuit->nodes.size(); ++j) {
+    const auto& node = circuit->nodes[j];
+    std::cout << "    Node [" << j << "] ID: " << node->identifier << std::endl;
+  }
+
+  std::cout << "  Pipes in circuit: " << circuit->pipes.size() << std::endl;
+  for (size_t j = 0; j < circuit->pipes.size(); ++j) {
+    const auto& pipe = circuit->pipes[j];
+    std::cout << "    Pipe [" << j << "] ID: " << pipe->identifier << std::endl;
+    std::cout << "      Faces in pipe: " << pipe->faces.size() << std::endl;
+
+    for (size_t k = 0; k < pipe->faces.size(); ++k) {
+      const auto& face = pipe->faces[k];
+      std::cout << "        Face [" << k << "] faceno: " << face->faceno << std::endl;
+
+      if (face->unode)
+        std::cout << "          Upstream Node: " << face->unode->identifier << " (ufrac: " << face->ufrac << ")\n";
+
+      if (face->dnode)
+        std::cout << "          Downstream Node: " << face->dnode->identifier << " (dfrac: " << face->dfrac << ")\n";
+
+      std::cout << "          mflow: " << face->mflow << ", velocity: " << face->velocity << std::endl;
+    }
+  }
+}
 model::circuits.clear();
 
 {
@@ -141,8 +172,8 @@ model::circuits.clear();
 for (size_t i = 0; i < model::circuits.size(); ++i) {
   const auto& circuit = model::circuits[i];
   std::cout << "Circuit [" << i << "] ID: " << circuit->identifier << std::endl;
-
   std::cout << "  Nodes in circuit: " << circuit->nodes.size() << std::endl;
+
   for (size_t j = 0; j < circuit->nodes.size(); ++j) {
     const auto& node = circuit->nodes[j];
     std::cout << "    Node [" << j << "] ID: " << node->identifier << std::endl;
@@ -152,15 +183,20 @@ for (size_t i = 0; i < model::circuits.size(); ++i) {
   for (size_t j = 0; j < circuit->pipes.size(); ++j) {
     const auto& pipe = circuit->pipes[j];
     std::cout << "    Pipe [" << j << "] ID: " << pipe->identifier << std::endl;
-  }
+    std::cout << "      Faces in pipe: " << pipe->faces.size() << std::endl;
 
-  std::cout << "  BCs in circuit: " << circuit->bcs.size() << std::endl;
-  for (size_t j = 0; j < circuit->bcs.size(); ++j) {
-    const auto& bc = circuit->bcs[j];
-    std::cout << "    BC [" << j << "] ID: " << bc.identifier
-              << ", Node: " << bc.node_
-              << ", Variable: " << bc.var_
-              << ", Value: " << bc.val_ << std::endl;
+    for (size_t k = 0; k < pipe->faces.size(); ++k) {
+      const auto& face = pipe->faces[k];
+      std::cout << "        Face [" << k << "] faceno: " << face->faceno << std::endl;
+
+      if (face->unode)
+        std::cout << "          Upstream Node: " << face->unode->identifier << " (ufrac: " << face->ufrac << ")\n";
+
+      if (face->dnode)
+        std::cout << "          Downstream Node: " << face->dnode->identifier << " (dfrac: " << face->dfrac << ")\n";
+
+      std::cout << "          mflow: " << face->mflow << ", velocity: " << face->velocity << std::endl;
+    }
   }
 }
 

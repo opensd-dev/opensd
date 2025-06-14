@@ -68,7 +68,7 @@ private:
     ar & nodes;
     ar & pipes;
     ar & bcs;
-//    ar & faces;
+    ar & faces;
     ar & Pbound_ind;
   }
 

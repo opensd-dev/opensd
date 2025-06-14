@@ -64,7 +64,7 @@ void serialize(Archive& ar, const unsigned int version) {
   ar & unode;
   ar & dnode;
   ar & circuit;
-  // ar & faces;
+  ar & faces;
   ar & ufrac;
   ar & dfrac;
   ar & npar;
