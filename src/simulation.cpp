@@ -151,21 +151,16 @@ for (size_t i = 0; i < model::circuits.size(); ++i) {
   std::cout << "  Pipes in circuit: " << circuit->pipes.size() << std::endl;
   for (size_t j = 0; j < circuit->pipes.size(); ++j) {
     const auto& pipe = circuit->pipes[j];
-    std::cout << "    Pipe [" << j << "] ID: " << pipe->identifier
-              << ", length = " << pipe->length
-              << ", diameter = " << pipe->diameter;
+    std::cout << "    Pipe [" << j << "] ID: " << pipe->identifier << std::endl;
+  }
 
-    if (pipe->unode)
-      std::cout << ", unode = " << pipe->unode->identifier;
-    else
-      std::cout << ", unode = (null)";
-
-    if (pipe->dnode)
-      std::cout << ", dnode = " << pipe->dnode->identifier;
-    else
-      std::cout << ", dnode = (null)";
-
-    std::cout << std::endl;
+  std::cout << "  BCs in circuit: " << circuit->bcs.size() << std::endl;
+  for (size_t j = 0; j < circuit->bcs.size(); ++j) {
+    const auto& bc = circuit->bcs[j];
+    std::cout << "    BC [" << j << "] ID: " << bc.identifier
+              << ", Node: " << bc.node_
+              << ", Variable: " << bc.var_
+              << ", Value: " << bc.val_ << std::endl;
   }
 }
 
