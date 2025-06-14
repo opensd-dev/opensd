@@ -137,18 +137,37 @@ model::circuits.clear();
 }
 
   std::cout << "Circuits after load: " << model::circuits.size() << std::endl;
-  std::cout << "Circuits after load: " << model::circuits.size() << std::endl;
   
-  for (size_t i = 0; i < model::circuits.size(); ++i) {
-    const auto& circuit = model::circuits[i];
-    std::cout << "Circuit [" << i << "] ID: " << circuit->identifier << std::endl;
-    std::cout << "  Nodes in circuit: " << circuit->nodes.size() << std::endl;
-  
-    for (size_t j = 0; j < circuit->nodes.size(); ++j) {
-      const auto& node = circuit->nodes[j];
-      std::cout << "    Node [" << j << "] ID: " << node->identifier << std::endl;
-    }
+for (size_t i = 0; i < model::circuits.size(); ++i) {
+  const auto& circuit = model::circuits[i];
+  std::cout << "Circuit [" << i << "] ID: " << circuit->identifier << std::endl;
+
+  std::cout << "  Nodes in circuit: " << circuit->nodes.size() << std::endl;
+  for (size_t j = 0; j < circuit->nodes.size(); ++j) {
+    const auto& node = circuit->nodes[j];
+    std::cout << "    Node [" << j << "] ID: " << node->identifier << std::endl;
   }
+
+  std::cout << "  Pipes in circuit: " << circuit->pipes.size() << std::endl;
+  for (size_t j = 0; j < circuit->pipes.size(); ++j) {
+    const auto& pipe = circuit->pipes[j];
+    std::cout << "    Pipe [" << j << "] ID: " << pipe->identifier
+              << ", length = " << pipe->length
+              << ", diameter = " << pipe->diameter;
+
+    if (pipe->unode)
+      std::cout << ", unode = " << pipe->unode->identifier;
+    else
+      std::cout << ", unode = (null)";
+
+    if (pipe->dnode)
+      std::cout << ", dnode = " << pipe->dnode->identifier;
+    else
+      std::cout << ", dnode = (null)";
+
+    std::cout << std::endl;
+  }
+}
 
   return 0;
 

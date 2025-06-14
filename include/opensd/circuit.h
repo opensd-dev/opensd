@@ -66,7 +66,7 @@ private:
     ar & eps_h;
     ar & eps_p;
     ar & nodes;
-//    ar & pipes;
+    ar & pipes;
 //    ar & bcs;
 //    ar & faces;
     ar & Pbound_ind;

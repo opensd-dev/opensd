@@ -52,6 +52,30 @@ public:
   
   
 protected:
+friend class boost::serialization::access;
+template <class Archive>
+void serialize(Archive& ar, const unsigned int version) {
+  ar & identifier;
+  ar & dnode_str;
+  ar & unode_str;
+  ar & diameter;
+  ar & length;
+  ar & ncell;
+  ar & unode;
+  ar & dnode;
+  ar & circuit;
+  // ar & faces;
+  ar & ufrac;
+  ar & dfrac;
+  ar & npar;
+  ar & qcrit;
+  ar & Kforward_old;
+  ar & Kforward;
+  ar & heat_input;
+  ar & mflow;
+  ar & cfarea1;
+  ar & roughness;
+}
 
 };
 
