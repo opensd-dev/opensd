@@ -11,7 +11,8 @@ hid_t create_or_open_file(const std::string& filename) {
 }
 
 void close_file(hid_t file_id) {
-  H5Fclose(file_id);
+  herr_t status = H5Fclose(file_id);
+  if (status < 0) std::cerr << "Warning: Failed to close HDF5 file.\n";
 }
 
 void write_string(hid_t loc_id, const std::string& name, const std::string& value) {
@@ -20,8 +21,9 @@ void write_string(hid_t loc_id, const std::string& name, const std::string& valu
 }
 
 std::string read_string(hid_t loc_id, const std::string& name) {
-  char buffer[1024];
-  H5LTread_dataset_string(loc_id, name.c_str(), buffer);
+  char buffer[1024];  // Fixed-size buffer; adjust if needed
+  herr_t status = H5LTread_dataset_string(loc_id, name.c_str(), buffer);
+  if (status < 0) throw std::runtime_error("Failed to read string: " + name);
   return std::string(buffer);
 }
 
@@ -40,10 +42,9 @@ double read_scalar(hid_t loc_id, const std::string& name) {
 
 void write_vector(hid_t loc_id, const std::string& name, const std::vector<int>& vec) {
   if (vec.empty()) {
-    std::cerr << "Warning: not writing vector '" << name << "' because it's empty.\n";
+    std::cerr << "Warning: vector '" << name << "' is empty; skipping write.\n";
     return;
   }
-
   hsize_t dim = vec.size();
   herr_t status = H5LTmake_dataset_int(loc_id, name.c_str(), 1, &dim, vec.data());
   if (status < 0) throw std::runtime_error("Failed to write vector: " + name);
@@ -51,9 +52,13 @@ void write_vector(hid_t loc_id, const std::string& name, const std::vector<int>&
 
 std::vector<int> read_vector_int(hid_t loc_id, const std::string& name) {
   hsize_t dim;
-  H5LTget_dataset_info(loc_id, name.c_str(), &dim, nullptr, nullptr);
+  herr_t status = H5LTget_dataset_info(loc_id, name.c_str(), &dim, nullptr, nullptr);
+  if (status < 0) throw std::runtime_error("Failed to get dataset info for: " + name);
+
   std::vector<int> vec(dim);
-  H5LTread_dataset_int(loc_id, name.c_str(), vec.data());
+  status = H5LTread_dataset_int(loc_id, name.c_str(), vec.data());
+  if (status < 0) throw std::runtime_error("Failed to read vector: " + name);
+
   return vec;
 }
 
