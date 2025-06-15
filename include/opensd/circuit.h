@@ -9,8 +9,7 @@
 #include "opensd/bc.h"
 #include "opensd/face.h"
 #include "opensd/vector.h"
-#include <H5Cpp.h>
-#include <memory> 
+#include "hdf5_interface.h"
 
 namespace opensd {
 
@@ -44,8 +43,8 @@ public:
   vector<std::shared_ptr<Face>> faces;
   vector<int> Pbound_ind;
 
-  void save_to_hdf5(H5::Group& parent, size_t index) const;
-  void load_from_hdf5(const H5::Group& parent, size_t index);
+  void save_to_hdf5(hid_t group_id) const;
+  void load_from_hdf5(hid_t group_id);
 
 protected:
 

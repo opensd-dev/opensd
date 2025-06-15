@@ -4,7 +4,7 @@ project(OpenSD)
 
 # Find MPI
 find_package(MPI REQUIRED)
-find_package(HDF5 REQUIRED COMPONENTS CXX)
+find_package(HDF5 REQUIRED COMPONENTS C HL)
 
 if (MPI_FOUND)
   message(STATUS "Found MPI: ${MPI_CXX_COMPILER}")
@@ -63,7 +63,7 @@ target_link_libraries(${EXENAME}
     CoolProp
     pugixml
     MPI::MPI_CXX
-	${HDF5_CXX_LIBRARIES}
+	${HDF5_C_LIBRARIES} ${HDF5_HL_LIBRARIES}
 )
 
 install(TARGETS ${EXENAME})

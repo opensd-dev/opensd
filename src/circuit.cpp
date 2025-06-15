@@ -1,12 +1,12 @@
 //! \file circuit.cpp
 
-#include "opensd/circuit.h"
-using namespace H5;
+#include "opensd/hdf5_interface.h"
 
 #include <iostream>
 #include <cmath>
 #include <cstdlib>
 
+#include "opensd/circuit.h"
 #include "opensd/node.h"
 #include "opensd/pipe.h"
 #include "opensd/bc.h"
@@ -160,65 +160,129 @@ for (auto& circuit : model::circuits) {
 }
 
 
-void Circuit::save_to_hdf5(H5::Group& parent, size_t index) const {
-  // Create a group named "circuit_0", "circuit_1", etc.
-  std::string group_name = "circuit_" + std::to_string(index);
-  H5::Group g = parent.createGroup(group_name);
+void Circuit::save_to_hdf5(hid_t group_id) const {
+  write_string(group_id, "identifier", identifier);
+  write_string(group_id, "flname", flname);
+  write_scalar(group_id, "eps_m", eps_m);
+  write_scalar(group_id, "mean_flow", mean_flow);
+  write_scalar(group_id, "eps_h", eps_h);
+  write_scalar(group_id, "eps_p", eps_p);
+  write_vector(group_id, "Pbound_ind", Pbound_ind);
 
-  // Save string attributes
-  H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
-  H5::DataSpace scalar_space = H5::DataSpace(H5S_SCALAR);
-
-  H5::DataSet id_ds = g.createDataSet("identifier", str_type, scalar_space);
-  id_ds.write(identifier, str_type);
-
-  H5::DataSet fname_ds = g.createDataSet("flname", str_type, scalar_space);
-  fname_ds.write(flname, str_type);
-
-  // Save scalars
-  g.createDataSet("eps_m", H5::PredType::NATIVE_DOUBLE, scalar_space).write(&eps_m, H5::PredType::NATIVE_DOUBLE);
-  g.createDataSet("mean_flow", H5::PredType::NATIVE_DOUBLE, scalar_space).write(&mean_flow, H5::PredType::NATIVE_DOUBLE);
-  g.createDataSet("eps_h", H5::PredType::NATIVE_DOUBLE, scalar_space).write(&eps_h, H5::PredType::NATIVE_DOUBLE);
-  g.createDataSet("eps_p", H5::PredType::NATIVE_DOUBLE, scalar_space).write(&eps_p, H5::PredType::NATIVE_DOUBLE);
-
-  // Save Pbound_ind
-  if (!Pbound_ind.empty()) {
-    hsize_t dims[1] = {Pbound_ind.size()};
-    H5::DataSpace space(1, dims);
-    H5::DataSet pb_ds = g.createDataSet("Pbound_ind", H5::PredType::NATIVE_INT, space);
-    pb_ds.write(Pbound_ind.data(), H5::PredType::NATIVE_INT);
+/*   // Save Nodes
+  hid_t node_group = H5Gcreate(group_id, "nodes", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  for (size_t i = 0; i < nodes.size(); ++i) {
+    std::string name = "node_" + std::to_string(i);
+    hid_t ngrp = H5Gcreate(node_group, name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    nodes[i]->save_to_hdf5(ngrp);
+    H5Gclose(ngrp);
   }
+  H5Gclose(node_group);
+
+  // Save Pipes
+  hid_t pipe_group = H5Gcreate(group_id, "pipes", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  for (size_t i = 0; i < pipes.size(); ++i) {
+    std::string name = "pipe_" + std::to_string(i);
+    hid_t pgrp = H5Gcreate(pipe_group, name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    pipes[i]->save_to_hdf5(pgrp);
+    H5Gclose(pgrp);
+  }
+  H5Gclose(pipe_group);
+
+  // Save BCs
+  hid_t bc_group = H5Gcreate(group_id, "bcs", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  for (size_t i = 0; i < bcs.size(); ++i) {
+    std::string name = "bc_" + std::to_string(i);
+    hid_t bcgrp = H5Gcreate(bc_group, name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    bcs[i].save_to_hdf5(bcgrp);
+    H5Gclose(bcgrp);
+  }
+  H5Gclose(bc_group);
+
+  // Save Faces
+  hid_t face_group = H5Gcreate(group_id, "faces", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  for (size_t i = 0; i < faces.size(); ++i) {
+    std::string name = "face_" + std::to_string(i);
+    hid_t fgrp = H5Gcreate(face_group, name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    faces[i]->save_to_hdf5(fgrp);
+    H5Gclose(fgrp);
+  }
+   H5Gclose(face_group);
+ */
 }
 
-void Circuit::load_from_hdf5(const H5::Group& parent, size_t index) {
-  std::string group_name = "circuit_" + std::to_string(index);
-  H5::Group g = parent.openGroup(group_name);
+void Circuit::load_from_hdf5(hid_t group_id) {
+  identifier = read_string(group_id, "identifier");
+  flname = read_string(group_id, "flname");
+  eps_m = read_scalar(group_id, "eps_m");
+  mean_flow = read_scalar(group_id, "mean_flow");
+  eps_h = read_scalar(group_id, "eps_h");
+  eps_p = read_scalar(group_id, "eps_p");
+  Pbound_ind = read_vector_int(group_id, "Pbound_ind");
 
-  // String attributes
-  H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
-  H5::DataSpace scalar_space(H5S_SCALAR);
-
-  H5::DataSet id_ds = g.openDataSet("identifier");
-  id_ds.read(identifier, str_type);
-
-  H5::DataSet fname_ds = g.openDataSet("flname");
-  fname_ds.read(flname, str_type);
-
-  // Scalars
-  g.openDataSet("eps_m").read(&eps_m, H5::PredType::NATIVE_DOUBLE);
-  g.openDataSet("mean_flow").read(&mean_flow, H5::PredType::NATIVE_DOUBLE);
-  g.openDataSet("eps_h").read(&eps_h, H5::PredType::NATIVE_DOUBLE);
-  g.openDataSet("eps_p").read(&eps_p, H5::PredType::NATIVE_DOUBLE);
-
-  // Pbound_ind
-  if (g.nameExists("Pbound_ind")) {
-    H5::DataSet pb_ds = g.openDataSet("Pbound_ind");
-    H5::DataSpace pb_space = pb_ds.getSpace();
-    hsize_t dims[1];
-    pb_space.getSimpleExtentDims(dims);
-    Pbound_ind.resize(dims[0]);
-    pb_ds.read(Pbound_ind.data(), H5::PredType::NATIVE_INT);
+/*   // Load Nodes
+  nodes.clear();
+  hid_t node_group = H5Gopen(group_id, "nodes", H5P_DEFAULT);
+  size_t i = 0;
+  while (true) {
+    std::string name = "node_" + std::to_string(i);
+    if (H5Lexists(node_group, name.c_str(), H5P_DEFAULT) <= 0) break;
+    hid_t ngrp = H5Gopen(node_group, name.c_str(), H5P_DEFAULT);
+    auto node = std::make_shared<Node>();
+    node->load_from_hdf5(ngrp);
+    nodes.push_back(node);
+    H5Gclose(ngrp);
+    ++i;
   }
-}
+  H5Gclose(node_group);
+
+  // Load Pipes
+  pipes.clear();
+  hid_t pipe_group = H5Gopen(group_id, "pipes", H5P_DEFAULT);
+  i = 0;
+  while (true) {
+    std::string name = "pipe_" + std::to_string(i);
+    if (H5Lexists(pipe_group, name.c_str(), H5P_DEFAULT) <= 0) break;
+    hid_t pgrp = H5Gopen(pipe_group, name.c_str(), H5P_DEFAULT);
+    auto pipe = std::make_shared<Pipe>();
+    pipe->load_from_hdf5(pgrp);
+    pipes.push_back(pipe);
+    H5Gclose(pgrp);
+    ++i;
+  }
+  H5Gclose(pipe_group);
+
+  // Load BCs
+  bcs.clear();
+  hid_t bc_group = H5Gopen(group_id, "bcs", H5P_DEFAULT);
+  i = 0;
+  while (true) {
+    std::string name = "bc_" + std::to_string(i);
+    if (H5Lexists(bc_group, name.c_str(), H5P_DEFAULT) <= 0) break;
+    hid_t bcgrp = H5Gopen(bc_group, name.c_str(), H5P_DEFAULT);
+    BC bc;
+    bc.load_from_hdf5(bcgrp);
+    bcs.push_back(bc);
+    H5Gclose(bcgrp);
+    ++i;
+  }
+  H5Gclose(bc_group);
+
+  // Load Faces
+  faces.clear();
+  hid_t face_group = H5Gopen(group_id, "faces", H5P_DEFAULT);
+  i = 0;
+  while (true) {
+    std::string name = "face_" + std::to_string(i);
+    if (H5Lexists(face_group, name.c_str(), H5P_DEFAULT) <= 0) break;
+    hid_t fgrp = H5Gopen(face_group, name.c_str(), H5P_DEFAULT);
+    auto face = std::make_shared<Face>();
+    face->load_from_hdf5(fgrp);
+    faces.push_back(face);
+    H5Gclose(fgrp);
+    ++i;
+  }
+  H5Gclose(face_group);
+ */}
 
 } // namespace opensd
