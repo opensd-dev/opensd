@@ -4,6 +4,7 @@ project(OpenSD)
 
 # Find MPI
 find_package(MPI REQUIRED)
+find_package(HDF5 REQUIRED COMPONENTS CXX)
 
 if (MPI_FOUND)
   message(STATUS "Found MPI: ${MPI_CXX_COMPILER}")
@@ -43,6 +44,8 @@ endif()
 
 
 add_subdirectory ("${CMAKE_SOURCE_DIR}/externals/CoolProp")
+include_directories(${HDF5_INCLUDE_DIRS})
+include_directories(include)
 
 file(GLOB SOURCES "src/*.cpp")
 add_executable(${EXENAME} ${SOURCES})
@@ -60,6 +63,7 @@ target_link_libraries(${EXENAME}
     CoolProp
     pugixml
     MPI::MPI_CXX
+	${HDF5_CXX_LIBRARIES}
 )
 
 install(TARGETS ${EXENAME})

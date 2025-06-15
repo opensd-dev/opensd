@@ -9,6 +9,8 @@
 #include "opensd/bc.h"
 #include "opensd/face.h"
 #include "opensd/vector.h"
+#include <H5Cpp.h>
+#include <memory> 
 
 namespace opensd {
 
@@ -31,7 +33,7 @@ public:
   std::string identifier; //!< User-defined identifier
   std::string flname;
   explicit Circuit(pugi::xml_node cir_node);
-  // Circuit() = default;
+  Circuit() = default;
   double eps_m;
   double mean_flow;
   double eps_h;
@@ -41,6 +43,9 @@ public:
   vector<BC> bcs;
   vector<std::shared_ptr<Face>> faces;
   vector<int> Pbound_ind;
+
+  void save_to_hdf5(H5::Group& parent, size_t index) const;
+  void load_from_hdf5(const H5::Group& parent, size_t index);
 
 protected:
 

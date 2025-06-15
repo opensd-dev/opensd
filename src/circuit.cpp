@@ -1,6 +1,7 @@
 //! \file circuit.cpp
 
 #include "opensd/circuit.h"
+using namespace H5;
 
 #include <iostream>
 #include <cmath>
@@ -156,6 +157,68 @@ for (auto& circuit : model::circuits) {
   }
 }
 
+}
+
+
+void Circuit::save_to_hdf5(H5::Group& parent, size_t index) const {
+  // Create a group named "circuit_0", "circuit_1", etc.
+  std::string group_name = "circuit_" + std::to_string(index);
+  H5::Group g = parent.createGroup(group_name);
+
+  // Save string attributes
+  H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
+  H5::DataSpace scalar_space = H5::DataSpace(H5S_SCALAR);
+
+  H5::DataSet id_ds = g.createDataSet("identifier", str_type, scalar_space);
+  id_ds.write(identifier, str_type);
+
+  H5::DataSet fname_ds = g.createDataSet("flname", str_type, scalar_space);
+  fname_ds.write(flname, str_type);
+
+  // Save scalars
+  g.createDataSet("eps_m", H5::PredType::NATIVE_DOUBLE, scalar_space).write(&eps_m, H5::PredType::NATIVE_DOUBLE);
+  g.createDataSet("mean_flow", H5::PredType::NATIVE_DOUBLE, scalar_space).write(&mean_flow, H5::PredType::NATIVE_DOUBLE);
+  g.createDataSet("eps_h", H5::PredType::NATIVE_DOUBLE, scalar_space).write(&eps_h, H5::PredType::NATIVE_DOUBLE);
+  g.createDataSet("eps_p", H5::PredType::NATIVE_DOUBLE, scalar_space).write(&eps_p, H5::PredType::NATIVE_DOUBLE);
+
+  // Save Pbound_ind
+  if (!Pbound_ind.empty()) {
+    hsize_t dims[1] = {Pbound_ind.size()};
+    H5::DataSpace space(1, dims);
+    H5::DataSet pb_ds = g.createDataSet("Pbound_ind", H5::PredType::NATIVE_INT, space);
+    pb_ds.write(Pbound_ind.data(), H5::PredType::NATIVE_INT);
+  }
+}
+
+void Circuit::load_from_hdf5(const H5::Group& parent, size_t index) {
+  std::string group_name = "circuit_" + std::to_string(index);
+  H5::Group g = parent.openGroup(group_name);
+
+  // String attributes
+  H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
+  H5::DataSpace scalar_space(H5S_SCALAR);
+
+  H5::DataSet id_ds = g.openDataSet("identifier");
+  id_ds.read(identifier, str_type);
+
+  H5::DataSet fname_ds = g.openDataSet("flname");
+  fname_ds.read(flname, str_type);
+
+  // Scalars
+  g.openDataSet("eps_m").read(&eps_m, H5::PredType::NATIVE_DOUBLE);
+  g.openDataSet("mean_flow").read(&mean_flow, H5::PredType::NATIVE_DOUBLE);
+  g.openDataSet("eps_h").read(&eps_h, H5::PredType::NATIVE_DOUBLE);
+  g.openDataSet("eps_p").read(&eps_p, H5::PredType::NATIVE_DOUBLE);
+
+  // Pbound_ind
+  if (g.nameExists("Pbound_ind")) {
+    H5::DataSet pb_ds = g.openDataSet("Pbound_ind");
+    H5::DataSpace pb_space = pb_ds.getSpace();
+    hsize_t dims[1];
+    pb_space.getSimpleExtentDims(dims);
+    Pbound_ind.resize(dims[0]);
+    pb_ds.read(Pbound_ind.data(), H5::PredType::NATIVE_INT);
+  }
 }
 
 } // namespace opensd

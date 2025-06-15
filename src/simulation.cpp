@@ -11,6 +11,7 @@
 #include "opensd/convergence.h"
 #include "opensd/flow_solver.h"
 #include "opensd/post.h"
+// #include "opensd/circuit.h"
 
 //==============================================================================
 // C API functions
@@ -118,6 +119,55 @@ int opensd_run()
   
   std::cout << "Execution time = " << (std::clock() - start_time) / (double)CLOCKS_PER_SEC << std::endl;
     
+
+  // Write both to HDF5
+
+  try {
+    // Save circuits to HDF5
+    H5::H5File file("circuits.h5", H5F_ACC_TRUNC);
+    H5::Group root_group = file.createGroup("/circuits");
+
+    for (size_t i = 0; i < model::circuits.size(); ++i) {
+      model::circuits[i]->save_to_hdf5(root_group, i);
+    }
+
+    std::cout << "Circuits saved to HDF5 successfully.\n";
+  }
+  catch (const H5::Exception& err) {
+    std::cerr << "HDF5 error during save: " << err.getDetailMsg() << std::endl;
+  }
+
+	  // Clear existing data
+	  model::circuits.clear();
+
+  try {
+    H5::H5File file("circuits.h5", H5F_ACC_RDONLY);
+    H5::Group root = file.openGroup("/circuits");
+
+    // Detect number of circuit groups
+    size_t index = 0;
+    while (true) {
+      std::string group_name = "circuit_" + std::to_string(index);
+      if (!root.nameExists(group_name)) break;
+
+      auto circuit = std::make_shared<opensd::Circuit>(/* dummy node or null if needed */);
+      circuit->load_from_hdf5(root, index);
+      model::circuits.push_back(circuit);
+      ++index;
+    }
+    
+    // Print to verify
+    for (size_t i = 0; i < model::circuits.size(); ++i) {
+      const auto& circuit = model::circuits[i];
+      std::cout << "Circuit [" << i << "] ID: " << circuit->identifier << std::endl;
+      std::cout << "  mean_flow: " << circuit->mean_flow << std::endl;
+      std::cout << "  eps_h: " << circuit->eps_h << std::endl;
+    }
+
+  } catch (const H5::Exception& e) {
+    std::cerr << "HDF5 error: " << e.getDetailMsg() << std::endl;
+  }
+
   return 0;
 
 }
