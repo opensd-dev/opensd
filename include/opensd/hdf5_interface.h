@@ -20,6 +20,12 @@ double read_scalar(hid_t loc_id, const std::string& name);
 void write_vector(hid_t loc_id, const std::string& name, const std::vector<int>& vec);
 std::vector<int> read_vector_int(hid_t loc_id, const std::string& name);
 
+void write_string_attribute(hid_t group_id, const std::string& name, const std::string& value);
+void write_double_attribute(hid_t group_id, const std::string& name, double value);
+
+void read_string_attribute(hid_t group_id, const std::string& name, std::string& value);
+void read_double_attribute(hid_t group_id, const std::string& name, double& value);
+
 } // namespace opensd
 
 #endif

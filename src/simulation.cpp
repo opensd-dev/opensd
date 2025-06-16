@@ -176,6 +176,7 @@ for (size_t i = 0; i < model::circuits.size(); ++i) {
   std::cout << "  mean_flow: " << circuit->mean_flow << "\n";
   std::cout << "  eps_h: " << circuit->eps_h << "\n";
 
+  // Nodes
   std::cout << "  Nodes (" << circuit->nodes.size() << "):\n";
   for (size_t j = 0; j < circuit->nodes.size(); ++j) {
     const auto& node = circuit->nodes[j];
@@ -188,7 +189,21 @@ for (size_t i = 0; i < model::circuits.size(); ++i) {
       std::cout << "    Node [" << j << "] is null\n";
     }
   }
+
+  // Pipes
+  std::cout << "  Pipes (" << circuit->pipes.size() << "):\n";
+  for (size_t j = 0; j < circuit->pipes.size(); ++j) {
+    const auto& pipe = circuit->pipes[j];
+    if (pipe) {
+      std::cout << "    Pipe [" << j << "] ID: " << pipe->identifier << "\n";
+      std::cout << "      length: " << pipe->length << "\n";
+      std::cout << "      diameter: " << pipe->diameter << "\n";
+    } else {
+      std::cout << "    Pipe [" << j << "] is null\n";
+    }
+  }
 }
+
 
   } catch (const std::exception& e) {
     std::cerr << "HDF5 error during load: " << e.what() << std::endl;

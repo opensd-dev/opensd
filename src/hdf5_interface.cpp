@@ -62,4 +62,21 @@ std::vector<int> read_vector_int(hid_t loc_id, const std::string& name) {
   return vec;
 }
 
+void write_string_attribute(hid_t group_id, const std::string& name, const std::string& value) {
+  H5LTset_attribute_string(group_id, ".", name.c_str(), value.c_str());
+}
+
+void write_double_attribute(hid_t group_id, const std::string& name, double value) {
+  H5LTset_attribute_double(group_id, ".", name.c_str(), &value, 1);
+}
+
+void read_string_attribute(hid_t group_id, const std::string& name, std::string& value) {
+  char buffer[1024];
+  H5LTget_attribute_string(group_id, ".", name.c_str(), buffer);
+  value = std::string(buffer);
+}
+
+void read_double_attribute(hid_t group_id, const std::string& name, double& value) {
+  H5LTget_attribute_double(group_id, ".", name.c_str(), &value);
+}
 } // namespace opensd

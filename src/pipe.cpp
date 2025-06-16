@@ -58,6 +58,20 @@ Pipe::Pipe(pugi::xml_node pipe_node)
 
 }
 
+void Pipe::save_to_hdf5(hid_t group_id) const {
+  write_string_attribute(group_id, "identifier", identifier);
+  write_double_attribute(group_id, "diameter", diameter);
+  write_double_attribute(group_id, "length", length);
+  write_double_attribute(group_id, "ufrac", ufrac);
+  write_double_attribute(group_id, "dfrac", dfrac);
+}
+void Pipe::load_from_hdf5(hid_t group_id) {
+  read_string_attribute(group_id, "identifier", identifier);
+  read_double_attribute(group_id, "diameter", diameter);
+  read_double_attribute(group_id, "length", length);
+  read_double_attribute(group_id, "ufrac", ufrac);
+  read_double_attribute(group_id, "dfrac", dfrac);
+}
 
 /*Pipe::Pipe(std::string identifier, Circuit* circuit, double diameter, double length, Node* unode, double ufrac, Node* dnode, double dfrac, double ficopt, double roughness, int ncell, double heat_input, double cfarea, int npar, double qcrit, double Kforward, int flowreg)
     : identifier(identifier), circuit(circuit), diameter(diameter), length(length), unode(unode), ufrac(ufrac), dnode(dnode), dfrac(dfrac), ncell(ncell), heat_input(heat_input), npar(npar), qcrit(qcrit), Kforward_old(Kforward), Kforward(Kforward), cfarea1(cfarea1) {
