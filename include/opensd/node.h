@@ -10,6 +10,7 @@
 #include "CoolProp.h"
 #include "AbstractState.h"
 #include "crossplatform_shared_ptr.h"
+#include "hdf5_interface.h"
 
 namespace opensd {
 
@@ -74,6 +75,11 @@ public:
   void assign_staticvar();
   void update_staticvar();
   void assign_prop();
+  
+  void save_to_hdf5(hid_t group_id) const;
+  void load_from_hdf5(hid_t group_id);
+
+
 };
 
 //==============================================================================

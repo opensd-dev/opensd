@@ -169,13 +169,26 @@ int opensd_run()
   
     std::cout << "Read " << model::circuits.size() << " circuit(s) from HDF5.\n";
   
-    // Print to verify
-    for (size_t i = 0; i < model::circuits.size(); ++i) {
-      const auto& circuit = model::circuits[i];
-      std::cout << "Circuit [" << i << "] ID: " << circuit->identifier << "\n";
-      std::cout << "  mean_flow: " << circuit->mean_flow << "\n";
-      std::cout << "  eps_h: " << circuit->eps_h << "\n";
+// Print to verify
+for (size_t i = 0; i < model::circuits.size(); ++i) {
+  const auto& circuit = model::circuits[i];
+  std::cout << "Circuit [" << i << "] ID: " << circuit->identifier << "\n";
+  std::cout << "  mean_flow: " << circuit->mean_flow << "\n";
+  std::cout << "  eps_h: " << circuit->eps_h << "\n";
+
+  std::cout << "  Nodes (" << circuit->nodes.size() << "):\n";
+  for (size_t j = 0; j < circuit->nodes.size(); ++j) {
+    const auto& node = circuit->nodes[j];
+    if (node) {
+      std::cout << "    Node [" << j << "] ID: " << node->identifier << "\n";
+      std::cout << "      volume: " << node->volume << "\n";
+      std::cout << "      mflow_in: " << node->mflow_in << "\n";
+      std::cout << "      mflow_out: " << node->mflow_out << "\n";
+    } else {
+      std::cout << "    Node [" << j << "] is null\n";
     }
+  }
+}
 
   } catch (const std::exception& e) {
     std::cerr << "HDF5 error during load: " << e.what() << std::endl;

@@ -163,5 +163,26 @@ void Node::update_staticvar() {
   }
 }
 
+void Node::save_to_hdf5(hid_t group_id) const {
+  H5LTset_attribute_string(group_id, ".", "identifier", identifier.c_str());
+
+  H5LTset_attribute_double(group_id, ".", "volume", &volume, 1);
+  H5LTset_attribute_double(group_id, ".", "heat_input", &heat_input, 1);
+  H5LTset_attribute_double(group_id, ".", "elevation", &elevation, 1);
+  H5LTset_attribute_double(group_id, ".", "mresidue", &mresidue, 1);
+  H5LTset_attribute_double(group_id, ".", "msource", &msource, 1);
+}
+
+void Node::load_from_hdf5(hid_t group_id) {
+  char id_buf[256];
+  H5LTget_attribute_string(group_id, ".", "identifier", id_buf);
+  identifier = id_buf;
+
+  H5LTget_attribute_double(group_id, ".", "volume", &volume);
+  H5LTget_attribute_double(group_id, ".", "heat_input", &heat_input);
+  H5LTget_attribute_double(group_id, ".", "elevation", &elevation);
+  H5LTget_attribute_double(group_id, ".", "mresidue", &mresidue);
+  H5LTget_attribute_double(group_id, ".", "msource", &msource);
+}
 
 } // namespace opensd

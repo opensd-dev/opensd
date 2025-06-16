@@ -169,7 +169,7 @@ void Circuit::save_to_hdf5(hid_t group_id) const {
   write_scalar(group_id, "eps_p", eps_p);
   write_vector(group_id, "Pbound_ind", Pbound_ind);
 
-/*   // Save Nodes
+   // Save Nodes
   hid_t node_group = H5Gcreate(group_id, "nodes", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
   for (size_t i = 0; i < nodes.size(); ++i) {
     std::string name = "node_" + std::to_string(i);
@@ -179,7 +179,7 @@ void Circuit::save_to_hdf5(hid_t group_id) const {
   }
   H5Gclose(node_group);
 
-  // Save Pipes
+/*  // Save Pipes
   hid_t pipe_group = H5Gcreate(group_id, "pipes", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
   for (size_t i = 0; i < pipes.size(); ++i) {
     std::string name = "pipe_" + std::to_string(i);
@@ -220,11 +220,9 @@ void Circuit::load_from_hdf5(hid_t group_id) {
   eps_p = read_scalar(group_id, "eps_p");
   Pbound_ind = read_vector_int(group_id, "Pbound_ind");
 
-/*   // Load Nodes
-  nodes.clear();
+  // Load Nodes
   hid_t node_group = H5Gopen(group_id, "nodes", H5P_DEFAULT);
-  size_t i = 0;
-  while (true) {
+  for (size_t i = 0;; ++i) {
     std::string name = "node_" + std::to_string(i);
     if (H5Lexists(node_group, name.c_str(), H5P_DEFAULT) <= 0) break;
     hid_t ngrp = H5Gopen(node_group, name.c_str(), H5P_DEFAULT);
@@ -232,11 +230,11 @@ void Circuit::load_from_hdf5(hid_t group_id) {
     node->load_from_hdf5(ngrp);
     nodes.push_back(node);
     H5Gclose(ngrp);
-    ++i;
   }
   H5Gclose(node_group);
 
-  // Load Pipes
+
+/*  // Load Pipes
   pipes.clear();
   hid_t pipe_group = H5Gopen(group_id, "pipes", H5P_DEFAULT);
   i = 0;
