@@ -217,6 +217,39 @@ for (size_t i = 0; i < model::circuits.size(); ++i) {
     std::cout << "      var: " << bc.var_ << "\n";
     std::cout << "      val: " << bc.val_ << "\n";
   }
+  
+    // Faces
+  std::cout << "  Faces (" << circuit->faces.size() << "):\n";
+  for (size_t j = 0; j < circuit->faces.size(); ++j) {
+    const auto& face = circuit->faces[j];
+    if (face) {
+      std::cout << "    Face [" << j << "] faceno: " << face->faceno << "\n";
+
+      if (face->unode) {
+        std::cout << "      unode ID: " << face->unode->identifier << "\n";
+        std::cout << "      ufrac: " << face->ufrac << ", uheight: " << face->uheight << "\n";
+      } else {
+        std::cout << "      unode is null\n";
+      }
+
+      if (face->dnode) {
+        std::cout << "      dnode ID: " << face->dnode->identifier << "\n";
+        std::cout << "      dfrac: " << face->dfrac << ", dheight: " << face->dheight << "\n";
+      } else {
+        std::cout << "      dnode is null\n";
+      }
+
+      std::cout << "      mflow: " << face->mflow << ", velocity: " << face->velocity << "\n";
+      std::cout << "      choked: " << std::boolalpha << face->choked << "\n";
+      std::cout << "      heat_input: " << face->heat_input << "\n";
+      // std::cout << "      heat_hslab size: " << face->heat_hslab.size() << "\n";
+
+    } else {
+      std::cout << "    Face [" << j << "] is null\n";
+    }
+  }
+
+  
 }
 
 

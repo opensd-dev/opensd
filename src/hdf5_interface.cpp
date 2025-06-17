@@ -62,6 +62,28 @@ std::vector<int> read_vector_int(hid_t loc_id, const std::string& name) {
   return vec;
 }
 
+void write_vector(hid_t loc_id, const std::string& name, const std::vector<double>& vec) {
+  if (vec.empty()) {
+    std::cerr << "Warning: vector '" << name << "' is empty; skipping write.\n";
+    return;
+  }
+  hsize_t dim = vec.size();
+  herr_t status = H5LTmake_dataset_double(loc_id, name.c_str(), 1, &dim, vec.data());
+  if (status < 0) throw std::runtime_error("Failed to write vector: " + name);
+}
+
+std::vector<double> read_vector_double(hid_t loc_id, const std::string& name) {
+  hsize_t dim;
+  herr_t status = H5LTget_dataset_info(loc_id, name.c_str(), &dim, nullptr, nullptr);
+  if (status < 0) throw std::runtime_error("Failed to get dataset info for: " + name);
+
+  std::vector<double> vec(dim);
+  status = H5LTread_dataset_double(loc_id, name.c_str(), vec.data());
+  if (status < 0) throw std::runtime_error("Failed to read vector: " + name);
+
+  return vec;
+}
+
 void write_string_attribute(hid_t group_id, const std::string& name, const std::string& value) {
   H5LTset_attribute_string(group_id, ".", name.c_str(), value.c_str());
 }

@@ -7,6 +7,8 @@
 
 #include "opensd/circuit.h"
 #include "opensd/constants.h"
+#include "opensd/hdf5_interface.h"
+#include "opensd/node.h"
 
 namespace opensd {
 
@@ -295,5 +297,91 @@ void PFace::update_fricfact() {
     // std::exit(EXIT_FAILURE);
   // }
 }
+
+
+void Face::save_to_hdf5(hid_t group_id) const {
+  write_scalar(group_id, "faceno", faceno);
+  write_string(group_id, "unode", unode ? unode->identifier : "");
+  write_scalar(group_id, "ufrac", ufrac);
+  write_scalar(group_id, "uheight", uheight);
+  write_string(group_id, "dnode", dnode ? dnode->identifier : "");
+  write_scalar(group_id, "dfrac", dfrac);
+  write_scalar(group_id, "dheight", dheight);
+
+  write_scalar(group_id, "vflow_old", vflow_old);
+  write_scalar(group_id, "vflow_gues", vflow_gues);
+  write_scalar(group_id, "mflow", mflow);
+  write_scalar(group_id, "velocity", velocity);
+  write_scalar(group_id, "heat_input_old", heat_input_old);
+  write_scalar(group_id, "heat_input", heat_input);
+
+  // Vectors
+  // write_vector(group_id, "heat_hslab", heat_hslab);
+  // write_vector(group_id, "heat_hslab_old", heat_hslab_old);
+
+  write_scalar(group_id, "choked", choked ? 1.0 : 0.0);
+  write_scalar(group_id, "presidue", presidue);
+  write_scalar(group_id, "Gcr", Gcr);
+  write_scalar(group_id, "pcr", pcr);
+
+  write_scalar(group_id, "tpres_old", tpres_old);
+  write_scalar(group_id, "spres_old", spres_old);
+  write_scalar(group_id, "ttemp_old", ttemp_old);
+  write_scalar(group_id, "stemp_old", stemp_old);
+
+  write_scalar(group_id, "tpres_gues", tpres_gues);
+  write_scalar(group_id, "spres_gues", spres_gues);
+  write_scalar(group_id, "ttemp_gues", ttemp_gues);
+  write_scalar(group_id, "stemp_gues", stemp_gues);
+
+  write_scalar(group_id, "aplus", aplus);
+  write_scalar(group_id, "aminus", aminus);
+  write_scalar(group_id, "bplus", bplus);
+  write_scalar(group_id, "bminus", bminus);
+}
+
+void Face::load_from_hdf5(hid_t group_id) {
+  faceno = (int) read_scalar(group_id, "faceno");
+
+  std::string up_id = read_string(group_id, "unode");
+  ufrac = read_scalar(group_id, "ufrac");
+  uheight = read_scalar(group_id, "uheight");
+  std::string down_id = read_string(group_id, "dnode");
+  dfrac = read_scalar(group_id, "dfrac");
+  dheight = read_scalar(group_id, "dheight");
+
+  vflow_old = read_scalar(group_id, "vflow_old");
+  vflow_gues = read_scalar(group_id, "vflow_gues");
+  mflow = read_scalar(group_id, "mflow");
+  velocity = read_scalar(group_id, "velocity");
+  heat_input_old = read_scalar(group_id, "heat_input_old");
+  heat_input = read_scalar(group_id, "heat_input");
+
+  // heat_hslab = read_vector_double(group_id, "heat_hslab");
+  // heat_hslab_old = read_vector_double(group_id, "heat_hslab_old");
+
+  choked = (read_scalar(group_id, "choked") > 0.5);
+  presidue = read_scalar(group_id, "presidue");
+  Gcr = read_scalar(group_id, "Gcr");
+  pcr = read_scalar(group_id, "pcr");
+
+  tpres_old = read_scalar(group_id, "tpres_old");
+  spres_old = read_scalar(group_id, "spres_old");
+  ttemp_old = read_scalar(group_id, "ttemp_old");
+  stemp_old = read_scalar(group_id, "stemp_old");
+
+  tpres_gues = read_scalar(group_id, "tpres_gues");
+  spres_gues = read_scalar(group_id, "spres_gues");
+  ttemp_gues = read_scalar(group_id, "ttemp_gues");
+  stemp_gues = read_scalar(group_id, "stemp_gues");
+
+  aplus = read_scalar(group_id, "aplus");
+  aminus = read_scalar(group_id, "aminus");
+  bplus = read_scalar(group_id, "bplus");
+  bminus = read_scalar(group_id, "bminus");
+
+  // You need to resolve `unode` and `dnode` manually by matching identifiers after loading all nodes in circuit
+}
+
 
 } // namespace opensd

@@ -199,7 +199,7 @@ void Circuit::save_to_hdf5(hid_t group_id) const {
   }
   H5Gclose(bc_group);
 
-/*  // Save Faces
+  // Save Faces
   hid_t face_group = H5Gcreate(group_id, "faces", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
   for (size_t i = 0; i < faces.size(); ++i) {
     std::string name = "face_" + std::to_string(i);
@@ -208,7 +208,7 @@ void Circuit::save_to_hdf5(hid_t group_id) const {
     H5Gclose(fgrp);
   }
    H5Gclose(face_group);
- */
+
 }
 
 void Circuit::load_from_hdf5(hid_t group_id) {
@@ -261,12 +261,9 @@ void Circuit::load_from_hdf5(hid_t group_id) {
   }
   H5Gclose(bc_group);
 
-
-/*  // Load Faces
-  faces.clear();
+  // Load Faces
   hid_t face_group = H5Gopen(group_id, "faces", H5P_DEFAULT);
-  i = 0;
-  while (true) {
+   for (size_t i = 0;; ++i) {
     std::string name = "face_" + std::to_string(i);
     if (H5Lexists(face_group, name.c_str(), H5P_DEFAULT) <= 0) break;
     hid_t fgrp = H5Gopen(face_group, name.c_str(), H5P_DEFAULT);
@@ -277,6 +274,6 @@ void Circuit::load_from_hdf5(hid_t group_id) {
     ++i;
   }
   H5Gclose(face_group);
- */}
+ }
 
 } // namespace opensd
