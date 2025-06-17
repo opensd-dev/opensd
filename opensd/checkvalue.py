@@ -148,3 +148,22 @@ def check_greater_than(name, value, minimum, equality=False):
             msg = (f'Unable to set "{name}" to "{value}" since it is less than '
                    f'or equal to "{minimum}"')
             raise ValueError(msg)
+
+def check_value(name, value, accepted_values):
+    """Ensure that an object's value is contained in a set of acceptable values.
+
+    Parameters
+    ----------
+    name : str
+        Description of value being checked
+    value : collections.Iterable
+        Object to check
+    accepted_values : collections.Container
+        Container of acceptable values
+
+    """
+
+    if value not in accepted_values:
+        msg = (f'Unable to set "{name}" to "{value}" since it is not in '
+               f'"{accepted_values}"')
+        raise ValueError(msg)

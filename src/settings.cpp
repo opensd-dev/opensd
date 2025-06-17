@@ -89,7 +89,7 @@ void read_settings_xml(pugi::xml_node root)
         run_mode = RunMode::SENSITIVITY;
       } else if (temp_str == "optimize") {
         run_mode = RunMode::OPTIMIZE;
-      } else if (temp_str == "transient restart") {
+      } else if (temp_str == "transient") {
         run_mode = RunMode::TRANSIENT;
       } else {
         fatal_error("Unrecognized run mode: " + temp_str);

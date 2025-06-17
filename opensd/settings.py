@@ -14,7 +14,7 @@ class RunMode(Enum):
     DESIGN = 'design'
     SENSITIVITY = 'sensitivity'
     OPTIMIZE = 'optimize'
-    TRANSIENT_RESTART = 'transient restart'
+    TRANSIENT = 'transient'
 
 class Settings:
     """Settings used for an OpenSD simulation.
@@ -28,7 +28,7 @@ class Settings:
     ----------
     tim_slot : list of list of delt,etime
         Time slot.
-    run_mode : {'steady', 'design', 'sensitivity', 'optimize', 'transient restart'}
+    run_mode : {'steady', 'design', 'sensitivity', 'optimize', 'transient'}
         The type of calculation to perform (default is 'steady')
     verbosity : int
         Verbosity during simulation between 1 and 10. Verbosity levels are
@@ -176,6 +176,17 @@ class Settings:
     def temp_solve(self, temp_solve: bool):
         cv.check_type('temperature solver', temp_solve, bool)
         self._temp_solve = temp_solve
+
+    @property
+    def run_mode(self) -> str:
+        return self._run_mode.value
+
+    @run_mode.setter
+    def run_mode(self, run_mode: str):
+        cv.check_value('run mode', run_mode, {x.value for x in RunMode})
+        for mode in RunMode:
+            if mode.value == run_mode:
+                self._run_mode = mode
 
     @property
     def tim_slot(self):
