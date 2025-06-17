@@ -220,60 +220,71 @@ void Circuit::load_from_hdf5(hid_t group_id) {
   eps_p = read_scalar(group_id, "eps_p");
   Pbound_ind = read_vector_int(group_id, "Pbound_ind");
 
-  // Load Nodes
+   // Load Nodes
   hid_t node_group = H5Gopen(group_id, "nodes", H5P_DEFAULT);
-  for (size_t i = 0;; ++i) {
+  for (size_t i = 0; i < nodes.size(); ++i) {
     std::string name = "node_" + std::to_string(i);
-    if (H5Lexists(node_group, name.c_str(), H5P_DEFAULT) <= 0) break;
-    hid_t ngrp = H5Gopen(node_group, name.c_str(), H5P_DEFAULT);
-    auto node = std::make_shared<Node>();
-    node->load_from_hdf5(ngrp);
-    nodes.push_back(node);
-    H5Gclose(ngrp);
+    if (H5Lexists(node_group, name.c_str(), H5P_DEFAULT) > 0) {
+      hid_t ngrp = H5Gopen(node_group, name.c_str(), H5P_DEFAULT);
+      if (nodes[i]) nodes[i]->load_from_hdf5(ngrp);
+      H5Gclose(ngrp);
+    }
   }
   H5Gclose(node_group);
 
-
   // Load Pipes
   hid_t pipe_group = H5Gopen(group_id, "pipes", H5P_DEFAULT);
-  for (size_t i = 0;; ++i) {
+  for (size_t i = 0; i < pipes.size(); ++i) {
     std::string name = "pipe_" + std::to_string(i);
-    if (H5Lexists(pipe_group, name.c_str(), H5P_DEFAULT) <= 0) break;
+    if (H5Lexists(pipe_group, name.c_str(), H5P_DEFAULT) <= 0) {
+      std::cerr << "Warning: pipe group '" << name << "' missing in HDF5\n";
+      continue;
+    }
     hid_t pgrp = H5Gopen(pipe_group, name.c_str(), H5P_DEFAULT);
-    auto pipe = std::make_shared<Pipe>();
-    pipe->load_from_hdf5(pgrp);
-    pipes.push_back(pipe);
+    if (pipes[i]) {
+      pipes[i]->load_from_hdf5(pgrp);
+    } else {
+      std::cerr << "Warning: pipes[" << i << "] is null\n";
+    }
     H5Gclose(pgrp);
   }
   H5Gclose(pipe_group);
 
-  // Load BCs
-  bcs.clear();
+/*  // Load BCs
+  if (bcs.size() > 0)
+    std::cerr << "Warning: Overwriting existing BC values\n";
   hid_t bc_group = H5Gopen(group_id, "bcs", H5P_DEFAULT);
-  for (size_t i = 0;; ++i) {
+  for (size_t i = 0; i < bcs.size(); ++i) {
     std::string name = "bc_" + std::to_string(i);
-    if (H5Lexists(bc_group, name.c_str(), H5P_DEFAULT) <= 0) break;
+    if (H5Lexists(bc_group, name.c_str(), H5P_DEFAULT) <= 0) {
+      std::cerr << "Warning: bc group '" << name << "' missing in HDF5\n";
+      continue;
+    }
     hid_t bcgrp = H5Gopen(bc_group, name.c_str(), H5P_DEFAULT);
-    BC bc;
-    bc.load_from_hdf5(bcgrp);
-    bcs.push_back(bc);
+    bcs[i].load_from_hdf5(bcgrp);
     H5Gclose(bcgrp);
   }
   H5Gclose(bc_group);
 
   // Load Faces
   hid_t face_group = H5Gopen(group_id, "faces", H5P_DEFAULT);
-   for (size_t i = 0;; ++i) {
+  for (size_t i = 0; i < faces.size(); ++i) {
     std::string name = "face_" + std::to_string(i);
-    if (H5Lexists(face_group, name.c_str(), H5P_DEFAULT) <= 0) break;
+    if (H5Lexists(face_group, name.c_str(), H5P_DEFAULT) <= 0) {
+      std::cerr << "Warning: face group '" << name << "' missing in HDF5\n";
+      continue;
+    }
     hid_t fgrp = H5Gopen(face_group, name.c_str(), H5P_DEFAULT);
-    auto face = std::make_shared<Face>();
-    face->load_from_hdf5(fgrp);
-    faces.push_back(face);
+    if (faces[i]) {
+      faces[i]->load_from_hdf5(fgrp);
+    } else {
+      std::cerr << "Warning: faces[" << i << "] is null\n";
+    }
     H5Gclose(fgrp);
-    ++i;
   }
   H5Gclose(face_group);
- }
+ */    
+}
+  
 
 } // namespace opensd

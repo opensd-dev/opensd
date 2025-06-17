@@ -66,11 +66,9 @@ void Pipe::save_to_hdf5(hid_t group_id) const {
   write_double_attribute(group_id, "dfrac", dfrac);
 }
 void Pipe::load_from_hdf5(hid_t group_id) {
-  read_string_attribute(group_id, "identifier", identifier);
-  read_double_attribute(group_id, "diameter", diameter);
-  read_double_attribute(group_id, "length", length);
-  read_double_attribute(group_id, "ufrac", ufrac);
-  read_double_attribute(group_id, "dfrac", dfrac);
+  // identifier = read_string(group_id, "identifier");
+  length = read_double_attribute(group_id, "length");
+  diameter = read_double_attribute(group_id, "diameter");
 }
 
 /*Pipe::Pipe(std::string identifier, Circuit* circuit, double diameter, double length, Node* unode, double ufrac, Node* dnode, double dfrac, double ficopt, double roughness, int ncell, double heat_input, double cfarea, int npar, double qcrit, double Kforward, int flowreg)

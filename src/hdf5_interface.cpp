@@ -98,7 +98,23 @@ void read_string_attribute(hid_t group_id, const std::string& name, std::string&
   value = std::string(buffer);
 }
 
+std::string read_string_attribute(hid_t group_id, const std::string& name) {
+  char buffer[256]; // adjust if needed
+  herr_t status = H5LTget_attribute_string(group_id, ".", name.c_str(), buffer);
+  if (status < 0) throw std::runtime_error("Failed to read attribute: " + name);
+  return std::string(buffer);
+}
+
 void read_double_attribute(hid_t group_id, const std::string& name, double& value) {
   H5LTget_attribute_double(group_id, ".", name.c_str(), &value);
 }
+
+double read_double_attribute(hid_t loc_id, const std::string& name) {
+  double value;
+  herr_t status = H5LTget_attribute_double(loc_id, ".", name.c_str(), &value);
+  if (status < 0) throw std::runtime_error("Failed to read attribute: " + name);
+  return value;
+}
+
 } // namespace opensd
+

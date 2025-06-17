@@ -24,7 +24,9 @@ void write_string_attribute(hid_t group_id, const std::string& name, const std::
 void write_double_attribute(hid_t group_id, const std::string& name, double value);
 
 void read_string_attribute(hid_t group_id, const std::string& name, std::string& value);
+std::string read_string_attribute(hid_t group_id, const std::string& name);
 void read_double_attribute(hid_t group_id, const std::string& name, double& value);
+double read_double_attribute(hid_t loc_id, const std::string& name);
 
 } // namespace opensd
 

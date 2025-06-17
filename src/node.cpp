@@ -174,15 +174,12 @@ void Node::save_to_hdf5(hid_t group_id) const {
 }
 
 void Node::load_from_hdf5(hid_t group_id) {
-  char id_buf[256];
-  H5LTget_attribute_string(group_id, ".", "identifier", id_buf);
-  identifier = id_buf;
-
-  H5LTget_attribute_double(group_id, ".", "volume", &volume);
-  H5LTget_attribute_double(group_id, ".", "heat_input", &heat_input);
-  H5LTget_attribute_double(group_id, ".", "elevation", &elevation);
-  H5LTget_attribute_double(group_id, ".", "mresidue", &mresidue);
-  H5LTget_attribute_double(group_id, ".", "msource", &msource);
+  identifier = opensd::read_string_attribute(group_id, "identifier");
+  volume = opensd::read_double_attribute(group_id, "volume");
+  heat_input = opensd::read_double_attribute(group_id, "heat_input");
+  elevation = opensd::read_double_attribute(group_id, "elevation");
+  mresidue = opensd::read_double_attribute(group_id, "mresidue");
+  msource = opensd::read_double_attribute(group_id, "msource");
 }
 
 } // namespace opensd

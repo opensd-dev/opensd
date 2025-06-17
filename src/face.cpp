@@ -341,12 +341,9 @@ void Face::save_to_hdf5(hid_t group_id) const {
 }
 
 void Face::load_from_hdf5(hid_t group_id) {
-  faceno = (int) read_scalar(group_id, "faceno");
-
-  std::string up_id = read_string(group_id, "unode");
+  faceno = static_cast<int>(read_scalar(group_id, "faceno"));
   ufrac = read_scalar(group_id, "ufrac");
   uheight = read_scalar(group_id, "uheight");
-  std::string down_id = read_string(group_id, "dnode");
   dfrac = read_scalar(group_id, "dfrac");
   dheight = read_scalar(group_id, "dheight");
 
@@ -354,13 +351,14 @@ void Face::load_from_hdf5(hid_t group_id) {
   vflow_gues = read_scalar(group_id, "vflow_gues");
   mflow = read_scalar(group_id, "mflow");
   velocity = read_scalar(group_id, "velocity");
+
   heat_input_old = read_scalar(group_id, "heat_input_old");
   heat_input = read_scalar(group_id, "heat_input");
 
   // heat_hslab = read_vector_double(group_id, "heat_hslab");
   // heat_hslab_old = read_vector_double(group_id, "heat_hslab_old");
 
-  choked = (read_scalar(group_id, "choked") > 0.5);
+  choked = static_cast<bool>(read_scalar(group_id, "choked"));
   presidue = read_scalar(group_id, "presidue");
   Gcr = read_scalar(group_id, "Gcr");
   pcr = read_scalar(group_id, "pcr");
@@ -379,8 +377,6 @@ void Face::load_from_hdf5(hid_t group_id) {
   aminus = read_scalar(group_id, "aminus");
   bplus = read_scalar(group_id, "bplus");
   bminus = read_scalar(group_id, "bminus");
-
-  // You need to resolve `unode` and `dnode` manually by matching identifiers after loading all nodes in circuit
 }
 
 
