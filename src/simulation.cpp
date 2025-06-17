@@ -169,6 +169,11 @@ int opensd_run()
   
     std::cout << "Read " << model::circuits.size() << " circuit(s) from HDF5.\n";
   
+  } catch (const std::exception& e) {
+    std::cerr << "HDF5 error during load: " << e.what() << std::endl;
+  }
+
+
 // Print to verify
 for (size_t i = 0; i < model::circuits.size(); ++i) {
   const auto& circuit = model::circuits[i];
@@ -202,12 +207,19 @@ for (size_t i = 0; i < model::circuits.size(); ++i) {
       std::cout << "    Pipe [" << j << "] is null\n";
     }
   }
+
+  // BCs
+  std::cout << "  BCs (" << circuit->bcs.size() << "):\n";
+  for (size_t j = 0; j < circuit->bcs.size(); ++j) {
+    const auto& bc = circuit->bcs[j];
+    std::cout << "    BC [" << j << "] ID: " << bc.identifier << "\n";
+    std::cout << "      node: " << bc.node_ << "\n";
+    std::cout << "      var: " << bc.var_ << "\n";
+    std::cout << "      val: " << bc.val_ << "\n";
+  }
 }
 
 
-  } catch (const std::exception& e) {
-    std::cerr << "HDF5 error during load: " << e.what() << std::endl;
-  }
 
   return 0;
 

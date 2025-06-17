@@ -29,5 +29,18 @@ BC::BC(pugi::xml_node bc_node)
 
 }
 
+void BC::save_to_hdf5(hid_t group_id) const {
+  write_string(group_id, "identifier", identifier);
+  write_string(group_id, "node", node_);
+  write_string(group_id, "var", var_);
+  write_scalar(group_id, "val", val_);
+}
+
+void BC::load_from_hdf5(hid_t group_id) {
+  identifier = read_string(group_id, "identifier");
+  node_ = read_string(group_id, "node");
+  var_ = read_string(group_id, "var");
+  val_ = read_scalar(group_id, "val");
+}
 
 } // namespace opensd

@@ -189,7 +189,7 @@ void Circuit::save_to_hdf5(hid_t group_id) const {
   }
   H5Gclose(pipe_group);
 
-/*  // Save BCs
+  // Save BCs
   hid_t bc_group = H5Gcreate(group_id, "bcs", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
   for (size_t i = 0; i < bcs.size(); ++i) {
     std::string name = "bc_" + std::to_string(i);
@@ -199,7 +199,7 @@ void Circuit::save_to_hdf5(hid_t group_id) const {
   }
   H5Gclose(bc_group);
 
-  // Save Faces
+/*  // Save Faces
   hid_t face_group = H5Gcreate(group_id, "faces", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
   for (size_t i = 0; i < faces.size(); ++i) {
     std::string name = "face_" + std::to_string(i);
@@ -247,11 +247,10 @@ void Circuit::load_from_hdf5(hid_t group_id) {
   }
   H5Gclose(pipe_group);
 
-/*  // Load BCs
+  // Load BCs
   bcs.clear();
   hid_t bc_group = H5Gopen(group_id, "bcs", H5P_DEFAULT);
-  i = 0;
-  while (true) {
+  for (size_t i = 0;; ++i) {
     std::string name = "bc_" + std::to_string(i);
     if (H5Lexists(bc_group, name.c_str(), H5P_DEFAULT) <= 0) break;
     hid_t bcgrp = H5Gopen(bc_group, name.c_str(), H5P_DEFAULT);
@@ -259,11 +258,11 @@ void Circuit::load_from_hdf5(hid_t group_id) {
     bc.load_from_hdf5(bcgrp);
     bcs.push_back(bc);
     H5Gclose(bcgrp);
-    ++i;
   }
   H5Gclose(bc_group);
 
-  // Load Faces
+
+/*  // Load Faces
   faces.clear();
   hid_t face_group = H5Gopen(group_id, "faces", H5P_DEFAULT);
   i = 0;
