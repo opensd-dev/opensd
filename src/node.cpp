@@ -169,7 +169,7 @@ void Node::save_to_hdf5(hid_t group_id) const {
   H5LTset_attribute_double(group_id, ".", "volume", &volume, 1);
   H5LTset_attribute_double(group_id, ".", "heat_input", &heat_input, 1);
   H5LTset_attribute_double(group_id, ".", "elevation", &elevation, 1);
-  H5LTset_attribute_double(group_id, ".", "mresidue", &mresidue, 1);
+  H5LTset_attribute_double(group_id, ".", "tpres_gues", &tpres_gues, 1);
   H5LTset_attribute_double(group_id, ".", "msource", &msource, 1);
 }
 
@@ -178,7 +178,7 @@ void Node::load_from_hdf5(hid_t group_id) {
   volume = opensd::read_double_attribute(group_id, "volume");
   heat_input = opensd::read_double_attribute(group_id, "heat_input");
   elevation = opensd::read_double_attribute(group_id, "elevation");
-  mresidue = opensd::read_double_attribute(group_id, "mresidue");
+  tpres_old = opensd::read_double_attribute(group_id, "tpres_gues");
   msource = opensd::read_double_attribute(group_id, "msource");
 }
 

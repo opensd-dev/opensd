@@ -347,7 +347,7 @@ void Face::load_from_hdf5(hid_t group_id) {
   dfrac = read_scalar(group_id, "dfrac");
   dheight = read_scalar(group_id, "dheight");
 
-  vflow_old = read_scalar(group_id, "vflow_old");
+  vflow_old = read_scalar(group_id, "vflow_gues");
   vflow_gues = read_scalar(group_id, "vflow_gues");
   mflow = read_scalar(group_id, "mflow");
   velocity = read_scalar(group_id, "velocity");

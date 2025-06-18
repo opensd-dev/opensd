@@ -42,7 +42,7 @@ int opensd_run()
     if (settings::verbosity >= 1) std::cout << "time=" << std::setprecision(5) << simulation::current_time << " ";
     
     // action_setup.update(time, delt);
-    bool trans_sim = false;
+    bool trans_sim = settings::run_mode == RunMode::TRANSIENT;
     bool converged;
     double eps_m, eps_p, eps_h, eps_t;
     for (int main_iter = 0; main_iter < settings::no_main_iter; ++main_iter) {

@@ -28,15 +28,14 @@ std::string read_string(hid_t loc_id, const std::string& name) {
 }
 
 void write_scalar(hid_t loc_id, const std::string& name, double value) {
-  hsize_t dim = 1;
-  herr_t status = H5LTmake_dataset_double(loc_id, name.c_str(), 1, &dim, &value);
-  if (status < 0) throw std::runtime_error("Failed to write scalar: " + name);
+  herr_t status = H5LTset_attribute_double(loc_id, ".", name.c_str(), &value, 1);
+  if (status < 0) throw std::runtime_error("Failed to write scalar attribute: " + name);
 }
 
 double read_scalar(hid_t loc_id, const std::string& name) {
   double value;
-  herr_t status = H5LTread_dataset_double(loc_id, name.c_str(), &value);
-  if (status < 0) throw std::runtime_error("Failed to read scalar: " + name);
+  herr_t status = H5LTget_attribute_double(loc_id, ".", name.c_str(), &value);
+  if (status < 0) throw std::runtime_error("Failed to read scalar attribute: " + name);
   return value;
 }
 

@@ -250,7 +250,7 @@ void Circuit::load_from_hdf5(hid_t group_id) {
   }
   H5Gclose(pipe_group);
 
-/*  // Load BCs
+  // Load BCs
   if (bcs.size() > 0)
     std::cerr << "Warning: Overwriting existing BC values\n";
   hid_t bc_group = H5Gopen(group_id, "bcs", H5P_DEFAULT);
@@ -283,7 +283,8 @@ void Circuit::load_from_hdf5(hid_t group_id) {
     H5Gclose(fgrp);
   }
   H5Gclose(face_group);
- */    
+
+
 }
   
 

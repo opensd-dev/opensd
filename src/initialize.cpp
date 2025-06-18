@@ -17,7 +17,7 @@ int opensd_init(int argc, char* argv[])
   read_separate_xml_files();
   discretize_pipes();
   
-  
+  if (settings::run_mode == RunMode::TRANSIENT) {
   try {
   hid_t file_id = H5Fopen("circuits.h5", H5F_ACC_RDONLY, H5P_DEFAULT);
 
@@ -46,6 +46,7 @@ int opensd_init(int argc, char* argv[])
 } catch (const std::exception& e) {
   std::cerr << "HDF5 error during load: " << e.what() << std::endl;
 }
+  }
 
 initialize_circuits(); //assign properties
 
@@ -58,19 +59,20 @@ for (size_t i = 0; i < model::circuits.size(); ++i) {
   std::cout << "  eps_h: " << circuit->eps_h << "\n";
 
   // Nodes
-  std::cout << "  Nodes (" << circuit->nodes.size() << "):\n";
-  for (size_t j = 0; j < circuit->nodes.size(); ++j) {
-    const auto& node = circuit->nodes[j];
-    if (node) {
-      std::cout << "    Node [" << j << "] ID: " << node->identifier << "\n";
-      std::cout << "      volume: " << node->volume << "\n";
-      std::cout << "      mflow_in: " << node->mflow_in << "\n";
-      std::cout << "      mflow_out: " << node->mflow_out << "\n";
-    } else {
-      std::cout << "    Node [" << j << "] is null\n";
-    }
-  }
+  // std::cout << "  Nodes (" << circuit->nodes.size() << "):\n";
+  // for (size_t j = 0; j < circuit->nodes.size(); ++j) {
+  //   const auto& node = circuit->nodes[j];
+  //   if (node) {
+  //     std::cout << "    Node [" << j << "] ID: " << node->identifier << "\n";
+  //     std::cout << "      volume: " << node->volume << "\n";
+  //     std::cout << "      tpres_old: " << node->tpres_old << "\n";
+  //     std::cout << "      tpres_gues: " << node->tpres_gues << "\n";
+  //   } else {
+  //     std::cout << "    Node [" << j << "] is null\n";
+  //   }
+  // }
 
+  /*
   // Pipes
   std::cout << "  Pipes (" << circuit->pipes.size() << "):\n";
   for (size_t j = 0; j < circuit->pipes.size(); ++j) {
@@ -93,7 +95,7 @@ for (size_t i = 0; i < model::circuits.size(); ++i) {
     std::cout << "      var: " << bc.var_ << "\n";
     std::cout << "      val: " << bc.val_ << "\n";
   }
-  
+  */
     // Faces
   std::cout << "  Faces (" << circuit->faces.size() << "):\n";
   for (size_t j = 0; j < circuit->faces.size(); ++j) {
@@ -101,21 +103,21 @@ for (size_t i = 0; i < model::circuits.size(); ++i) {
     if (face) {
       std::cout << "    Face [" << j << "] faceno: " << face->faceno << "\n";
 
-      if (face->unode) {
-        std::cout << "      unode ID: " << face->unode->identifier << "\n";
-        std::cout << "      ufrac: " << face->ufrac << ", uheight: " << face->uheight << "\n";
-      } else {
-        std::cout << "      unode is null\n";
-      }
+      // if (face->unode) {
+      //   std::cout << "      unode ID: " << face->unode->identifier << "\n";
+      //   std::cout << "      ufrac: " << face->ufrac << ", uheight: " << face->uheight << "\n";
+      // } else {
+      //   std::cout << "      unode is null\n";
+      // }
+      //
+      // if (face->dnode) {
+      //   std::cout << "      dnode ID: " << face->dnode->identifier << "\n";
+      //   std::cout << "      dfrac: " << face->dfrac << ", dheight: " << face->dheight << "\n";
+      // } else {
+      //   std::cout << "      dnode is null\n";
+      // }
 
-      if (face->dnode) {
-        std::cout << "      dnode ID: " << face->dnode->identifier << "\n";
-        std::cout << "      dfrac: " << face->dfrac << ", dheight: " << face->dheight << "\n";
-      } else {
-        std::cout << "      dnode is null\n";
-      }
-
-      std::cout << "      mflow: " << face->mflow << ", velocity: " << face->velocity << "\n";
+      std::cout << "      vflow_old: " << face->vflow_old << ", vflow_gues " << face->vflow_gues << "\n";
       std::cout << "      choked: " << std::boolalpha << face->choked << "\n";
       std::cout << "      heat_input: " << face->heat_input << "\n";
       // std::cout << "      heat_hslab size: " << face->heat_hslab.size() << "\n";
