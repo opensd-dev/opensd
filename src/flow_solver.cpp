@@ -152,8 +152,6 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
         // }
       // }
       face->update_abcoef(time, delt, trans_sim, alpha_mom);
-      // auto pface = std::static_pointer_cast<PFace>(face);
-      std::cout << face->vflow_gues << std::endl;
       // std::cout << face->vflow_gues << std::endl;
   }
 }
@@ -164,7 +162,6 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     // if (!trans_sim && !circuit->solveSS) continue;
     // std::cout << circuit->identifier << std::endl;
     guess_flow(time, delt, trans_sim, alpha_mom, main_iter, circuit);
-    std::exit(1);
 
     // Pressure corrections
     int n = circuit->nodes.size();
@@ -186,6 +183,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         A(i, i) = trans_sim * B * node->ther_old->rhomass() / delt;
         D = trans_sim * node->volume * node->ther_old->first_partial_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
       }
+	  std::cout << B << std::endl;
       // std::cout << A(i, i) << std::endl;
       b(i) = -trans_sim * B * node->ther_old->rhomass() / delt * (node->tpres_gues - node->ther_gues->rhomass() * std::pow(node->velocity, 2) / 2.0 - node->spres_old)
            - trans_sim * D * (node->senth_gues - node->senth_old) / delt;
@@ -223,6 +221,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         // }
       }
     }
+    std::exit(1);
 
 
     for (int i = 0; i < n; ++i) {

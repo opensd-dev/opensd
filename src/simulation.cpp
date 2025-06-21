@@ -35,14 +35,14 @@ int opensd_run()
   // Loop through time slots
   for (int i = 0; i < settings::tim_slot.size(); ++i) {
     simulation::current_time = settings::tim_slot[i];
-    if (i != 0) {
+    
+    bool trans_sim = settings::run_mode == RunMode::TRANSIENT;
+    if (trans_sim) {
       simulation::delt = settings::tim_slot[i] - settings::tim_slot[i-1];
     }
-    
     if (settings::verbosity >= 1) std::cout << "time=" << std::setprecision(5) << simulation::current_time << " ";
     
     // action_setup.update(time, delt);
-    bool trans_sim = settings::run_mode == RunMode::TRANSIENT;
     bool converged;
     double eps_m, eps_p, eps_h, eps_t;
     for (int main_iter = 0; main_iter < settings::no_main_iter; ++main_iter) {
