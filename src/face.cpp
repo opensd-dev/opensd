@@ -299,7 +299,7 @@ void PFace::update_fricfact() {
 }
 
 
-void Face::save_to_hdf5(hid_t group_id) const {
+void PFace::save_to_hdf5(hid_t group_id) const {
   write_scalar(group_id, "faceno", faceno);
   write_string(group_id, "unode", unode ? unode->identifier : "");
   write_scalar(group_id, "ufrac", ufrac);
@@ -338,9 +338,11 @@ void Face::save_to_hdf5(hid_t group_id) const {
   write_scalar(group_id, "aminus", aminus);
   write_scalar(group_id, "bplus", bplus);
   write_scalar(group_id, "bminus", bminus);
+  write_scalar(group_id, "bminus", bminus);
+  write_scalar(group_id, "fricfact_gues", fricfact_gues);
 }
 
-void Face::load_from_hdf5(hid_t group_id) {
+void PFace::load_from_hdf5(hid_t group_id) {
   faceno = static_cast<int>(read_scalar(group_id, "faceno"));
   ufrac = read_scalar(group_id, "ufrac");
   uheight = read_scalar(group_id, "uheight");
@@ -377,6 +379,7 @@ void Face::load_from_hdf5(hid_t group_id) {
   aminus = read_scalar(group_id, "aminus");
   bplus = read_scalar(group_id, "bplus");
   bminus = read_scalar(group_id, "bminus");
+  fricfact_old = read_scalar(group_id, "fricfact_gues");
 }
 
 

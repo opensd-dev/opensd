@@ -152,7 +152,9 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
         // }
       // }
       face->update_abcoef(time, delt, trans_sim, alpha_mom);
+      // auto pface = std::static_pointer_cast<PFace>(face);
       std::cout << face->vflow_gues << std::endl;
+      // std::cout << face->vflow_gues << std::endl;
   }
 }
   

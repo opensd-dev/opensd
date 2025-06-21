@@ -78,8 +78,9 @@ public:
   virtual double eqn_mom(double x, double time, double delt, bool trans_sim, double alpha_mom) {return 0;}
   virtual void update_abcoef(double time, double delt, double trans_sim, double alpha_mom) {}
   
-  void save_to_hdf5(hid_t group_id) const;
-  void load_from_hdf5(hid_t group_id);
+  virtual void save_to_hdf5(hid_t group_id) const {}
+  virtual void load_from_hdf5(hid_t group_id) {}
+
 
 };
 
@@ -118,6 +119,9 @@ public:
   void update_velocity() override;
   
   void update_fricfact() override;
+
+  void save_to_hdf5(hid_t group_id) const override;
+  void load_from_hdf5(hid_t group_id) override;
   
 };
 
