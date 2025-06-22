@@ -60,6 +60,7 @@ public:
   shared_ptr<CoolProp::AbstractState> ther_gues;
   shared_ptr<CoolProp::AbstractState> ther_old;
   double velocity;
+  double B1;
 
   explicit Node(pugi::xml_node flnode_node);
   Node(std::string identifier, double volume, double heat_input, double elevation, double tpres_old = 0.0, double ttemp_old = 0.0, double tenth_old = 0.0); //Circuit* circuit, 

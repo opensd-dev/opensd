@@ -173,13 +173,11 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       
       double B, D;
       if (node->ther_old->phase() == 6) {
-        // B = node.B1 + node.volume * node.ther_old.first_two_phase_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node.ther_old.rhomass();
-        B = node->volume * node->ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node->ther_old->rhomass();
+        B = node->B1 + node->volume * node->ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node->ther_old->rhomass();
         A(i, i) = trans_sim * B * node->ther_old->rhomass() / delt;
         D = trans_sim * node->volume * node->ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
       } else {
-        // B = node.B1 + node.volume * node.ther_old.first_partial_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node.ther_old.rhomass();
-        B = node->volume * node->ther_old->first_partial_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node->ther_old->rhomass();
+        B = node->B1 + node->volume * node->ther_old->first_partial_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node->ther_old->rhomass();
         A(i, i) = trans_sim * B * node->ther_old->rhomass() / delt;
         D = trans_sim * node->volume * node->ther_old->first_partial_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
       }

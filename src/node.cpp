@@ -109,6 +109,36 @@ void Node::update_gues() {
   tenth_gues = tenth_old;
   senth_gues = senth_old;
   ther_gues->update(CoolProp::HmassP_INPUTS,senth_gues,spres_gues);
+
+  double c1 = 5./4. - 0.26; //self.mech_gues.poissons_ratio()
+  double youngs_modulus = 1.E11; 
+  double isum = 0.0;
+  for (const auto& iface : ifaces) {
+	  auto pface = std::dynamic_pointer_cast<PFace>(iface);
+	  if (pface) {
+      // if (pface->has_wall()) {  // Assuming has_wall() is a method that checks for wall existence
+          isum += pface->diameter * (pface->delx * pface->cfarea) * c1
+                  / (2.0 * 0.019 * youngs_modulus); //pface->wall->thk
+      // }
+	}
+  }
+  
+  double osum = 0.0;
+  for (const auto& oface : ofaces) {
+  	  auto pface = std::dynamic_pointer_cast<PFace>(oface);
+	  if (pface) {
+
+      // if (pface->has_wall()) {
+          osum += pface->diameter * (pface->delx * pface->cfarea) * c1 //pface->wall->c1
+                  / (2.0 * 0.019 * youngs_modulus); // pface->wall->thk //pface->wall->mech_gues->youngs_modulus()
+      // }
+	  }
+  }
+  
+  B1 = isum + osum;
+
+
+
 }
 
 void Node::assign_staticvar() {
