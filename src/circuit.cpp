@@ -145,7 +145,10 @@ void initialize_circuits() {
 
 for (auto& circuit : model::circuits) {
   for (auto& node : circuit->nodes) {
-    node->assign_staticvar();
+	bool trans_sim = settings::run_mode == RunMode::TRANSIENT;
+	if (not trans_sim) {
+      node->assign_staticvar();
+	}
     node->assign_prop();
     node->update_gues();
   }

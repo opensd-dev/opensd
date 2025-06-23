@@ -181,14 +181,12 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         A(i, i) = trans_sim * B * node->ther_old->rhomass() / delt;
         D = trans_sim * node->volume * node->ther_old->first_partial_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
       }
-	  std::cout << B << std::endl;
-      // std::cout << A(i, i) << std::endl;
       b(i) = -trans_sim * B * node->ther_old->rhomass() / delt * (node->tpres_gues - node->ther_gues->rhomass() * std::pow(node->velocity, 2) / 2.0 - node->spres_old)
            - trans_sim * D * (node->senth_gues - node->senth_old) / delt;
 
       for (auto& iface : node->ifaces) {
         A(i, iface->unode->node_ind) = -alpha_mom * (iface->aminus * iface->ther_gues->rhomass() + iface->bminus * iface->vflow_gues);
-        A(i, i) -= alpha_mom * (-iface->aplus * iface->ther_gues->rhomass() + iface->bplus * iface->vflow_gues);
+        A(i, i) = A(i, i) - alpha_mom * (-iface->aplus * iface->ther_gues->rhomass() + iface->bplus * iface->vflow_gues);
         b(i) += alpha_mom * (iface->ther_gues->rhomass() * iface->vflow_gues) + (1.0 - alpha_mom) * (iface->ther_old->rhomass() * iface->vflow_old);
         if (A(i, iface->unode->node_ind) > 0.0) {
           // if ((show_warn && trans_sim) || !trans_sim) {
@@ -200,7 +198,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       for (auto& oface : node->ofaces) {
         A(i, oface->dnode->node_ind) = -alpha_mom * (oface->aplus * oface->ther_gues->rhomass() - oface->bplus * oface->vflow_gues);
         A(i, i) += alpha_mom * (oface->aminus * oface->ther_gues->rhomass() + oface->bminus * oface->vflow_gues);
-        b(i) -= alpha_mom * (oface->ther_gues->rhomass() * oface->vflow_gues) - (1.0 - alpha_mom) * (oface->ther_old->rhomass() * oface->vflow_old);
+        b(i) = b(i) - alpha_mom * (oface->ther_gues->rhomass() * oface->vflow_gues) - (1.0 - alpha_mom) * (oface->ther_old->rhomass() * oface->vflow_old);
         if (A(i, oface->dnode->node_ind) > 1.E-6) { // Pending check if 0
           // if ((show_warn && trans_sim) || !trans_sim) {
             std::cout << "Warning: downstream coef negative. " << node->identifier << std::endl;
@@ -219,7 +217,11 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         // }
       }
     }
-    std::exit(1);
+	
+	std::cout << A << std::endl;
+    if (trans_sim) {
+      std::exit(1);
+	}
 
 
     for (int i = 0; i < n; ++i) {

@@ -37,8 +37,10 @@ int opensd_run()
     simulation::current_time = settings::tim_slot[i];
     
     bool trans_sim = settings::run_mode == RunMode::TRANSIENT;
+	double alpha_mom = settings::alpha_mom;
     if (trans_sim) {
       simulation::delt = settings::tim_slot[i] - settings::tim_slot[i-1];
+	  alpha_mom = 0.6;
     }
     if (settings::verbosity >= 1) std::cout << "time=" << std::setprecision(5) << simulation::current_time << " ";
     
@@ -48,7 +50,7 @@ int opensd_run()
     for (int main_iter = 0; main_iter < settings::no_main_iter; ++main_iter) {
       
       for (int flow_iter = 0; flow_iter < settings::no_flow_iter; ++flow_iter) {
-        exec_massmom(simulation::current_time, simulation::delt, trans_sim, settings::alpha_mom, main_iter, flow_iter);
+        exec_massmom(simulation::current_time, simulation::delt, trans_sim, alpha_mom, main_iter, flow_iter);
         std::tuple<bool, std::tuple<double, double>> result = check_conv(simulation::current_time, simulation::delt, trans_sim, settings::alpha_mom, "massmom");
         converged = std::get<0>(result);
         std::tie(eps_m, eps_p) = std::get<1>(result);
