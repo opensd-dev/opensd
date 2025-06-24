@@ -1,6 +1,7 @@
 #include "opensd/settings.h"
 
 #include <string>
+#include <iostream>
 
 #include "opensd/error.h"
 #include "opensd/xml_interface.h"
@@ -103,6 +104,16 @@ void read_settings_xml(pugi::xml_node root)
   no_main_iter = stod(get_node_value(root, "no_main_iter"));
   no_flow_iter = stod(get_node_value(root, "no_flow_iter"));
   // conv_crit_flow = stod(get_node_value(root, "conv_crit_flow"));
+
+
+  double start = tim_slot[0];
+  double end = tim_slot[1];
+  double step = tim_slot[0];
+  tim_slot.clear();
+  
+  for (double t = start; t <= end + 1e-9; t += step) {
+      tim_slot.push_back(t);
+  }
 
 }
 

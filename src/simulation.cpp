@@ -51,7 +51,7 @@ int opensd_run()
       
       for (int flow_iter = 0; flow_iter < settings::no_flow_iter; ++flow_iter) {
         exec_massmom(simulation::current_time, simulation::delt, trans_sim, alpha_mom, main_iter, flow_iter);
-        std::tuple<bool, std::tuple<double, double>> result = check_conv(simulation::current_time, simulation::delt, trans_sim, settings::alpha_mom, "massmom");
+        std::tuple<bool, std::tuple<double, double>> result = check_conv(simulation::current_time, simulation::delt, trans_sim, alpha_mom, "massmom");
         converged = std::get<0>(result);
         std::tie(eps_m, eps_p) = std::get<1>(result);
         if (converged) {

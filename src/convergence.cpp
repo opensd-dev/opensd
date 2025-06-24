@@ -17,7 +17,7 @@ std::tuple<bool, std::tuple<double, double>> check_conv(double time, double delt
     
     vector<double> eps_mlist;
     for (auto& node : circuit->nodes) {
-      node->mresidue = node->eqn_cont(alpha_mom);
+      node->mresidue = node->eqn_cont(time,delt,trans_sim,alpha_mom);
       // if (dynamic_cast<comp::Reservoir*>(&node)) node.mresidue = 0;
       if (std::abs(node->mflow_in) > 1.E-5 || std::abs(node->mflow_out) > 1.E-5) {
         eps_mlist.push_back(std::abs(node->mresidue));
@@ -70,7 +70,7 @@ std::tuple<bool, std::tuple<double, double>> check_conv(double time, double delt
     }
 
     for (auto& face : circuit->faces) {
-      // std::cout << face->vflow_gues*face->ther_gues->rhomass() << std::endl;
+      std::cout << face->vflow_gues*face->ther_gues->rhomass() << std::endl;
     }
 
 

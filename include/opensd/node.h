@@ -71,7 +71,7 @@ public:
   // delete ther_gues;
   // }
 
-  double eqn_cont(double alpha_mom);
+  double eqn_cont(double time, double delt, bool trans_sim, double alpha_mom);
   void update_gues();
   void assign_staticvar();
   void update_staticvar();

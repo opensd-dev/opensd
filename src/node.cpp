@@ -65,36 +65,35 @@ Node::Node(pugi::xml_node flnode_node)
 
 
 
-double Node::eqn_cont(double alpha_mom) {
+double Node::eqn_cont(double time, double delt, bool trans_sim, double alpha_mom) {
   double isum_gues = 0.;
   double isum_old = 0.;
   for (const auto& iface : ifaces) {
     isum_gues += iface->ther_gues->rhomass()* iface->vflow_gues;
-    // isum_old += iface->ther_old->rhomass() * iface->vflow_old;
+    isum_old += iface->ther_old->rhomass() * iface->vflow_old;
   }
   double osum_gues = 0.;
   double osum_old = 0.;
   for (const auto& oface : ofaces) {
     osum_gues += oface->ther_gues->rhomass() * oface->vflow_gues;
-    // osum_old += oface.ther_old.rhomass() * oface.vflow_old;
+    osum_old += oface->ther_old->rhomass() * oface->vflow_old;
   }
 
   mflow_in = isum_gues;
   mflow_out = osum_gues;
 
-/*
-  double B, D;
-  if (ther_old.phase() == 6) {
-    B = B1 + volume * ther_old.first_two_phase_deriv(iDmass, iP, iHmass) / ther_old.rhomass();
-    D = volume * ther_old.first_two_phase_deriv(iDmass, iHmass, iP);
-  } else {
- */  
-    // B = B1 + volume * ther_old.first_partial_deriv(iDmass, iP, iHmass) / ther_old.rhomass();
-    // D = volume * ther_old.first_partial_deriv(iDmass, iHmass, iP);
-  // }
 
-  double trans3 = 0.; //trans_sim * ther_old.rhomass() * B * (spres_gues - spres_old) / delt;
-  double trans4 = 0.; //trans_sim * D * (senth_gues - senth_old) / delt;
+  double B, D;
+  if (ther_old->phase() == 6) {
+    B = B1 + volume * ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / ther_old->rhomass();
+    D = volume * ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
+  } else {
+    B = B1 + volume * ther_old->first_partial_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / ther_old->rhomass();
+    D = volume * ther_old->first_partial_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
+  }
+
+  double trans3 = trans_sim * ther_old->rhomass() * B * (spres_gues - spres_old) / delt;
+  double trans4 = trans_sim * D * (senth_gues - senth_old) / delt;
 
   double y = (trans3 + trans4 + alpha_mom * (osum_gues - isum_gues) + (1. - alpha_mom) * (osum_old - isum_old) - msource);
   

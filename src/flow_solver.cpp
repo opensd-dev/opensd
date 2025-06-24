@@ -217,12 +217,6 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         // }
       }
     }
-	
-	std::cout << A << std::endl;
-    if (trans_sim) {
-      std::exit(1);
-	}
-
 
     for (int i = 0; i < n; ++i) {
       auto& node = circuit->nodes[i];
@@ -327,6 +321,9 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         // node.pc_flag = true;
       // }
     }
+    // if (trans_sim) {
+      // std::exit(1);
+    // }
 
 
     for (auto& face : circuit->faces) {
