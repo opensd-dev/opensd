@@ -221,6 +221,12 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     for (int i = 0; i < n; ++i) {
       auto& node = circuit->nodes[i];
       if (node->fixed_var.count("msource")) {
+        if (time <= 20) {
+            node->msource = -753.6*(20.-time)/20.;
+		}
+        else {
+            node->msource = 0.;
+		}
         b(i) += node->msource;
       }
     }
@@ -364,7 +370,7 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
       b(i) = node->tenth_old * (trans_sim * C / delt) 
              + trans_sim * E * (node->spres_gues - node->spres_old) / delt
              + node->heat_input; // + std::accumulate(node.heat_hslab.begin(), node.heat_hslab.end(), 0.0);
-      b(i) -= node->tenth_old * node->msource * trans_sim;
+      b(i) = b(i) - node->tenth_old * node->msource * trans_sim;
 
       for (auto& iface : node->ifaces) {
         // if (dynamic_cast<cont::Reservoir*>(iface.dnode) && iface.dfrac != nullptr 
