@@ -24,7 +24,7 @@ std::unordered_map<std::string, std::function<double(const Node&)>> nodeAttribut
 void openFile(const std::string& outputFile) {
   std::string fixedOutputFile = "output.res";
   std::string bPath = std::string(getenv("PWD")) + "/" + fixedOutputFile;
-  f1.open(bPath);
+  f1.open(bPath, std::ios::out | std::ios::app);  // append mode
 }
 
 

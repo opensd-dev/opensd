@@ -31,6 +31,7 @@ int opensd_run()
   // time steps has already been run in a restart statepoint file
 
   // opensd::settings::alpha_mom
+  openFile("outputfile");
 
   // Loop through time slots
   for (int i = 0; i < settings::tim_slot.size(); ++i) {
@@ -114,7 +115,6 @@ int opensd_run()
     // post.update_calcs(time, delt);
 
     // if (flag_write) {
-      openFile("outputfile");
       writeOutput(simulation::current_time, simulation::delt);
     // }
   }
