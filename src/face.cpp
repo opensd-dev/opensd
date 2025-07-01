@@ -106,6 +106,27 @@ void Face::assign_prop() {
   // }
 }
 
+void Face::update_old() {
+    vflow_old = vflow_gues;
+    tpres_old = tpres_gues;
+    spres_old = spres_gues;
+    ttemp_old = ttemp_gues;
+    stemp_old = stemp_gues;
+
+    // if (choked) {
+    //   ther_old.update(ther_gues);
+    // } else {
+      ther_old->update();
+    // }
+
+    // heat_hslab_old = heat_hslab;
+    // heat_input_old = heat_input;
+    //
+    // if (upstream) upstream->update_old();
+    // if (downstream) downstream->update_old();
+}
+
+
 //==============================================================================
 // PFace implementation
 //==============================================================================
@@ -138,11 +159,11 @@ double PFace::eqn_mom(double x, double time, double delt, bool trans_sim, double
   }
 */
   double delp_gr = ther_gues->rhomass() * grav * delz; 
-  // double term_old = ((1. - alpha_mom) * ((downstream.tpres_old - upstream.tpres_old) 
-                    // - vflow_old * vflow_old / (2. * cfarea * cfarea) * (downstream.rhomass_old - upstream.rhomass_old) 
-                    // + ther_old.rhomass() * const.grav * delz
-                    // + fricfact_old * delx * ther_old.rhomass() * vflow_old * std::abs(vflow_old) / (2. * diameter * cfarea * cfarea)));
-  double term_old = 0.;
+  double term_old = ((1. - alpha_mom) * ((dnode->tpres_gues - unode->tpres_gues) //downstream.tpres_old - upstream.tpres_old
+                    - vflow_old * vflow_old / (2. * cfarea * cfarea) * 0. //(downstream.rhomass_old - upstream.rhomass_old)
+                    + ther_old->rhomass() * grav * delz
+                    + fricfact_old * delx * ther_old->rhomass() * vflow_old * std::abs(vflow_old) / (2. * diameter * cfarea * cfarea)));
+
 /*
   if (faceno == 0) {
     Term_old += (1. - alpha_mom) * pipe.Kforward_old * ther_old.rhomass() * vflow_old * std::abs(vflow_old) / (2. * cfarea * cfarea);
@@ -168,7 +189,7 @@ void PFace::update_abcoef(double time, double delt, double trans_sim, double alp
       // A = pow(vflow_gues, 2) / (2 * pow(cfarea, 2)) * dnode.spres_gues / dnode.tpres_gues * dnode.ther_gues.first_partial_deriv(1, 2, 3); // replace iDmass, iP, iHmass with appropriate values
     // }
 
-    double dr = 0.;
+    double dr;
     dr = (trans_sim * ther_gues->rhomass() * delx / (cfarea * delt)
                  + alpha_mom * (2 * (fricfact_gues * delx / diameter) * ther_gues->rhomass() * fabs(vflow_gues) / (2 * pow(cfarea, 2))
                                 + 0.0 * 2.0 * vflow_gues * (unode->ther_gues->rhomass() - dnode->ther_gues->rhomass()) / (2 * pow(cfarea, 2))));
@@ -229,11 +250,11 @@ void PFace::update_abcoef(double time, double delt, double trans_sim, double alp
  */  }
 }
 
-// void PFace::update_old() {
-  // Face::update_old();
-  // fricfact_old = fricfact_gues;
-  // pipe->Kforward_old = pipe->Kforward;
-// }
+void PFace::update_old() {
+  Face::update_old();
+  fricfact_old = fricfact_gues;
+  pipe->Kforward_old = pipe->Kforward;
+}
 
 void PFace::update_gues() {
   Face::update_gues();

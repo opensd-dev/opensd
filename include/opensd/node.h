@@ -76,7 +76,8 @@ public:
   void assign_staticvar();
   void update_staticvar();
   void assign_prop();
-  
+  void update_old();
+
   void save_to_hdf5(hid_t group_id) const;
   void load_from_hdf5(hid_t group_id);
 

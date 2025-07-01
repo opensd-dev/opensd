@@ -83,7 +83,7 @@ int opensd_run()
             // time, delt, trans_sim, alpha_mom, alpha_ener, "all", alpha_heat);
       }
 
-      if (converged && main_iter > 1) {
+      if (converged) {
         if (settings::temp_solve) {
           if (settings::verbosity >= 1 || (settings::verbosity >= 0 && !trans_sim)) {
               eps_h = 0.;

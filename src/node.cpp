@@ -192,6 +192,23 @@ void Node::update_staticvar() {
   }
 }
 
+void Node::update_old() {
+  tpres_old = tpres_gues;
+  ttemp_old = ttemp_gues;
+  spres_old = spres_gues;
+  stemp_old = stemp_gues;
+  tenth_old = tenth_gues;
+  senth_old = senth_gues;
+
+  ther_old->update(CoolProp::HmassP_INPUTS,senth_old,spres_old);
+
+  // if (circuit->flag_tp || dynamic_cast<TPTank*>(this)) {
+  //   ther_old.update_sat();
+  // }
+
+}
+
+
 void Node::save_to_hdf5(hid_t group_id) const {
   H5LTset_attribute_string(group_id, ".", "identifier", identifier.c_str());
 

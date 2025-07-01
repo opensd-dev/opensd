@@ -105,14 +105,18 @@ void read_settings_xml(pugi::xml_node root)
   no_flow_iter = stod(get_node_value(root, "no_flow_iter"));
   // conv_crit_flow = stod(get_node_value(root, "conv_crit_flow"));
 
-
-  double start = tim_slot[0];
-  double end = tim_slot[1];
-  double step = tim_slot[0];
-  tim_slot.clear();
+  bool trans_sim = settings::run_mode == RunMode::TRANSIENT;
+  if (trans_sim) {
+    double start = tim_slot[0];
+    double end = tim_slot[1];
+    double step = tim_slot[0];
+    tim_slot.clear();
   
-  for (double t = start; t <= end + 1e-9; t += step) {
+    for (double t = start; t <= end + 1e-9; t += step) {
       tim_slot.push_back(t);
+    }
+  } else {
+    tim_slot = {0.0};
   }
 
 }
