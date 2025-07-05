@@ -14,4 +14,5 @@ other related topics.
 
    contributing
    sds
+   tests
    docbuild
