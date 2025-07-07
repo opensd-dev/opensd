@@ -75,7 +75,7 @@ def _compare_results():
 
 class Test():
     def test_case1(self):
-        c_path = b_path + "/tutorial1.ipynb"
+        c_path = b_path + "/tutorial.ipynb"
         execute_ipynb(c_path)
         _compare_results()
 

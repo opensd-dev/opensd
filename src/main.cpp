@@ -8,7 +8,20 @@ int main(int argc, char* argv[])
   
   using namespace opensd;
   int err;
-  err = opensd_init(argc, argv);
+
+  // Initialize run -- when run with MPI, pass communicator
+#ifdef OPENSD_MPI
+  MPI_Comm world {MPI_COMM_WORLD};
+  err = opensd_init(argc, argv, &world);
+#else
+  err = opensd_init(argc, argv, nullptr);
+#endif
+  if (err == -1) {
+    // This happens for the -h and -v flags
+    return 0;
+  } else if (err) {
+    // fatal_error(opensd_err_msg);
+  }
   
   opensd_run();
 

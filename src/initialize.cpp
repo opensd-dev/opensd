@@ -8,9 +8,27 @@
 #include "opensd/settings.h"
 #include "opensd/geometry.h"
 
-int opensd_init(int argc, char* argv[])
+int opensd_init(int argc, char* argv[], const void* intracomm)
 {
   using namespace opensd;
+
+#ifdef OPENSD_MPI
+  // Check if intracomm was passed
+  MPI_Comm comm;
+  if (intracomm) {
+    comm = *static_cast<const MPI_Comm*>(intracomm);
+  } else {
+    comm = MPI_COMM_WORLD;
+  }
+
+  // Initialize MPI for C++
+  initialize_mpi(comm);
+#endif
+
+  // Parse command-line arguments
+  // int err = parse_command_line(argc, argv);
+  // if (err)
+    // return err;
 
   // Read XML input files
   // if (!read_model_xml())
