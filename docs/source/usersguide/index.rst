@@ -16,4 +16,5 @@ essential aspects of using OpenMC to perform simulations.
     basics
     geometry
     settings
+    parallel
 
