@@ -5,9 +5,16 @@
 
 #include <opensd/circuit.h>
 
+#ifdef OPENSD_MPI
+#include <mpi.h>
+#endif
+
 namespace opensd {
 
 // int parse_command_line(int argc, char* argv[]);
+#ifdef OPENSD_MPI
+void initialize_mpi(MPI_Comm intracomm);
+#endif
 
 //! Read circuit, heat slab, and settings from a single XML file
 // bool read_model_xml();

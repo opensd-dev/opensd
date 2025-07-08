@@ -1,3 +1,6 @@
+#ifdef OPENSD_MPI
+#include <mpi.h>
+#endif
 #include <iostream>
 // #include "CoolProp.h"
 #include "opensd/capi.h"
@@ -28,6 +31,11 @@ int main(int argc, char* argv[])
   // std::cout << CoolProp::PropsSI("T","P",101325,"Q",0,"Water") << std::endl;
   std::cout << PI << std::endl;
 
-  return 1;
+#ifdef OPENSD_MPI
+  std::cerr << ">> Finalizing MPI" << std::endl;
+  MPI_Finalize();
+#endif
+
+  return 0;
   
 }

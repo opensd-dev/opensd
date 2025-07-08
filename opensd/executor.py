@@ -1,6 +1,6 @@
 import subprocess
 
-def _process_CLI_arguments(opensd_exec='opensd'):
+def _process_CLI_arguments(opensd_exec='opensd', mpi_args=None):
     """Converts user-readable flags in to command-line arguments to be run with
     the OpenSD executable via subprocess.
 
@@ -8,6 +8,9 @@ def _process_CLI_arguments(opensd_exec='opensd'):
     ----------
     opensd_exec : str, optional
         Path to OpenMC executable. Defaults to 'opensd'.
+    mpi_args : list of str, optional
+        MPI execute command and any additional MPI arguments to pass,
+        e.g., ['mpiexec', '-n', '8'].
 
     Returns
     -------
@@ -17,6 +20,9 @@ def _process_CLI_arguments(opensd_exec='opensd'):
     """
 
     args = [opensd_exec]
+
+    if mpi_args is not None:
+        args = mpi_args + args
 
     return args
 
@@ -52,7 +58,7 @@ def _run(args, output, cwd):
 
         # raise RuntimeError(error_msg)
 
-def run(output=True, cwd='.',opensd_exec='opensd'):
+def run(output=True, cwd='.', opensd_exec='opensd', mpi_args=None):
     """Run an OpenSD simulation.
 
     Parameters
@@ -64,6 +70,9 @@ def run(output=True, cwd='.',opensd_exec='opensd'):
         directory.
     opensd_exec : str, optional
         Path to OpenSD executable. Defaults to 'opensd'.
+    mpi_args : list of str, optional
+        MPI execute command and any additional MPI arguments to pass, e.g.,
+        ['mpiexec', '-n', '8'].
 
     Raises
     ------
@@ -71,6 +80,6 @@ def run(output=True, cwd='.',opensd_exec='opensd'):
         If the `opensd` executable returns a non-zero status
 
     """
-    args = _process_CLI_arguments(opensd_exec=opensd_exec)
+    args = _process_CLI_arguments(opensd_exec=opensd_exec, mpi_args=mpi_args)
 
     _run(args, output, cwd)

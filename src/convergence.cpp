@@ -75,7 +75,7 @@ std::tuple<bool, std::tuple<double, double>> check_conv(double time, double delt
         face->ther_gues->update();
       }
       face->update_old();
-      std::cout << face->vflow_gues*face->ther_gues->rhomass() << std::endl;
+      // std::cout << face->vflow_gues*face->ther_gues->rhomass() << std::endl;
     }
 
 

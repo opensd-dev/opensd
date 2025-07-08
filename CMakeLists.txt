@@ -2,8 +2,21 @@ cmake_minimum_required(VERSION 3.10)
 
 project(OpenSD)
 
-# Find MPI
-find_package(MPI REQUIRED)
+#===============================================================================
+# Command line options
+#===============================================================================
+option(OPENSD_USE_MPI         "Enable MPI"                                           OFF)
+
+message(STATUS "OPENSD_USE_MPI ${OPENSD_USE_MPI}")
+
+#===============================================================================
+# MPI for distributed-memory parallelism
+#===============================================================================
+
+if(OPENSD_USE_MPI)
+  find_package(MPI REQUIRED)
+endif()
+
 find_package(HDF5 REQUIRED COMPONENTS C HL)
 
 if (MPI_FOUND)
@@ -58,12 +71,20 @@ target_include_directories(${EXENAME} PUBLIC
   ${MPI_CXX_INCLUDE_DIRS}
 )
 
+if (OPENSD_USE_MPI)
+  target_compile_definitions(${EXENAME} PUBLIC -DOPENSD_MPI)
+endif()
+
 target_link_libraries(${EXENAME}
   PUBLIC
     CoolProp
     pugixml
-    MPI::MPI_CXX
 	${HDF5_C_LIBRARIES} ${HDF5_HL_LIBRARIES}
+	MPI::MPI_CXX
 )
+
+# if (OPENSD_USE_MPI)
+#   target_link_libraries(${EXENAME} MPI::MPI_CXX)
+# endif()
 
 install(TARGETS ${EXENAME})

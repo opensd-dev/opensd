@@ -7,6 +7,7 @@
 // #include "opensd/constants.h"
 #include "opensd/settings.h"
 #include "opensd/geometry.h"
+#include "opensd/message_passing.h"
 
 int opensd_init(int argc, char* argv[], const void* intracomm)
 {
@@ -155,7 +156,27 @@ for (size_t i = 0; i < model::circuits.size(); ++i) {
 }
 
 namespace opensd {
-    
+
+#ifdef OPENSD_MPI
+void initialize_mpi(MPI_Comm intracomm)
+{
+  mpi::intracomm = intracomm;
+
+  // Initialize MPI
+  int flag;
+  MPI_Initialized(&flag);
+  if (!flag)
+    MPI_Init(nullptr, nullptr);
+
+  // Determine number of processes and rank for each
+  MPI_Comm_size(intracomm, &mpi::n_procs);
+  MPI_Comm_rank(intracomm, &mpi::rank);
+  mpi::master = (mpi::rank == 0);
+  std::cerr << ">> MPI rank: " << opensd::mpi::rank << std::endl;
+}
+#endif // OPENSD_MPI
+
+
 void read_separate_xml_files()
 {
   read_settings_xml();
