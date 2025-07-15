@@ -8,7 +8,7 @@
 #include <Eigen/Dense>   // For matrix manipulations
 #include <cstdlib>
 #include "opensd/vector.h"
-#include <mpi.h>
+#include "opensd/message_passing.h"
 
 #include "opensd/circuit.h"
 // #include <numeric>     // For std::accumulate
@@ -168,17 +168,26 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     Eigen::MatrixXd A = Eigen::MatrixXd::Zero(n, n);
     Eigen::VectorXd b = Eigen::VectorXd::Zero(n);
     
-    for (int i = 0; i < n; ++i) {
+    int start = mpi::rank * (n / mpi::n_procs);
+    int end = (mpi::rank == mpi::n_procs - 1) ? n : start + (n / mpi::n_procs);
+
+    Eigen::MatrixXd A_local = Eigen::MatrixXd::Zero(end - start, n);
+    Eigen::VectorXd b_local = Eigen::VectorXd::Zero(end - start);
+
+    for (int i = start; i < end; ++i) {
       auto& node = circuit->nodes[i];
+      int i_local = i - start;
       
       double B, D;
       if (node->ther_old->phase() == 6) {
         B = node->B1 + node->volume * node->ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node->ther_old->rhomass();
         A(i, i) = trans_sim * B * node->ther_old->rhomass() / delt;
+        A_local(i_local, i) = trans_sim * B * node->ther_old->rhomass() / delt;
         D = trans_sim * node->volume * node->ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
       } else {
         B = node->B1 + node->volume * node->ther_old->first_partial_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node->ther_old->rhomass();
         A(i, i) = trans_sim * B * node->ther_old->rhomass() / delt;
+        A_local(i_local, i) = trans_sim * B * node->ther_old->rhomass() / delt;
         D = trans_sim * node->volume * node->ther_old->first_partial_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
       }
       b(i) = -trans_sim * B * node->ther_old->rhomass() / delt * (node->tpres_gues - node->ther_gues->rhomass() * std::pow(node->velocity, 2) / 2.0 - node->spres_old)
@@ -186,7 +195,9 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
       for (auto& iface : node->ifaces) {
         A(i, iface->unode->node_ind) = -alpha_mom * (iface->aminus * iface->ther_gues->rhomass() + iface->bminus * iface->vflow_gues);
+        A_local(i_local, iface->unode->node_ind) = -alpha_mom * (iface->aminus * iface->ther_gues->rhomass() + iface->bminus * iface->vflow_gues);
         A(i, i) = A(i, i) - alpha_mom * (-iface->aplus * iface->ther_gues->rhomass() + iface->bplus * iface->vflow_gues);
+        A_local(i_local, i) = A_local(i_local, i) - alpha_mom * (-iface->aplus * iface->ther_gues->rhomass() + iface->bplus * iface->vflow_gues);
         b(i) += alpha_mom * (iface->ther_gues->rhomass() * iface->vflow_gues) + (1.0 - alpha_mom) * (iface->ther_old->rhomass() * iface->vflow_old);
         if (A(i, iface->unode->node_ind) > 0.0) {
           // if ((show_warn && trans_sim) || !trans_sim) {
@@ -197,7 +208,9 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
       for (auto& oface : node->ofaces) {
         A(i, oface->dnode->node_ind) = -alpha_mom * (oface->aplus * oface->ther_gues->rhomass() - oface->bplus * oface->vflow_gues);
+        A_local(i_local, oface->dnode->node_ind) = -alpha_mom * (oface->aplus * oface->ther_gues->rhomass() - oface->bplus * oface->vflow_gues);
         A(i, i) += alpha_mom * (oface->aminus * oface->ther_gues->rhomass() + oface->bminus * oface->vflow_gues);
+        A_local(i_local, i) += alpha_mom * (oface->aminus * oface->ther_gues->rhomass() + oface->bminus * oface->vflow_gues);
         b(i) = b(i) - alpha_mom * (oface->ther_gues->rhomass() * oface->vflow_gues) - (1.0 - alpha_mom) * (oface->ther_old->rhomass() * oface->vflow_old);
         if (A(i, oface->dnode->node_ind) > 1.E-6) { // Pending check if 0
           // if ((show_warn && trans_sim) || !trans_sim) {
@@ -217,6 +230,22 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         // }
       }
     }
+
+// if (mpi::rank == 0) {
+//     std::cout << "A_local from rank " << mpi::rank << std::endl << A_local << std::endl;
+//     std::cout << "Global matrix A\n" << A << std::endl;
+//     std::cout.flush();
+// }
+// MPI_Barrier(mpi::intracomm);  // Wait for rank 0 to finish
+//
+// if (mpi::rank == 1) {
+//     std::cout << "A_local from rank " << mpi::rank << std::endl << A_local << std::endl;
+//     std::cout << "Global matrix A\n" << A << std::endl;
+//     std::cout.flush();
+// }
+// MPI_Barrier(mpi::intracomm);  // Wait for rank 1 to finish
+//
+// MPI_Abort(mpi::intracomm, 0);  // Kill all after printing
 
     for (int i = 0; i < n; ++i) {
       auto& node = circuit->nodes[i];
