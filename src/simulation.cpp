@@ -12,6 +12,7 @@
 #include "opensd/flow_solver.h"
 #include "opensd/post.h"
 #include "opensd/hdf5_interface.h"
+#include "opensd/message_passing.h"
 
 //==============================================================================
 // C API functions
@@ -52,6 +53,7 @@ int opensd_run()
       
       for (int flow_iter = 0; flow_iter < settings::no_flow_iter; ++flow_iter) {
         exec_massmom(simulation::current_time, simulation::delt, trans_sim, alpha_mom, main_iter, flow_iter);
+        if (mpi::rank == 0) {
         std::tuple<bool, std::tuple<double, double>> result = check_conv(simulation::current_time, simulation::delt, trans_sim, alpha_mom, "massmom");
         converged = std::get<0>(result);
         std::tie(eps_m, eps_p) = std::get<1>(result);
@@ -65,8 +67,15 @@ int opensd_run()
             std::cout << "massmom iteration " << flow_iter + 1 << " " << eps_m << " " << eps_p << std::endl;
           }
         }
+        }
       }
-      
+
+  if (mpi::rank != 0) {
+    MPI_Finalize();
+    std::exit(0);
+  }
+
+
       if (!converged) {
         std::cerr << "massmom not converged. stopping " << eps_m << " " << eps_p << std::endl;
         std::exit(EXIT_FAILURE);

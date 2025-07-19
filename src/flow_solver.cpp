@@ -241,38 +241,53 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       }
     }
 
-    // if (mpi::rank == 0) {
-      MatrixR A = MatrixR::Zero(n, n);
-      Eigen::VectorXd b = Eigen::VectorXd::Zero(n);
-    // }
+// Declare A and b outside so all ranks can see them
+MatrixR A;
+Eigen::VectorXd b;
 
-std::vector<int> recvcounts(mpi::n_procs), displs(mpi::n_procs);
+if (mpi::rank == 0) {
+  A = MatrixR::Zero(n, n);
+  b = Eigen::VectorXd::Zero(n);
+}
+
+// For matrix A
+std::vector<int> recvcounts_A(mpi::n_procs), displs_A(mpi::n_procs);
 int rows_per_rank = n / mpi::n_procs;
 
 for (int r = 0; r < mpi::n_procs; ++r) {
   int r_rows = (r == mpi::n_procs - 1) ? n - r * rows_per_rank : rows_per_rank;
-  recvcounts[r] = r_rows * n;  // because A_local is (rows x n)
-  displs[r] = (r == 0) ? 0 : displs[r - 1] + recvcounts[r - 1];
+  recvcounts_A[r] = r_rows * n;
+  displs_A[r] = (r == 0) ? 0 : displs_A[r - 1] + recvcounts_A[r - 1];
 }
 
-    if (mpi::rank == 0) {
-      MPI_Gatherv(A_local.data(), A_local.size(), MPI_DOUBLE,
-            A.data(), recvcounts.data(), displs.data(), MPI_DOUBLE,
-            0, mpi::intracomm);
-    }
+// std::cout << "Rank " << mpi::rank << " before gather A" << std::endl;
 
+MPI_Gatherv(
+  A_local.data(), A_local.size(), MPI_DOUBLE,
+  (mpi::rank == 0 ? A.data() : nullptr),
+  recvcounts_A.data(), displs_A.data(), MPI_DOUBLE,
+  0, mpi::intracomm
+);
+// std::cout << "Rank " << mpi::rank << " after gather A" << std::endl;
+
+// For vector b
+std::vector<int> recvcounts_b(mpi::n_procs), displs_b(mpi::n_procs);
 
 for (int r = 0; r < mpi::n_procs; ++r) {
   int r_rows = (r == mpi::n_procs - 1) ? n - r * rows_per_rank : rows_per_rank;
-  recvcounts[r] = r_rows;
-  displs[r] = (r == 0) ? 0 : displs[r - 1] + recvcounts[r - 1];
+  recvcounts_b[r] = r_rows;
+  displs_b[r] = (r == 0) ? 0 : displs_b[r - 1] + recvcounts_b[r - 1];
 }
 
-    if (mpi::rank == 0) {
-      MPI_Gatherv(b_local.data(), b_local.size(), MPI_DOUBLE,
-            b.data(), recvcounts.data(), displs.data(), MPI_DOUBLE,
-            0, mpi::intracomm);
-    }
+// std::cout << "Rank " << mpi::rank << " before gather b" << std::endl;
+
+MPI_Gatherv(
+  b_local.data(), b_local.size(), MPI_DOUBLE,
+  (mpi::rank == 0 ? b.data() : nullptr),
+  recvcounts_b.data(), displs_b.data(), MPI_DOUBLE,
+  0, mpi::intracomm
+);
+// std::cout << "Rank " << mpi::rank << " after gather b" << std::endl;
 
 // if (mpi::rank == 0) {
 //     std::cout << "b_local from rank " << mpi::rank << std::endl << b_local << std::endl;
@@ -294,11 +309,7 @@ MPI_Barrier(mpi::intracomm);  // Wait for rank 1 to finish
 
 // MPI_Abort(mpi::intracomm, 0);  // Kill all after printing
 
-if (mpi::rank != 0) {
-    MPI_Finalize();
-    std::exit(0);  // clean exit
-}
-
+if (mpi::rank == 0) {
     // Collect rows that are not in circuit->Pbound_ind
     Eigen::MatrixXd A_new(A.rows() - circuit->Pbound_ind.size(), A.cols());
     int j = 0;
@@ -417,6 +428,7 @@ if (mpi::rank != 0) {
   }
 }
 
+}
 
 void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, int main_iter) {
   
