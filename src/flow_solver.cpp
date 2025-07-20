@@ -309,6 +309,8 @@ MPI_Barrier(mpi::intracomm);  // Wait for rank 1 to finish
 
 // MPI_Abort(mpi::intracomm, 0);  // Kill all after printing
 
+Eigen::VectorXd pc; 
+
 if (mpi::rank == 0) {
     // Collect rows that are not in circuit->Pbound_ind
     Eigen::MatrixXd A_new(A.rows() - circuit->Pbound_ind.size(), A.cols());
@@ -353,7 +355,6 @@ if (mpi::rank == 0) {
 //    std::cout << "Matrix A:\n" << A << std::endl;
 //    std::cout << "b = \n" << b << std::endl;
 
-    Eigen::VectorXd pc;
     if (A.fullPivLu().isInvertible()) {
       pc = A.lu().solve(b);
     } else {
@@ -363,7 +364,13 @@ if (mpi::rank == 0) {
     // Insert zeros at boundary indices
     pc = insertZerosAtIndices(pc, circuit->Pbound_ind);
     
-    
+} else {
+	pc = Eigen::VectorXd::Zero(circuit->nodes.size());  // Allocate space in other ranks
+}
+
+// Broadcast pc to all ranks
+MPI_Bcast(pc.data(), pc.size() , MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
 //    std::cout << "pc = \n" << pc << std::endl;
     
 //    if (flow_iter == 1) {
@@ -425,7 +432,6 @@ if (mpi::rank == 0) {
       // }
     }
 
-  }
 }
 
 }

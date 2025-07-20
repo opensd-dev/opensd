@@ -54,27 +54,28 @@ int opensd_run()
       for (int flow_iter = 0; flow_iter < settings::no_flow_iter; ++flow_iter) {
         exec_massmom(simulation::current_time, simulation::delt, trans_sim, alpha_mom, main_iter, flow_iter);
         if (mpi::rank == 0) {
-        std::tuple<bool, std::tuple<double, double>> result = check_conv(simulation::current_time, simulation::delt, trans_sim, alpha_mom, "massmom");
-        converged = std::get<0>(result);
-        std::tie(eps_m, eps_p) = std::get<1>(result);
-        if (converged) {
-          if (settings::verbosity >= 3 || (settings::verbosity >= 2 && !trans_sim)) {
-            std::cout << "massmom converged in " << flow_iter + 1 << " iter. " << eps_m << " " << eps_p << std::endl;
-          }
-          break;
-        } else {
-          if (settings::verbosity >= 3 || (settings::verbosity >= 2 && !trans_sim)) {
-            std::cout << "massmom iteration " << flow_iter + 1 << " " << eps_m << " " << eps_p << std::endl;
+          std::tuple<bool, std::tuple<double, double>> result = check_conv(simulation::current_time, simulation::delt, trans_sim, alpha_mom, "massmom");
+          converged = std::get<0>(result);
+          std::tie(eps_m, eps_p) = std::get<1>(result);
+		}
+		
+		MPI_Bcast(&converged, 1, MPI_C_BOOL, 0, mpi::intracomm);
+		
+		if (mpi::rank == 0) {
+          if (converged) {
+            if (settings::verbosity >= 2 || (settings::verbosity >= 1 && !trans_sim)) {
+              std::cout << "massmom converged in " << flow_iter + 1 << " iter. " << eps_m << " " << eps_p << std::endl;
+            }
+          } else {
+            if (settings::verbosity >= 3 || (settings::verbosity >= 2 && !trans_sim)) {
+              std::cout << "massmom iteration " << flow_iter + 1 << " " << eps_m << " " << eps_p << std::endl;
+            }
           }
         }
-        }
+		
+		if (converged) break;
+		
       }
-
-  if (mpi::rank != 0) {
-    MPI_Finalize();
-    std::exit(0);
-  }
-
 
       if (!converged) {
         std::cerr << "massmom not converged. stopping " << eps_m << " " << eps_p << std::endl;
@@ -100,9 +101,11 @@ int opensd_run()
             std::cout << "main converged in " << main_iter + 1 << " iter. " << eps_m << " " << eps_p << " " << eps_h << " " << eps_t << std::endl;
           }
         } else {
-          if (settings::verbosity >= 1 || (settings::verbosity >= 0 && !trans_sim)) {
-            std::cout << "main converged in " << main_iter + 1 << " iter. " << eps_m << " " << eps_p << std::endl;
-          }
+		  if (mpi::rank == 0) {
+            if (settings::verbosity >= 1 || (settings::verbosity >= 0 && !trans_sim)) {
+              std::cout << "main converged in " << main_iter + 1 << " iter. " << eps_m << " " << eps_p << std::endl;
+            }
+		  }
         }
         break;
       } else {
@@ -124,13 +127,16 @@ int opensd_run()
     // post.update_calcs(time, delt);
 
     // if (flag_write) {
+	if (mpi::rank == 0) {
       writeOutput(simulation::current_time, simulation::delt);
+	}
     // }
   }
-  
-  std::cout << "Execution time = " << (std::clock() - start_time) / (double)CLOCKS_PER_SEC << std::endl;
-    
+  if (mpi::rank == 0) {
+    std::cout << "Execution time = " << (std::clock() - start_time) / (double)CLOCKS_PER_SEC << std::endl;
+  }
 
+  if (mpi::rank == 0) {
   try {
     hid_t file_id = opensd::create_or_open_file("circuits.h5");
   
@@ -156,6 +162,7 @@ int opensd_run()
   
   } catch (const std::exception& e) {
     std::cerr << "HDF5 error during save: " << e.what() << std::endl;
+  }
   }
 
   return 0;
