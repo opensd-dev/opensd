@@ -44,8 +44,9 @@ int opensd_run()
       simulation::delt = settings::tim_slot[i] - settings::tim_slot[i-1];
 	  alpha_mom = 0.6;
     }
+    if (mpi::rank == 0) {
     if (settings::verbosity >= 1) std::cout << "time=" << std::setprecision(5) << simulation::current_time << " ";
-    
+    }
     // action_setup.update(time, delt);
     bool converged;
     double eps_m, eps_p, eps_h, eps_t;
@@ -53,11 +54,11 @@ int opensd_run()
       
       for (int flow_iter = 0; flow_iter < settings::no_flow_iter; ++flow_iter) {
         exec_massmom(simulation::current_time, simulation::delt, trans_sim, alpha_mom, main_iter, flow_iter);
-        if (mpi::rank == 0) {
+        // if (mpi::rank == 0) {
           std::tuple<bool, std::tuple<double, double>> result = check_conv(simulation::current_time, simulation::delt, trans_sim, alpha_mom, "massmom");
           converged = std::get<0>(result);
           std::tie(eps_m, eps_p) = std::get<1>(result);
-		}
+		// }
 		
 		MPI_Bcast(&converged, 1, MPI_C_BOOL, 0, mpi::intracomm);
 		

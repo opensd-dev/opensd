@@ -172,7 +172,8 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
     MatrixR A_local = MatrixR::Zero(end - start, n);
     Eigen::VectorXd b_local = Eigen::VectorXd::Zero(end - start);
-
+    std::vector<double> msource_local(end - start);
+    
     for (int i = start; i < end; ++i) {
       auto& node = circuit->nodes[i];
       int i_local = i - start;
@@ -189,6 +190,21 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       }
       b_local(i_local) = -trans_sim * B * node->ther_old->rhomass() / delt * (node->tpres_gues - node->ther_gues->rhomass() * std::pow(node->velocity, 2) / 2.0 - node->spres_old)
            - trans_sim * D * (node->senth_gues - node->senth_old) / delt;
+// MPI_Barrier(mpi::intracomm);  // Wait for rank 0 to finish
+
+// if (mpi::rank == 0) {
+    // std::cout << "b_local from rank " << mpi::rank << std::endl
+          // << i_local << " " << std::setprecision(16) << node->senth_gues << " " << node->senth_old  << std::endl;
+    // std::cout.flush();
+// }
+// MPI_Barrier(mpi::intracomm);  // Wait for rank 0 to finish
+
+// if (mpi::rank == 1) {
+    // std::cout << "b_local from rank " << mpi::rank << std::endl
+          // << i_local << " " << std::setprecision(16) << node->senth_gues << " " << node->senth_old  << std::endl;
+    // std::cout.flush();
+// }
+// MPI_Barrier(mpi::intracomm);  // Wait for rank 0 to finish
 
       for (auto& iface : node->ifaces) {
         A_local(i_local, iface->unode->node_ind) = -alpha_mom * (iface->aminus * iface->ther_gues->rhomass() + iface->bminus * iface->vflow_gues);
@@ -217,6 +233,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         // node->msource = -b(i);
         // std::cout << "node" << node->identifier << " " << i_local << " " << b_local(i_local) << " " << mpi::rank << std::endl;
         node->msource = -b_local(i_local);
+        msource_local[i_local] = node->msource;
       }
 
       if (A_local(i_local, i) < -1.E-6) { // Pending check if 0
@@ -237,6 +254,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         else {
             node->msource = 0.;
 		}
+        msource_local[i_local] = node->msource;
         b_local(i_local) += node->msource;
       }
     }
@@ -244,15 +262,16 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 // Declare A and b outside so all ranks can see them
 MatrixR A;
 Eigen::VectorXd b;
+std::vector<double> msource_global(n);
 
 if (mpi::rank == 0) {
   A = MatrixR::Zero(n, n);
   b = Eigen::VectorXd::Zero(n);
 }
 
+int rows_per_rank = n / mpi::n_procs;
 // For matrix A
 std::vector<int> recvcounts_A(mpi::n_procs), displs_A(mpi::n_procs);
-int rows_per_rank = n / mpi::n_procs;
 
 for (int r = 0; r < mpi::n_procs; ++r) {
   int r_rows = (r == mpi::n_procs - 1) ? n - r * rows_per_rank : rows_per_rank;
@@ -289,6 +308,21 @@ MPI_Gatherv(
 );
 // std::cout << "Rank " << mpi::rank << " after gather b" << std::endl;
 
+
+
+std::vector<int> recvcounts_m(mpi::n_procs), displs_m(mpi::n_procs);
+
+for (int r = 0; r < mpi::n_procs; ++r) {
+  int r_rows = (r == mpi::n_procs - 1) ? n - r * rows_per_rank : rows_per_rank;
+  recvcounts_m[r] = r_rows;
+  displs_m[r] = (r == 0) ? 0 : displs_m[r - 1] + recvcounts_m[r - 1];
+}
+
+MPI_Gatherv(msource_local.data(), msource_local.size(), MPI_DOUBLE,
+            (mpi::rank == 0 ? msource_global.data() : nullptr), recvcounts_m.data(), displs_m.data(), MPI_DOUBLE,
+            0, mpi::intracomm);
+
+
 // if (mpi::rank == 0) {
 //     std::cout << "b_local from rank " << mpi::rank << std::endl << b_local << std::endl;
 //     std::cout.flush();
@@ -301,8 +335,9 @@ MPI_Gatherv(
 // }
 // MPI_Barrier(mpi::intracomm);  // Wait for rank 1 to finish
 //
-// if (mpi::rank == 0) {
-//     std::cout << "Global matrix b\n" << b << std::endl;
+// if (mpi::rank == 0 and time == 2*delt) {
+    // std::cout << "Global matrix b\n" << b << std::endl;
+    // std::exit(0);
 // }
 
 MPI_Barrier(mpi::intracomm);  // Wait for rank 1 to finish
@@ -369,7 +404,9 @@ if (mpi::rank == 0) {
 }
 
 // Broadcast pc to all ranks
-MPI_Bcast(pc.data(), pc.size() , MPI_DOUBLE, 0, MPI_COMM_WORLD);
+MPI_Bcast(pc.data(), pc.size() , MPI_DOUBLE, 0, mpi::intracomm);
+
+MPI_Bcast(msource_global.data(), msource_global.size(), MPI_DOUBLE, 0, mpi::intracomm);
 
 //    std::cout << "pc = \n" << pc << std::endl;
     
@@ -391,6 +428,7 @@ MPI_Bcast(pc.data(), pc.size() , MPI_DOUBLE, 0, MPI_COMM_WORLD);
     for (int i = 0; i < n; ++i) {
       auto& node = circuit->nodes[i];
       // if (node.flowreg == "Slug") continue;
+      node->msource = msource_global[i];
       double relax = 0.6;
       // if (solver::relax_pres) {
         // relax = solver::relax_pres;
