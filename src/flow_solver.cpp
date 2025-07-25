@@ -13,6 +13,7 @@
 #include "opensd/circuit.h"
 // #include <numeric>     // For std::accumulate
 // #include <copy>          // For std::copy in Arow and brow
+#include <petscksp.h>
 
 namespace opensd {
 
@@ -165,7 +166,11 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     guess_flow(time, delt, trans_sim, alpha_mom, main_iter, circuit);
 
     // Pressure corrections
-    int n = circuit->nodes.size();
+    Mat A;
+    Vec b, pc;
+    KSP ksp;
+    std::vector<double> msource_global(circuit->nodes.size());
+    PetscInt n = circuit->nodes.size(), i;
 
     int start = mpi::rank * (n / mpi::n_procs);
     int end = (mpi::rank == mpi::n_procs - 1) ? n : start + (n / mpi::n_procs);
@@ -173,6 +178,18 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     MatrixR A_local = MatrixR::Zero(end - start, n);
     Eigen::VectorXd b_local = Eigen::VectorXd::Zero(end - start);
     std::vector<double> msource_local(end - start);
+    MatCreate(mpi::intracomm, &A);
+    MatSetSizes(A, PETSC_DECIDE, PETSC_DECIDE, n, n);
+    MatSetFromOptions(A);
+    MatSetUp(A);
+    
+    VecCreate(mpi::intracomm, &b);
+    VecSetSizes(b, PETSC_DECIDE, n);
+    VecSetFromOptions(b);
+    
+    VecCreate(mpi::intracomm, &pc);
+    VecSetSizes(pc, PETSC_DECIDE, n);
+    VecSetFromOptions(pc);
     
     for (int i = start; i < end; ++i) {
       auto& node = circuit->nodes[i];
@@ -182,14 +199,17 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       if (node->ther_old->phase() == 6) {
         B = node->B1 + node->volume * node->ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node->ther_old->rhomass();
         A_local(i_local, i) = trans_sim * B * node->ther_old->rhomass() / delt;
+        MatSetValue(A, i_local, i, A_local(i_local, i), INSERT_VALUES);
         D = trans_sim * node->volume * node->ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
       } else {
         B = node->B1 + node->volume * node->ther_old->first_partial_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node->ther_old->rhomass();
         A_local(i_local, i) = trans_sim * B * node->ther_old->rhomass() / delt;
+        MatSetValue(A, i_local, i, A_local(i_local, i), INSERT_VALUES);
         D = trans_sim * node->volume * node->ther_old->first_partial_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
       }
       b_local(i_local) = -trans_sim * B * node->ther_old->rhomass() / delt * (node->tpres_gues - node->ther_gues->rhomass() * std::pow(node->velocity, 2) / 2.0 - node->spres_old)
            - trans_sim * D * (node->senth_gues - node->senth_old) / delt;
+      VecSetValue(b, i_local, b_local(i_local), INSERT_VALUES);
 // MPI_Barrier(mpi::intracomm);  // Wait for rank 0 to finish
 
 // if (mpi::rank == 0) {
@@ -208,8 +228,11 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
       for (auto& iface : node->ifaces) {
         A_local(i_local, iface->unode->node_ind) = -alpha_mom * (iface->aminus * iface->ther_gues->rhomass() + iface->bminus * iface->vflow_gues);
+        MatSetValue(A, i_local, iface->unode->node_ind, A_local(i_local, iface->unode->node_ind), INSERT_VALUES);
         A_local(i_local, i) = A_local(i_local, i) - alpha_mom * (-iface->aplus * iface->ther_gues->rhomass() + iface->bplus * iface->vflow_gues);
+        MatSetValue(A, i_local, i, A_local(i_local, i), INSERT_VALUES);
         b_local(i_local) += alpha_mom * (iface->ther_gues->rhomass() * iface->vflow_gues) + (1.0 - alpha_mom) * (iface->ther_old->rhomass() * iface->vflow_old);
+        VecSetValue(b, i_local, b_local(i_local), INSERT_VALUES);
         if (A_local(i_local, iface->unode->node_ind) > 0.0) {
           // if ((show_warn && trans_sim) || !trans_sim) {
             std::cout << "Warning: upstream coef negative. " << node->identifier << std::endl;
@@ -219,8 +242,11 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
       for (auto& oface : node->ofaces) {
         A_local(i_local, oface->dnode->node_ind) = -alpha_mom * (oface->aplus * oface->ther_gues->rhomass() - oface->bplus * oface->vflow_gues);
+        MatSetValue(A, i_local, oface->dnode->node_ind, A_local(i_local, oface->dnode->node_ind), INSERT_VALUES);
         A_local(i_local, i) += alpha_mom * (oface->aminus * oface->ther_gues->rhomass() + oface->bminus * oface->vflow_gues);
+        MatSetValue(A, i_local, i, A_local(i_local, i), INSERT_VALUES);
         b_local(i_local) = b_local(i_local) - alpha_mom * (oface->ther_gues->rhomass() * oface->vflow_gues) - (1.0 - alpha_mom) * (oface->ther_old->rhomass() * oface->vflow_old);
+        VecSetValue(b, i_local, b_local(i_local), INSERT_VALUES);
         if (A_local(i_local, oface->dnode->node_ind) > 1.E-6) { // Pending check if 0
           // if ((show_warn && trans_sim) || !trans_sim) {
             std::cout << "Warning: downstream coef negative. " << node->identifier << std::endl;
@@ -256,59 +282,28 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 		}
         msource_local[i_local] = node->msource;
         b_local(i_local) += node->msource;
+        VecSetValue(b, i_local, b_local(i_local), INSERT_VALUES);
       }
     }
 
-// Declare A and b outside so all ranks can see them
-MatrixR A;
-Eigen::VectorXd b;
-std::vector<double> msource_global(n);
 
-if (mpi::rank == 0) {
-  A = MatrixR::Zero(n, n);
-  b = Eigen::VectorXd::Zero(n);
+MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
+MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
+
+VecAssemblyBegin(b);
+VecAssemblyEnd(b);
+
+KSPCreate(mpi::intracomm, &ksp);
+KSPSetOperators(ksp, A, A);
+KSPSetFromOptions(ksp);
+KSPSolve(ksp, b, pc);
+
+std::vector<double> pc_data(n);
+for (int i = 0; i < n; ++i) {
+    VecGetValues(pc, 1, &i, &pc_data[i]);
 }
-
+    
 int rows_per_rank = n / mpi::n_procs;
-// For matrix A
-std::vector<int> recvcounts_A(mpi::n_procs), displs_A(mpi::n_procs);
-
-for (int r = 0; r < mpi::n_procs; ++r) {
-  int r_rows = (r == mpi::n_procs - 1) ? n - r * rows_per_rank : rows_per_rank;
-  recvcounts_A[r] = r_rows * n;
-  displs_A[r] = (r == 0) ? 0 : displs_A[r - 1] + recvcounts_A[r - 1];
-}
-
-// std::cout << "Rank " << mpi::rank << " before gather A" << std::endl;
-
-MPI_Gatherv(
-  A_local.data(), A_local.size(), MPI_DOUBLE,
-  (mpi::rank == 0 ? A.data() : nullptr),
-  recvcounts_A.data(), displs_A.data(), MPI_DOUBLE,
-  0, mpi::intracomm
-);
-// std::cout << "Rank " << mpi::rank << " after gather A" << std::endl;
-
-// For vector b
-std::vector<int> recvcounts_b(mpi::n_procs), displs_b(mpi::n_procs);
-
-for (int r = 0; r < mpi::n_procs; ++r) {
-  int r_rows = (r == mpi::n_procs - 1) ? n - r * rows_per_rank : rows_per_rank;
-  recvcounts_b[r] = r_rows;
-  displs_b[r] = (r == 0) ? 0 : displs_b[r - 1] + recvcounts_b[r - 1];
-}
-
-// std::cout << "Rank " << mpi::rank << " before gather b" << std::endl;
-
-MPI_Gatherv(
-  b_local.data(), b_local.size(), MPI_DOUBLE,
-  (mpi::rank == 0 ? b.data() : nullptr),
-  recvcounts_b.data(), displs_b.data(), MPI_DOUBLE,
-  0, mpi::intracomm
-);
-// std::cout << "Rank " << mpi::rank << " after gather b" << std::endl;
-
-
 
 std::vector<int> recvcounts_m(mpi::n_procs), displs_m(mpi::n_procs);
 
@@ -322,89 +317,18 @@ MPI_Gatherv(msource_local.data(), msource_local.size(), MPI_DOUBLE,
             (mpi::rank == 0 ? msource_global.data() : nullptr), recvcounts_m.data(), displs_m.data(), MPI_DOUBLE,
             0, mpi::intracomm);
 
+// Eigen::VectorXd pc = Eigen::VectorXd::Zero(circuit->nodes.size());
 
-// if (mpi::rank == 0) {
-//     std::cout << "b_local from rank " << mpi::rank << std::endl << b_local << std::endl;
-//     std::cout.flush();
-// }
-// MPI_Barrier(mpi::intracomm);  // Wait for rank 0 to finish
-//
-// if (mpi::rank == 1) {
-//     std::cout << "b_local from rank " << mpi::rank << std::endl << b_local << std::endl;
-//     std::cout.flush();
-// }
-// MPI_Barrier(mpi::intracomm);  // Wait for rank 1 to finish
-//
-// if (mpi::rank == 0 and time == 2*delt) {
-    // std::cout << "Global matrix b\n" << b << std::endl;
-    // std::exit(0);
-// }
-
-MPI_Barrier(mpi::intracomm);  // Wait for rank 1 to finish
-
-// MPI_Abort(mpi::intracomm, 0);  // Kill all after printing
-
+/* pc_data = insertZerosAtIndices(pc_data, circuit->Pbound_ind);
 Eigen::VectorXd pc; 
-
-if (mpi::rank == 0) {
-    // Collect rows that are not in circuit->Pbound_ind
-    Eigen::MatrixXd A_new(A.rows() - circuit->Pbound_ind.size(), A.cols());
-    int j = 0;
-    for (int i = 0; i < A.rows(); ++i) {
-      if (std::find(circuit->Pbound_ind.begin(), circuit->Pbound_ind.end(), i) == circuit->Pbound_ind.end()) {
-        A_new.row(j++) = A.row(i);
-      }
-    }
-    
-    // Update A to have the new set of rows
-    A = A_new;
-    
-    // Collect columns that are not in circuit->Pbound_ind
-    Eigen::MatrixXd A_new_cols(A.rows(), A.cols() - circuit->Pbound_ind.size());
-    int k = 0;
-    for (int i = 0; i < A.cols(); ++i) {
-      if (std::find(circuit->Pbound_ind.begin(), circuit->Pbound_ind.end(), i) == circuit->Pbound_ind.end()) {
-        A_new_cols.col(k++) = A.col(i);
-      }
-    }
-    
-    // Set A to A_new_cols after deletion of columns
-    A = A_new_cols;
-    
-    // Create a new vector excluding elements at the indices in Pbound_ind
-    Eigen::VectorXd b_new(b.size() - circuit->Pbound_ind.size());
-    int b_new_index = 0;
-    int Pbound_index = 0;
-    
-    for (int i = 0; i < b.size(); ++i) {
-      if (Pbound_index < circuit->Pbound_ind.size() && i == circuit->Pbound_ind[Pbound_index]) {
-        ++Pbound_index; // Skip the current index
-      } else {
-        b_new[b_new_index++] = b[i]; // Copy the element
-      }
-    }
-    
-    // Assign the new vector back to b
-    b = b_new;
-
-//    std::cout << "Matrix A:\n" << A << std::endl;
-//    std::cout << "b = \n" << b << std::endl;
-
-    if (A.fullPivLu().isInvertible()) {
-      pc = A.lu().solve(b);
-    } else {
-      pc = Eigen::VectorXd::Zero(b.size()); // Skipping pressure correction for infinite conditional number (to be verified)
-    }
-    
-    // Insert zeros at boundary indices
-    pc = insertZerosAtIndices(pc, circuit->Pbound_ind);
-    
-} else {
-	pc = Eigen::VectorXd::Zero(circuit->nodes.size());  // Allocate space in other ranks
+// Copy to Eigen-style vector for downstream code
+for (int i = 0; i < n; ++i) {
+    pc(i) = pc_data[i];
 }
+ */std::exit(0);
 
 // Broadcast pc to all ranks
-MPI_Bcast(pc.data(), pc.size() , MPI_DOUBLE, 0, mpi::intracomm);
+// MPI_Bcast(pc.data(), pc.size() , MPI_DOUBLE, 0, mpi::intracomm);
 
 MPI_Bcast(msource_global.data(), msource_global.size(), MPI_DOUBLE, 0, mpi::intracomm);
 
