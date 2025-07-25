@@ -8,6 +8,7 @@
 #include "opensd/settings.h"
 #include "opensd/geometry.h"
 #include "opensd/message_passing.h"
+#include <petscsys.h>
 
 int opensd_init(int argc, char* argv[], const void* intracomm)
 {
@@ -19,7 +20,7 @@ int opensd_init(int argc, char* argv[], const void* intracomm)
   if (intracomm) {
     comm = *static_cast<const MPI_Comm*>(intracomm);
   } else {
-    comm = MPI_COMM_WORLD;
+    comm = PETSC_COMM_WORLD;
   }
 
   // Initialize MPI for C++
@@ -161,12 +162,6 @@ namespace opensd {
 void initialize_mpi(MPI_Comm intracomm)
 {
   mpi::intracomm = intracomm;
-
-  // Initialize MPI
-  int flag;
-  MPI_Initialized(&flag);
-  if (!flag)
-    MPI_Init(nullptr, nullptr);
 
   // Determine number of processes and rank for each
   MPI_Comm_size(intracomm, &mpi::n_procs);

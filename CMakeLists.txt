@@ -25,6 +25,8 @@ else()
   message(FATAL_ERROR "MPI not found!")
 endif()
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(PETSC REQUIRED IMPORTED_TARGET petsc)
 
 set(COOLPROP_STATIC_LIBRARY true)
 SET(EXENAME opensd)
@@ -81,6 +83,7 @@ target_link_libraries(${EXENAME}
     pugixml
 	${HDF5_C_LIBRARIES} ${HDF5_HL_LIBRARIES}
 	MPI::MPI_CXX
+    PkgConfig::PETSC
 )
 
 # if (OPENSD_USE_MPI)

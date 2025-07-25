@@ -1,10 +1,11 @@
 #ifdef OPENSD_MPI
-#include <mpi.h>
+// #include <mpi.h>
 #endif
 #include <iostream>
 // #include "CoolProp.h"
 #include "opensd/capi.h"
 #include "opensd/constants.h"
+#include <petscsys.h>
 
 int main(int argc, char* argv[])
 {
@@ -12,9 +13,10 @@ int main(int argc, char* argv[])
   using namespace opensd;
   int err;
 
-  // Initialize run -- when run with MPI, pass communicator
 #ifdef OPENSD_MPI
-  MPI_Comm world {MPI_COMM_WORLD};
+
+  PetscInitialize(&argc, &argv, NULL, NULL); // Also initializes MPI
+  MPI_Comm world = PETSC_COMM_WORLD;
   err = opensd_init(argc, argv, &world);
 #else
   err = opensd_init(argc, argv, nullptr);
@@ -33,7 +35,7 @@ int main(int argc, char* argv[])
 
 #ifdef OPENSD_MPI
   std::cerr << ">> Finalizing MPI" << std::endl;
-  MPI_Finalize();
+  PetscFinalize(); // Cleans up PETSc + MPI
 #endif
 
   return 0;
