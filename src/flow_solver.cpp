@@ -14,6 +14,7 @@
 // #include <numeric>     // For std::accumulate
 // #include <copy>          // For std::copy in Arow and brow
 #include <petscksp.h>
+// #include <fstream>
 
 namespace opensd {
 
@@ -199,59 +200,44 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       if (node->ther_old->phase() == 6) {
         B = node->B1 + node->volume * node->ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node->ther_old->rhomass();
         A_local(i_local, i) = trans_sim * B * node->ther_old->rhomass() / delt;
-        MatSetValue(A, i_local, i, A_local(i_local, i), INSERT_VALUES);
+        MatSetValue(A, i, i, A_local(i_local, i), INSERT_VALUES);
         D = trans_sim * node->volume * node->ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
       } else {
         B = node->B1 + node->volume * node->ther_old->first_partial_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node->ther_old->rhomass();
         A_local(i_local, i) = trans_sim * B * node->ther_old->rhomass() / delt;
-        MatSetValue(A, i_local, i, A_local(i_local, i), INSERT_VALUES);
+        MatSetValue(A, i, i, A_local(i_local, i), INSERT_VALUES);
         D = trans_sim * node->volume * node->ther_old->first_partial_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
       }
       b_local(i_local) = -trans_sim * B * node->ther_old->rhomass() / delt * (node->tpres_gues - node->ther_gues->rhomass() * std::pow(node->velocity, 2) / 2.0 - node->spres_old)
            - trans_sim * D * (node->senth_gues - node->senth_old) / delt;
-      VecSetValue(b, i_local, b_local(i_local), INSERT_VALUES);
-// MPI_Barrier(mpi::intracomm);  // Wait for rank 0 to finish
-
-// if (mpi::rank == 0) {
-    // std::cout << "b_local from rank " << mpi::rank << std::endl
-          // << i_local << " " << std::setprecision(16) << node->senth_gues << " " << node->senth_old  << std::endl;
-    // std::cout.flush();
-// }
-// MPI_Barrier(mpi::intracomm);  // Wait for rank 0 to finish
-
-// if (mpi::rank == 1) {
-    // std::cout << "b_local from rank " << mpi::rank << std::endl
-          // << i_local << " " << std::setprecision(16) << node->senth_gues << " " << node->senth_old  << std::endl;
-    // std::cout.flush();
-// }
-// MPI_Barrier(mpi::intracomm);  // Wait for rank 0 to finish
+      VecSetValue(b, i, b_local(i_local), INSERT_VALUES);
 
       for (auto& iface : node->ifaces) {
         A_local(i_local, iface->unode->node_ind) = -alpha_mom * (iface->aminus * iface->ther_gues->rhomass() + iface->bminus * iface->vflow_gues);
-        MatSetValue(A, i_local, iface->unode->node_ind, A_local(i_local, iface->unode->node_ind), INSERT_VALUES);
+        MatSetValue(A, i, iface->unode->node_ind, A_local(i_local, iface->unode->node_ind), INSERT_VALUES);
         A_local(i_local, i) = A_local(i_local, i) - alpha_mom * (-iface->aplus * iface->ther_gues->rhomass() + iface->bplus * iface->vflow_gues);
-        MatSetValue(A, i_local, i, A_local(i_local, i), INSERT_VALUES);
+        MatSetValue(A, i, i, A_local(i_local, i), INSERT_VALUES);
         b_local(i_local) += alpha_mom * (iface->ther_gues->rhomass() * iface->vflow_gues) + (1.0 - alpha_mom) * (iface->ther_old->rhomass() * iface->vflow_old);
-        VecSetValue(b, i_local, b_local(i_local), INSERT_VALUES);
         if (A_local(i_local, iface->unode->node_ind) > 0.0) {
           // if ((show_warn && trans_sim) || !trans_sim) {
             std::cout << "Warning: upstream coef negative. " << node->identifier << std::endl;
           // }
         }
+        VecSetValue(b, i, b_local(i_local), INSERT_VALUES);
       }
 
       for (auto& oface : node->ofaces) {
         A_local(i_local, oface->dnode->node_ind) = -alpha_mom * (oface->aplus * oface->ther_gues->rhomass() - oface->bplus * oface->vflow_gues);
-        MatSetValue(A, i_local, oface->dnode->node_ind, A_local(i_local, oface->dnode->node_ind), INSERT_VALUES);
+        MatSetValue(A, i, oface->dnode->node_ind, A_local(i_local, oface->dnode->node_ind), INSERT_VALUES);
         A_local(i_local, i) += alpha_mom * (oface->aminus * oface->ther_gues->rhomass() + oface->bminus * oface->vflow_gues);
-        MatSetValue(A, i_local, i, A_local(i_local, i), INSERT_VALUES);
+        MatSetValue(A, i, i, A_local(i_local, i), INSERT_VALUES);
         b_local(i_local) = b_local(i_local) - alpha_mom * (oface->ther_gues->rhomass() * oface->vflow_gues) - (1.0 - alpha_mom) * (oface->ther_old->rhomass() * oface->vflow_old);
-        VecSetValue(b, i_local, b_local(i_local), INSERT_VALUES);
         if (A_local(i_local, oface->dnode->node_ind) > 1.E-6) { // Pending check if 0
           // if ((show_warn && trans_sim) || !trans_sim) {
             std::cout << "Warning: downstream coef negative. " << node->identifier << std::endl;
           // }
         }
+        VecSetValue(b, i, b_local(i_local), INSERT_VALUES);
       }
 
       // if (node.fixed_var.count("P") && !dynamic_cast<cont.Reservoir*>(node)) {
@@ -260,6 +246,16 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         // std::cout << "node" << node->identifier << " " << i_local << " " << b_local(i_local) << " " << mpi::rank << std::endl;
         node->msource = -b_local(i_local);
         msource_local[i_local] = node->msource;
+        
+        // Overwrite matrix row to enforce Dirichlet pressure BC
+        for (int j = 0; j < n; ++j) {
+            MatSetValue(A, i, j, 0.0, INSERT_VALUES);
+        }
+        MatSetValue(A, i, i_local, 1.0, INSERT_VALUES);
+
+        // Override b to enforce zero pressure correction (or another BC value)
+        VecSetValue(b, i, 0.0, INSERT_VALUES);  // or desired pressure correction        
+        
       }
 
       if (A_local(i_local, i) < -1.E-6) { // Pending check if 0
@@ -282,7 +278,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 		}
         msource_local[i_local] = node->msource;
         b_local(i_local) += node->msource;
-        VecSetValue(b, i_local, b_local(i_local), INSERT_VALUES);
+        VecSetValue(b, i, b_local(i_local), INSERT_VALUES);
       }
     }
 
@@ -298,11 +294,12 @@ KSPSetOperators(ksp, A, A);
 KSPSetFromOptions(ksp);
 KSPSolve(ksp, b, pc);
 
-std::vector<double> pc_data(n);
-for (int i = 0; i < n; ++i) {
-    VecGetValues(pc, 1, &i, &pc_data[i]);
-}
-    
+// PetscViewer viewer;
+// PetscViewerASCIIOpen(PETSC_COMM_WORLD, "pc_output.txt", &viewer);
+// VecView(pc, viewer);
+// PetscViewerDestroy(&viewer);
+
+
 int rows_per_rank = n / mpi::n_procs;
 
 std::vector<int> recvcounts_m(mpi::n_procs), displs_m(mpi::n_procs);
@@ -317,15 +314,7 @@ MPI_Gatherv(msource_local.data(), msource_local.size(), MPI_DOUBLE,
             (mpi::rank == 0 ? msource_global.data() : nullptr), recvcounts_m.data(), displs_m.data(), MPI_DOUBLE,
             0, mpi::intracomm);
 
-// Eigen::VectorXd pc = Eigen::VectorXd::Zero(circuit->nodes.size());
 
-/* pc_data = insertZerosAtIndices(pc_data, circuit->Pbound_ind);
-Eigen::VectorXd pc; 
-// Copy to Eigen-style vector for downstream code
-for (int i = 0; i < n; ++i) {
-    pc(i) = pc_data[i];
-}
- */std::exit(0);
 
 // Broadcast pc to all ranks
 // MPI_Bcast(pc.data(), pc.size() , MPI_DOUBLE, 0, mpi::intracomm);
@@ -338,10 +327,41 @@ MPI_Bcast(msource_global.data(), msource_global.size(), MPI_DOUBLE, 0, mpi::intr
 //      std::exit(0);
 //    }
 
-    // Flow rate corrections
+
+
+// Get global size
+VecGetSize(pc, &n);
+
+// Create sequential vector to hold full solution on all ranks
+Vec pc_full;
+VecCreateSeq(PETSC_COMM_SELF, n, &pc_full);
+
+// Create identity index sets
+IS from, to;
+ISCreateStride(PETSC_COMM_WORLD, n, 0, 1, &from);
+ISCreateStride(PETSC_COMM_SELF,  n, 0, 1, &to);
+
+// Create and execute scatter
+VecScatter scatter;
+VecScatterCreate(pc, from, pc_full, to, &scatter);
+VecScatterBegin(scatter, pc, pc_full, INSERT_VALUES, SCATTER_FORWARD);
+VecScatterEnd(scatter, pc, pc_full, INSERT_VALUES, SCATTER_FORWARD);
+
+// Access full pc values on all ranks
+PetscScalar* pc_array;
+VecGetArray(pc_full, &pc_array);
+
+// for (PetscInt i = 0; i < n; ++i) {
+    // std::cout << "Rank " << mpi::rank << " full pc[" << i << "] = " << pc_array[i] << std::endl;
+// }
+
+
+
+     // Flow rate corrections
     for (auto& face : circuit->faces) {
       if (!face->choked) {
-        double vc = face->aminus * pc(face->unode->node_ind) - face->aplus * pc(face->dnode->node_ind);
+
+        double vc = face->aminus * pc_array[face->unode->node_ind] - face->aplus * pc_array[face->dnode->node_ind];
         face->vflow_gues += vc;
       }
       face->update_velocity();
@@ -357,7 +377,7 @@ MPI_Bcast(msource_global.data(), msource_global.size(), MPI_DOUBLE, 0, mpi::intr
       // if (solver::relax_pres) {
         // relax = solver::relax_pres;
       // }
-      node->tpres_gues += relax * pc(i);
+      node->tpres_gues += relax * pc_array[i];
       if (node->tpres_gues < 0.0) {
         std::cerr << "Negative tpres " << node->identifier << " " << node->tpres_gues << " " << node->tpres_old << std::endl;
         std::cerr << pc << std::endl;
@@ -378,6 +398,21 @@ MPI_Bcast(msource_global.data(), msource_global.size(), MPI_DOUBLE, 0, mpi::intr
     // if (trans_sim) {
       // std::exit(1);
     // }
+
+
+// std::ofstream fout("tpres_rank" + std::to_string(mpi::rank) + ".txt");
+// for (auto& node : circuit->nodes) {
+  // fout << node->identifier << " " << node->tpres_gues << " " << node->tpres_old << "\n";
+// }
+// fout.close();
+
+VecRestoreArray(pc_full, &pc_array);
+
+// Clean up
+VecScatterDestroy(&scatter);
+ISDestroy(&from);
+ISDestroy(&to);
+VecDestroy(&pc_full);
 
 
     for (auto& face : circuit->faces) {
