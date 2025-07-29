@@ -251,7 +251,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         for (int j = 0; j < n; ++j) {
             MatSetValue(A, i, j, 0.0, INSERT_VALUES);
         }
-        MatSetValue(A, i, i_local, 1.0, INSERT_VALUES);
+        MatSetValue(A, i, i, 1.0, INSERT_VALUES);
 
         // Override b to enforce zero pressure correction (or another BC value)
         VecSetValue(b, i, 0.0, INSERT_VALUES);  // or desired pressure correction        
@@ -414,6 +414,10 @@ ISDestroy(&from);
 ISDestroy(&to);
 VecDestroy(&pc_full);
 
+KSPDestroy(&ksp);
+MatDestroy(&A);
+VecDestroy(&b);
+VecDestroy(&pc);
 
     for (auto& face : circuit->faces) {
       // if (!face->choked) {
