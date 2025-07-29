@@ -28,6 +28,8 @@ endif()
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(PETSC REQUIRED IMPORTED_TARGET petsc)
 
+find_package(fmt REQUIRED)
+
 set(COOLPROP_STATIC_LIBRARY true)
 SET(EXENAME opensd)
 
@@ -84,6 +86,7 @@ target_link_libraries(${EXENAME}
 	${HDF5_C_LIBRARIES} ${HDF5_HL_LIBRARIES}
 	MPI::MPI_CXX
     PkgConfig::PETSC
+    fmt::fmt-header-only
 )
 
 # if (OPENSD_USE_MPI)

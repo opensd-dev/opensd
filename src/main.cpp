@@ -5,6 +5,7 @@
 // #include "CoolProp.h"
 #include "opensd/capi.h"
 #include "opensd/constants.h"
+#include "opensd/error.h"
 #include <petscsys.h>
 
 int main(int argc, char* argv[])
@@ -30,8 +31,9 @@ int main(int argc, char* argv[])
   
   opensd_run();
 
-  // std::cout << CoolProp::PropsSI("T","P",101325,"Q",0,"Water") << std::endl;
-  std::cout << PI << std::endl;
+  err = opensd_finalize();
+  if (err)
+    fatal_error(opensd_err_msg);
 
 #ifdef OPENSD_MPI
   std::cerr << ">> Finalizing MPI" << std::endl;

@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include "opensd/vector.h"
 #include "opensd/message_passing.h"
+#include "opensd/timer.h"
 
 #include "opensd/circuit.h"
 // #include <numeric>     // For std::accumulate
@@ -160,6 +161,8 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
 }
   
 void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, int main_iter, int flow_iter) {
+  
+    simulation::time_massmom.start();
   
    for (auto& circuit : model::circuits) {
     // if (!trans_sim && !circuit->solveSS) continue;
@@ -434,7 +437,7 @@ VecDestroy(&pc);
     }
 
 }
-
+simulation::time_massmom.stop();
 }
 
 void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, int main_iter) {

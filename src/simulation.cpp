@@ -7,12 +7,15 @@
 #include <cmath> // for rounding function
 #include <iomanip> // for setting precision in output
 
-#include "opensd/settings.h"
+#include "opensd/capi.h"
 #include "opensd/convergence.h"
 #include "opensd/flow_solver.h"
-#include "opensd/post.h"
 #include "opensd/hdf5_interface.h"
 #include "opensd/message_passing.h"
+#include "opensd/output.h"
+#include "opensd/post.h"
+#include "opensd/settings.h"
+#include "opensd/timer.h"
 
 //==============================================================================
 // C API functions
@@ -27,6 +30,9 @@ int opensd_run()
 
   std::clock_t start_time;
   start_time = std::clock();
+
+  opensd::simulation::time_total.start();
+  opensd_simulation_init();
 
   // Ensure that a timestep isn't executed in the case that the maximum number of
   // time steps has already been run in a restart statepoint file
@@ -166,9 +172,101 @@ int opensd_run()
   }
   }
 
+  opensd_simulation_finalize();
+  opensd::simulation::time_total.stop();
+
   return 0;
 
 }
+
+
+
+int opensd_simulation_init()
+{
+  using namespace opensd;
+
+  // Skip if simulation has already been initialized
+  if (simulation::initialized)
+    return 0;
+
+
+  // Determine how much work each process should do
+  calculate_work();
+  
+  opensd_reset();
+
+/*   // If this is a restart run, load the state point data and binary source
+  // file
+  if (settings::restart_run) {
+    load_state_point();
+    write_message("Resuming simulation...", 6);
+  } else {
+    // Only initialize primary source bank for eigenvalue simulations
+    if (settings::run_mode == RunMode::EIGENVALUE &&
+        settings::solver_type == SolverType::MONTE_CARLO) {
+      initialize_source();
+    }
+  }
+ */
+
+/*   // Display header
+  if (mpi::master) {
+    if (settings::run_mode == RunMode::FIXED_SOURCE) {
+      if (settings::solver_type == SolverType::MONTE_CARLO) {
+        header("FIXED SOURCE TRANSPORT SIMULATION", 3);
+      } else if (settings::solver_type == SolverType::RANDOM_RAY) {
+        header("FIXED SOURCE TRANSPORT SIMULATION (RANDOM RAY SOLVER)", 3);
+      }
+    } else if (settings::run_mode == RunMode::EIGENVALUE) {
+      if (settings::solver_type == SolverType::MONTE_CARLO) {
+        header("K EIGENVALUE SIMULATION", 3);
+      } else if (settings::solver_type == SolverType::RANDOM_RAY) {
+        header("K EIGENVALUE SIMULATION (RANDOM RAY SOLVER)", 3);
+      }
+      if (settings::verbosity >= 7)
+        print_columns();
+    }
+  }
+ */
+
+  // Set flag indicating initialization is done
+  simulation::initialized = true;
+  return 0;
+}
+
+int opensd_simulation_finalize()
+{
+  using namespace opensd;
+
+  // Skip if simulation was never run
+  if (!simulation::initialized)
+    return 0;
+
+  // Start finalization timer
+  simulation::time_finalize.start();
+
+// #ifdef OPENMC_MPI
+  // broadcast_results();
+// #endif
+
+  // Stop timers and show timing statistics
+  simulation::time_finalize.stop();
+  simulation::time_total.stop();
+  if (mpi::master) {
+    // if (settings::solver_type != SolverType::RANDOM_RAY) {
+      // if (settings::verbosity >= 6)
+        print_runtime();
+      // if (settings::verbosity >= 4)
+        // print_results();
+    // }
+  }
+
+  // Reset flags
+  simulation::initialized = false;
+  return 0;
+}
+
+
 
 namespace opensd {
 
@@ -180,11 +278,38 @@ namespace simulation {
 
 double current_time; //!< current time
 double delt {1.E8}; //!< time step
+bool initialized {false};
 
 } // namespace simulation
 
 //==============================================================================
 // Non-member functions
 //==============================================================================
+
+void calculate_work()
+{
+/*   // Determine minimum amount of particles to simulate on each processor
+  int64_t min_work = settings::n_particles / mpi::n_procs;
+
+  // Determine number of processors that have one extra particle
+  int64_t remainder = settings::n_particles % mpi::n_procs;
+
+  int64_t i_bank = 0;
+  simulation::work_index.resize(mpi::n_procs + 1);
+  simulation::work_index[0] = 0;
+  for (int i = 0; i < mpi::n_procs; ++i) {
+    // Number of particles for rank i
+    int64_t work_i = i < remainder ? min_work + 1 : min_work;
+
+    // Set number of particles
+    if (mpi::rank == i)
+      simulation::work_per_rank = work_i;
+
+    // Set index into source bank for rank i
+    i_bank += work_i;
+    simulation::work_index[i + 1] = i_bank;
+  }
+ */}
+
 
 } // namespace opensd
