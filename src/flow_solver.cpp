@@ -179,7 +179,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     int start = mpi::rank * (n / mpi::n_procs);
     int end = (mpi::rank == mpi::n_procs - 1) ? n : start + (n / mpi::n_procs);
 
-    MatrixR A_local = MatrixR::Zero(end - start, n);
+    double A_local_node, A_local_iface, A_local_oface;
     Eigen::VectorXd b_local = Eigen::VectorXd::Zero(end - start);
     std::vector<double> msource_local(end - start);
     MatCreate(mpi::intracomm, &A);
@@ -202,25 +202,22 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       double B, D;
       if (node->ther_old->phase() == 6) {
         B = node->B1 + node->volume * node->ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node->ther_old->rhomass();
-        A_local(i_local, i) = trans_sim * B * node->ther_old->rhomass() / delt;
-        MatSetValue(A, i, i, A_local(i_local, i), INSERT_VALUES);
+        A_local_node = trans_sim * B * node->ther_old->rhomass() / delt;
         D = trans_sim * node->volume * node->ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
       } else {
         B = node->B1 + node->volume * node->ther_old->first_partial_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node->ther_old->rhomass();
-        A_local(i_local, i) = trans_sim * B * node->ther_old->rhomass() / delt;
-        MatSetValue(A, i, i, A_local(i_local, i), INSERT_VALUES);
+        A_local_node = trans_sim * B * node->ther_old->rhomass() / delt;
         D = trans_sim * node->volume * node->ther_old->first_partial_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
       }
       b_local(i_local) = -trans_sim * B * node->ther_old->rhomass() / delt * (node->tpres_gues - node->ther_gues->rhomass() * std::pow(node->velocity, 2) / 2.0 - node->spres_old)
            - trans_sim * D * (node->senth_gues - node->senth_old) / delt;
 
       for (auto& iface : node->ifaces) {
-        A_local(i_local, iface->unode->node_ind) = -alpha_mom * (iface->aminus * iface->ther_gues->rhomass() + iface->bminus * iface->vflow_gues);
-        MatSetValue(A, i, iface->unode->node_ind, A_local(i_local, iface->unode->node_ind), INSERT_VALUES);
-        A_local(i_local, i) = A_local(i_local, i) - alpha_mom * (-iface->aplus * iface->ther_gues->rhomass() + iface->bplus * iface->vflow_gues);
-        MatSetValue(A, i, i, A_local(i_local, i), INSERT_VALUES);
+        A_local_iface = -alpha_mom * (iface->aminus * iface->ther_gues->rhomass() + iface->bminus * iface->vflow_gues);
+        MatSetValue(A, i, iface->unode->node_ind, A_local_iface, INSERT_VALUES);
+        A_local_node = A_local_node - alpha_mom * (-iface->aplus * iface->ther_gues->rhomass() + iface->bplus * iface->vflow_gues);
         b_local(i_local) += alpha_mom * (iface->ther_gues->rhomass() * iface->vflow_gues) + (1.0 - alpha_mom) * (iface->ther_old->rhomass() * iface->vflow_old);
-        if (A_local(i_local, iface->unode->node_ind) > 0.0) {
+        if (A_local_iface > 0.0) {
           // if ((show_warn && trans_sim) || !trans_sim) {
             std::cout << "Warning: upstream coef negative. " << node->identifier << std::endl;
           // }
@@ -228,17 +225,17 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       }
 
       for (auto& oface : node->ofaces) {
-        A_local(i_local, oface->dnode->node_ind) = -alpha_mom * (oface->aplus * oface->ther_gues->rhomass() - oface->bplus * oface->vflow_gues);
-        MatSetValue(A, i, oface->dnode->node_ind, A_local(i_local, oface->dnode->node_ind), INSERT_VALUES);
-        A_local(i_local, i) += alpha_mom * (oface->aminus * oface->ther_gues->rhomass() + oface->bminus * oface->vflow_gues);
-        MatSetValue(A, i, i, A_local(i_local, i), INSERT_VALUES);
+        A_local_oface = -alpha_mom * (oface->aplus * oface->ther_gues->rhomass() - oface->bplus * oface->vflow_gues);
+        MatSetValue(A, i, oface->dnode->node_ind, A_local_oface, INSERT_VALUES);
+        A_local_node += alpha_mom * (oface->aminus * oface->ther_gues->rhomass() + oface->bminus * oface->vflow_gues);
         b_local(i_local) = b_local(i_local) - alpha_mom * (oface->ther_gues->rhomass() * oface->vflow_gues) - (1.0 - alpha_mom) * (oface->ther_old->rhomass() * oface->vflow_old);
-        if (A_local(i_local, oface->dnode->node_ind) > 1.E-6) { // Pending check if 0
+        if (A_local_oface > 1.E-6) { // Pending check if 0
           // if ((show_warn && trans_sim) || !trans_sim) {
             std::cout << "Warning: downstream coef negative. " << node->identifier << std::endl;
           // }
         }
       }
+      MatSetValue(A, i, i, A_local_node, INSERT_VALUES);
       VecSetValue(b, i, b_local(i_local), INSERT_VALUES);
 
       // if (node.fixed_var.count("P") && !dynamic_cast<cont.Reservoir*>(node)) {
@@ -259,9 +256,9 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         
       }
 
-      if (A_local(i_local, i) < -1.E-6) { // Pending check if 0
+      if (A_local_node < -1.E-6) { // Pending check if 0
         // if ((show_warn && trans_sim) || !trans_sim) {
-          std::cout << "Warning: negative A coef. " << node->identifier << " " << A_local(i_local, i) << std::endl;
+          std::cout << "Warning: negative A coef. " << node->identifier << " " << A_local_node << std::endl;
         // }
       }
     }
