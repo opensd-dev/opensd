@@ -197,7 +197,7 @@ void print_build_info()
 void show_time(const char* label, double secs, int indent_level)
 {
   int width = 33 - indent_level * 2;
-  fmt::print("{0:{1}} {2:<{3}} = {4:>10.4e} seconds\n", "", 2 * indent_level,
+  fmt::print("{0:{1}} {2:<{3}} = {4:>10.4f} seconds\n", "", 2 * indent_level,
     label, width, secs);
 }
 

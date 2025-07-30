@@ -213,7 +213,6 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       }
       b_local(i_local) = -trans_sim * B * node->ther_old->rhomass() / delt * (node->tpres_gues - node->ther_gues->rhomass() * std::pow(node->velocity, 2) / 2.0 - node->spres_old)
            - trans_sim * D * (node->senth_gues - node->senth_old) / delt;
-      VecSetValue(b, i, b_local(i_local), INSERT_VALUES);
 
       for (auto& iface : node->ifaces) {
         A_local(i_local, iface->unode->node_ind) = -alpha_mom * (iface->aminus * iface->ther_gues->rhomass() + iface->bminus * iface->vflow_gues);
@@ -226,7 +225,6 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
             std::cout << "Warning: upstream coef negative. " << node->identifier << std::endl;
           // }
         }
-        VecSetValue(b, i, b_local(i_local), INSERT_VALUES);
       }
 
       for (auto& oface : node->ofaces) {
@@ -240,8 +238,8 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
             std::cout << "Warning: downstream coef negative. " << node->identifier << std::endl;
           // }
         }
-        VecSetValue(b, i, b_local(i_local), INSERT_VALUES);
       }
+      VecSetValue(b, i, b_local(i_local), INSERT_VALUES);
 
       // if (node.fixed_var.count("P") && !dynamic_cast<cont.Reservoir*>(node)) {
       if (node->fixed_var.count("P")) {
