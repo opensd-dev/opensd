@@ -9,6 +9,8 @@
 #include "opensd/geometry.h"
 #include "opensd/message_passing.h"
 #include <petscsys.h>
+#include <metis.h>
+#include <unordered_map>
 
 int opensd_init(int argc, char* argv[], const void* intracomm)
 {
@@ -36,6 +38,78 @@ int opensd_init(int argc, char* argv[], const void* intracomm)
   // if (!read_model_xml())
   read_separate_xml_files();
   discretize_pipes();
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+
+// Build a map from Node* to contiguous METIS vertex ID
+std::unordered_map<std::shared_ptr<Node>, idx_t> node_to_vertex;
+std::vector<std::shared_ptr<Node>> vertex_to_node;
+idx_t vertex_count = 0;
+
+for (auto& circuit : model::circuits) {
+    for (auto& node : circuit->nodes) {
+        node_to_vertex[node] = vertex_count++;
+        vertex_to_node.push_back(node);
+    }
+}
+
+std::cout << "vertex_to_node:\n";
+for (size_t i = 0; i < vertex_to_node.size(); ++i)
+    std::cout << "  vertex " << i << " -> node " << vertex_to_node[i] << "\n";
+
+
+// Adjacency graph (CSR format)
+std::vector<idx_t> xadj(vertex_count + 1, 0);
+std::vector<idx_t> adjncy;
+
+for (auto& circuit : model::circuits) {
+    for (auto& pipe : circuit->pipes) {
+        idx_t u = node_to_vertex[pipe->unode];
+        idx_t v = node_to_vertex[pipe->dnode];
+        
+        // Add edges both directions (undirected graph)
+        adjncy.push_back(v);
+        xadj[u + 1]++;
+        
+        adjncy.push_back(u);
+        xadj[v + 1]++;
+    }
+}
+
+// Convert xadj to cumulative sum
+for (size_t i = 1; i < xadj.size(); ++i) {
+    xadj[i] += xadj[i - 1];
+}
+
+
+std::cout << "xadj:\n";
+for (size_t i = 0; i < xadj.size(); ++i)
+    std::cout << "  xadj[" << i << "] = " << xadj[i] << "\n";
+
+
+std::cout << "Adjacency list per vertex:\n";
+for (size_t i = 0; i < vertex_to_node.size(); ++i) {
+    std::cout << "  vertex " << i << " (node " << vertex_to_node[i] << "): ";
+    for (int j = xadj[i]; j < xadj[i + 1]; ++j)
+        std::cout << adjncy[j] << " ";
+    std::cout << "\n";
+}
+
+
+  
+  
   
   if (settings::run_mode == RunMode::TRANSIENT) {
   try {

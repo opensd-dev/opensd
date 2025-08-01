@@ -59,6 +59,22 @@ if (NOT pugixml_FOUND)
   set_target_properties(pugixml PROPERTIES CXX_STANDARD 14 CXX_EXTENSIONS OFF)
 endif()
 
+# Find METIS manually since no config file is provided
+find_path(METIS_INCLUDE_DIR metis.h
+  PATHS /usr/include /usr/local/include
+)
+
+find_library(METIS_LIBRARY metis
+  PATHS /usr/lib /usr/local/lib /usr/lib/x86_64-linux-gnu
+)
+
+if(NOT METIS_INCLUDE_DIR OR NOT METIS_LIBRARY)
+  message(FATAL_ERROR "Could not find METIS library or include path")
+else()
+  message(STATUS "Found METIS library: ${METIS_LIBRARY}")
+  message(STATUS "Found METIS include: ${METIS_INCLUDE_DIR}")
+endif()
+
 
 add_subdirectory ("${CMAKE_SOURCE_DIR}/externals/CoolProp")
 include_directories(${HDF5_INCLUDE_DIRS})
@@ -73,6 +89,7 @@ target_include_directories(${EXENAME} PUBLIC
   externals/CoolProp/include
   external/fmtlib
   ${MPI_CXX_INCLUDE_DIRS}
+  ${METIS_INCLUDE_DIRS}
 )
 
 if (OPENSD_USE_MPI)
@@ -87,6 +104,7 @@ target_link_libraries(${EXENAME}
 	MPI::MPI_CXX
     PkgConfig::PETSC
     fmt::fmt-header-only
+	${METIS_LIBRARIES}
 )
 
 # if (OPENSD_USE_MPI)
