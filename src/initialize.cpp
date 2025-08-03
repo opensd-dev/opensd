@@ -8,9 +8,11 @@
 #include "opensd/settings.h"
 #include "opensd/geometry.h"
 #include "opensd/message_passing.h"
+#include "opensd/error.h"
 #include <petscsys.h>
 #include <metis.h>
 #include <unordered_map>
+#include <fstream>
 
 int opensd_init(int argc, char* argv[], const void* intracomm)
 {
@@ -118,6 +120,51 @@ for (idx_t i = 0; i < vertex_count; ++i) {
         std::cout << "Edge: " << i << " -- " << adjncy[j] << "\n";
     }
 }
+
+
+
+
+
+
+
+
+
+
+idx_t nvtxs = vertex_count;
+idx_t ncon = 1;
+idx_t nparts = mpi::n_procs;  // Set this to number of partitions
+std::vector<idx_t> part(vertex_count);  // Output
+
+idx_t objval;
+if (nparts > 1) {
+    int status = METIS_PartGraphKway(&nvtxs, &ncon,
+                                     xadj.data(), adjncy.data(),
+                                     NULL, NULL, NULL,
+                                     &nparts, NULL, NULL, NULL,
+                                     &objval, part.data());
+
+    if (status != METIS_OK) {
+        fatal_error("METIS partitioning failed");
+    }
+} else {
+    // Assign everything to part 0
+    std::fill(part.begin(), part.end(), 0);
+}
+
+std::ofstream fout("partition_rank_" + std::to_string(mpi::rank) + ".txt");
+for (int i = 0; i < nvtxs; ++i) {
+    fout << "Node " << i << " -> Part " << part[i] << "\n";
+}
+fout.close();
+
+MPI_Barrier(mpi::intracomm);
+if (mpi::rank == 0) {
+    std::cerr << "METIS partition debug print complete.\n";
+}
+MPI_Finalize();
+exit(0); // clean termination
+
+
 
 
 

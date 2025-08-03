@@ -104,7 +104,7 @@ target_link_libraries(${EXENAME}
 	MPI::MPI_CXX
     PkgConfig::PETSC
     fmt::fmt-header-only
-	${METIS_LIBRARIES}
+	${METIS_LIBRARY}
 )
 
 # if (OPENSD_USE_MPI)
