@@ -67,25 +67,19 @@ for (auto& circuit : model::circuits) {
 
 std::cout << "vertex_to_node:\n";
 for (size_t i = 0; i < vertex_to_node.size(); ++i)
-    std::cout << "  vertex " << i << " -> node " << vertex_to_node[i] << "\n";
+    std::cout << "  vertex " << i << " -> node " << vertex_to_node[i]->identifier << "\n";
 
 
 // Adjacency graph (CSR format)
 std::vector<idx_t> xadj(vertex_count + 1, 0);
-std::vector<idx_t> adjncy;
 
 for (auto& circuit : model::circuits) {
-    for (auto& pipe : circuit->pipes) {
-        idx_t u = node_to_vertex[pipe->unode];
-        idx_t v = node_to_vertex[pipe->dnode];
-        
-        // Add edges both directions (undirected graph)
-        adjncy.push_back(v);
-        xadj[u + 1]++;
-        
-        adjncy.push_back(u);
-        xadj[v + 1]++;
-    }
+for (auto& face : circuit->faces) {
+    idx_t u = node_to_vertex[face->unode];
+    idx_t v = node_to_vertex[face->dnode];
+    xadj[u + 1]++;
+    xadj[v + 1]++;
+}
 }
 
 // Convert xadj to cumulative sum
@@ -93,6 +87,18 @@ for (size_t i = 1; i < xadj.size(); ++i) {
     xadj[i] += xadj[i - 1];
 }
 
+std::vector<idx_t> adjncy(xadj.back());
+std::vector<idx_t> current = xadj;  // track where to insert next neighbor
+
+for (auto& circuit : model::circuits) {
+    for (auto& face : circuit->faces) {
+        idx_t u = node_to_vertex[face->unode];
+        idx_t v = node_to_vertex[face->dnode];
+
+        adjncy[current[u]++] = v;
+        adjncy[current[v]++] = u;
+    }
+}
 
 std::cout << "xadj:\n";
 for (size_t i = 0; i < xadj.size(); ++i)
@@ -106,6 +112,13 @@ for (size_t i = 0; i < vertex_to_node.size(); ++i) {
         std::cout << adjncy[j] << " ";
     std::cout << "\n";
 }
+
+for (idx_t i = 0; i < vertex_count; ++i) {
+    for (idx_t j = xadj[i]; j < xadj[i+1]; ++j) {
+        std::cout << "Edge: " << i << " -- " << adjncy[j] << "\n";
+    }
+}
+
 
 
   
