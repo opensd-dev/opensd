@@ -121,15 +121,6 @@ for (idx_t i = 0; i < vertex_count; ++i) {
     }
 }
 
-
-
-
-
-
-
-
-
-
 idx_t nvtxs = vertex_count;
 idx_t ncon = 1;
 idx_t nparts = mpi::n_procs;  // Set this to number of partitions
@@ -161,10 +152,25 @@ MPI_Barrier(mpi::intracomm);
 if (mpi::rank == 0) {
     std::cerr << "METIS partition debug print complete.\n";
 }
-MPI_Finalize();
-exit(0); // clean termination
 
 
+for (auto& circuit : model::circuits) {
+    for (auto& face : circuit->faces) {
+        face->owner = part[node_to_vertex[face->unode]];
+	}
+}
+
+for (auto& circuit : model::circuits) {
+for (auto& face : circuit->faces) {
+    std::cout << "Face " << face->faceno
+              << " connects nodes " << face->unode->identifier
+              << " and " << face->dnode->identifier
+              << " => Owner: " << face->owner << "\n";
+}
+}
+
+std::map<int, std::vector<int>> ghost_nodes_to_recv_from_rank;
+std::map<int, std::vector<int>> ghost_edges_to_recv_from_rank;
 
 
 

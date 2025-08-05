@@ -62,6 +62,7 @@ public:
   double aminus;
   double bplus;
   double bminus;
+  int owner;
   
   
   Face(int faceno, std::shared_ptr<Node> unode, double ufrac, std::shared_ptr<Node> dnode, double dfrac);

@@ -24,7 +24,7 @@ Face::Face(int faceno, std::shared_ptr<Node> unode, double ufrac, std::shared_pt
     : faceno(faceno), unode(unode), ufrac(ufrac), dnode(dnode), dfrac(dfrac),
       vflow_old{1.0E-8}, vflow_gues{1.0E-8}, mflow(0.0), velocity(0.0), choked(false), 
 	  presidue(0.0), Gcr(1.0E8), pcr(0.0),heat_input_old(0.0), heat_input(0.0),
-	  heat_hslab_old{} {
+	  heat_hslab_old{}, owner(0) {
   // if (ufrac != nullptr && typeid(*unode) == typeid(Reservoir)) {
     // uheight = ufrac * unode->height;
   // }
