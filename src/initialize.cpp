@@ -153,10 +153,23 @@ if (mpi::rank == 0) {
     std::cerr << "METIS partition debug print complete.\n";
 }
 
+std::map<int, std::vector<std::shared_ptr<Face>>> ghost_edges_to_recv_from_rank;
+std::map<int, std::vector<std::shared_ptr<Node>>> ghost_nodes_to_recv_from_rank;
+
 
 for (auto& circuit : model::circuits) {
     for (auto& face : circuit->faces) {
-        face->owner = part[node_to_vertex[face->unode]];
+		int u_rank = part[node_to_vertex[face->unode]];
+		int v_rank = part[node_to_vertex[face->dnode]];
+        face->owner = u_rank;
+
+	if ((u_rank == mpi::rank || v_rank == mpi::rank) && face->owner != mpi::rank) {
+            ghost_edges_to_recv_from_rank[face->owner].push_back(face);
+        }
+		
+	if (v_rank != mpi::rank && u_rank == mpi::rank) {
+            ghost_nodes_to_recv_from_rank[v_rank].push_back(face->dnode);
+        }
 	}
 }
 
@@ -169,13 +182,25 @@ for (auto& face : circuit->faces) {
 }
 }
 
-std::map<int, std::vector<int>> ghost_nodes_to_recv_from_rank;
-std::map<int, std::vector<int>> ghost_edges_to_recv_from_rank;
+std::ofstream ghost_debug("ghosts_rank_" + std::to_string(mpi::rank) + ".txt");
+for (const auto& [rank, nodes] : ghost_nodes_to_recv_from_rank) {
+    ghost_debug << "Need nodes from rank " << rank << ": ";
+    for (auto node : nodes)
+    ghost_debug << node->identifier << " ";
+    ghost_debug << "\n";
+}
+for (const auto& [rank, faces] : ghost_edges_to_recv_from_rank) {
+    ghost_debug << "Need faces from rank " << rank << ": ";
+    for (auto face : faces)
+    ghost_debug << face->faceno << " ";
+
+    ghost_debug << "\n";
+}
+ghost_debug.close();
 
 
 
-  
-  
+ 
   
   if (settings::run_mode == RunMode::TRANSIENT) {
   try {
