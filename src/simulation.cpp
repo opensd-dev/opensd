@@ -9,6 +9,7 @@
 
 #include "opensd/capi.h"
 #include "opensd/convergence.h"
+#include "opensd/error.h"
 #include "opensd/flow_solver.h"
 #include "opensd/hdf5_interface.h"
 #include "opensd/message_passing.h"
@@ -16,6 +17,9 @@
 #include "opensd/post.h"
 #include "opensd/settings.h"
 #include "opensd/timer.h"
+#include <metis.h>
+#include <unordered_map>
+#include <fstream>
 
 //==============================================================================
 // C API functions
@@ -288,28 +292,150 @@ bool initialized {false};
 
 void calculate_work()
 {
-/*   // Determine minimum amount of particles to simulate on each processor
-  int64_t min_work = settings::n_particles / mpi::n_procs;
-
-  // Determine number of processors that have one extra particle
-  int64_t remainder = settings::n_particles % mpi::n_procs;
-
-  int64_t i_bank = 0;
-  simulation::work_index.resize(mpi::n_procs + 1);
-  simulation::work_index[0] = 0;
-  for (int i = 0; i < mpi::n_procs; ++i) {
-    // Number of particles for rank i
-    int64_t work_i = i < remainder ? min_work + 1 : min_work;
-
-    // Set number of particles
-    if (mpi::rank == i)
-      simulation::work_per_rank = work_i;
-
-    // Set index into source bank for rank i
-    i_bank += work_i;
-    simulation::work_index[i + 1] = i_bank;
+	
+  // Build a map from Node* to contiguous METIS vertex ID
+  std::unordered_map<std::shared_ptr<Node>, idx_t> node_to_vertex;
+  std::vector<std::shared_ptr<Node>> vertex_to_node;
+  idx_t vertex_count = 0;
+  
+  for (auto& circuit : model::circuits) {
+      for (auto& node : circuit->nodes) {
+          node_to_vertex[node] = vertex_count++;
+          vertex_to_node.push_back(node);
+      }
   }
- */}
+  
+  std::cout << "vertex_to_node:\n";
+  for (size_t i = 0; i < vertex_to_node.size(); ++i)
+      std::cout << "  vertex " << i << " -> node " << vertex_to_node[i]->identifier << "\n";
+  
+  
+  // Adjacency graph (CSR format)
+  std::vector<idx_t> xadj(vertex_count + 1, 0);
+  
+  for (auto& circuit : model::circuits) {
+  for (auto& face : circuit->faces) {
+      idx_t u = node_to_vertex[face->unode];
+      idx_t v = node_to_vertex[face->dnode];
+      xadj[u + 1]++;
+      xadj[v + 1]++;
+  }
+  }
+  
+  // Convert xadj to cumulative sum
+  for (size_t i = 1; i < xadj.size(); ++i) {
+      xadj[i] += xadj[i - 1];
+  }
+  
+  std::vector<idx_t> adjncy(xadj.back());
+  std::vector<idx_t> current = xadj;  // track where to insert next neighbor
+  
+  for (auto& circuit : model::circuits) {
+      for (auto& face : circuit->faces) {
+          idx_t u = node_to_vertex[face->unode];
+          idx_t v = node_to_vertex[face->dnode];
+  
+          adjncy[current[u]++] = v;
+          adjncy[current[v]++] = u;
+      }
+  }
+  
+  std::cout << "xadj:\n";
+  for (size_t i = 0; i < xadj.size(); ++i)
+      std::cout << "  xadj[" << i << "] = " << xadj[i] << "\n";
+  
+  
+  std::cout << "Adjacency list per vertex:\n";
+  for (size_t i = 0; i < vertex_to_node.size(); ++i) {
+      std::cout << "  vertex " << i << " (node " << vertex_to_node[i] << "): ";
+      for (int j = xadj[i]; j < xadj[i + 1]; ++j)
+          std::cout << adjncy[j] << " ";
+      std::cout << "\n";
+  }
+  
+  for (idx_t i = 0; i < vertex_count; ++i) {
+      for (idx_t j = xadj[i]; j < xadj[i+1]; ++j) {
+          std::cout << "Edge: " << i << " -- " << adjncy[j] << "\n";
+      }
+  }
+  
+  idx_t nvtxs = vertex_count;
+  idx_t ncon = 1;
+  idx_t nparts = mpi::n_procs;  // Set this to number of partitions
+  std::vector<idx_t> part(vertex_count);  // Output
+  
+  idx_t objval;
+  if (nparts > 1) {
+      int status = METIS_PartGraphKway(&nvtxs, &ncon,
+                                       xadj.data(), adjncy.data(),
+                                       NULL, NULL, NULL,
+                                       &nparts, NULL, NULL, NULL,
+                                       &objval, part.data());
+  
+      if (status != METIS_OK) {
+          fatal_error("METIS partitioning failed");
+      }
+  } else {
+      // Assign everything to part 0
+      std::fill(part.begin(), part.end(), 0);
+  }
+  
+  std::ofstream fout("partition_rank_" + std::to_string(mpi::rank) + ".txt");
+  for (int i = 0; i < nvtxs; ++i) {
+      fout << "Node " << i << " -> Part " << part[i] << "\n";
+  }
+  fout.close();
+  
+  MPI_Barrier(mpi::intracomm);
+  if (mpi::rank == 0) {
+      std::cerr << "METIS partition debug print complete.\n";
+  }
+  
+  std::map<int, std::vector<std::shared_ptr<Face>>> ghost_edges_to_recv_from_rank;
+  std::map<int, std::vector<std::shared_ptr<Node>>> ghost_nodes_to_recv_from_rank;
+  
+  
+  for (auto& circuit : model::circuits) {
+      for (auto& face : circuit->faces) {
+  		int u_rank = part[node_to_vertex[face->unode]];
+  		int v_rank = part[node_to_vertex[face->dnode]];
+          face->owner = u_rank;
+  
+  	if ((u_rank == mpi::rank || v_rank == mpi::rank) && face->owner != mpi::rank) {
+              ghost_edges_to_recv_from_rank[face->owner].push_back(face);
+          }
+  		
+  	if (v_rank != mpi::rank && u_rank == mpi::rank) {
+              ghost_nodes_to_recv_from_rank[v_rank].push_back(face->dnode);
+          }
+  	}
+  }
+  
+  for (auto& circuit : model::circuits) {
+  for (auto& face : circuit->faces) {
+      std::cout << "Face " << face->faceno
+                << " connects nodes " << face->unode->identifier
+                << " and " << face->dnode->identifier
+                << " => Owner: " << face->owner << "\n";
+  }
+  }
+  
+  std::ofstream ghost_debug("ghosts_rank_" + std::to_string(mpi::rank) + ".txt");
+  for (const auto& [rank, nodes] : ghost_nodes_to_recv_from_rank) {
+      ghost_debug << "Need nodes from rank " << rank << ": ";
+      for (auto node : nodes)
+      ghost_debug << node->identifier << " ";
+      ghost_debug << "\n";
+  }
+  for (const auto& [rank, faces] : ghost_edges_to_recv_from_rank) {
+      ghost_debug << "Need faces from rank " << rank << ": ";
+      for (auto face : faces)
+      ghost_debug << face->faceno << " ";
+  
+      ghost_debug << "\n";
+  }
+  ghost_debug.close();
 
+  }
 
 } // namespace opensd
