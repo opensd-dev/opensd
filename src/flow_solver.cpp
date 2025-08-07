@@ -15,7 +15,7 @@
 // #include <numeric>     // For std::accumulate
 // #include <copy>          // For std::copy in Arow and brow
 #include <petscksp.h>
-// #include <fstream>
+#include <fstream>
 
 namespace opensd {
 
@@ -195,9 +195,12 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     VecSetSizes(pc, PETSC_DECIDE, n);
     VecSetFromOptions(pc);
     
-    for (int i = start; i < end; ++i) {
-      auto& node = circuit->nodes[i];
-      int i_local = i - start;
+    // for (int i = start; i < end; ++i) {
+      // auto& node = circuit->nodes[i];
+
+    for (auto& node : circuit->nodes_owned) {
+      int i = node->node_ind;  // global row index
+      // int i_local = i - start;
 
       double B, D;
       if (node->ther_old->phase() == 6) {
@@ -235,21 +238,31 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
           // }
         }
       }
-      MatSetValue(A, i, i, A_local_node, INSERT_VALUES);
+      if (not node->fixed_var.count("P")) {
+        MatSetValue(A, i, i, A_local_node, INSERT_VALUES);
+      }
       VecSetValue(b, i, b_local, INSERT_VALUES);
+
+      if (A_local_node < -1.E-6) { // Pending check if 0
+        // if ((show_warn && trans_sim) || !trans_sim) {
+          std::cout << "Warning: negative A coef. " << node->identifier << " " << A_local_node << std::endl;
+        // }
+      }
 
       // if (node.fixed_var.count("P") && !dynamic_cast<cont.Reservoir*>(node)) {
       if (node->fixed_var.count("P")) {
         // node->msource = -b(i);
         // std::cout << "node" << node->identifier << " " << i_local << " " << b_local(i_local) << " " << mpi::rank << std::endl;
         node->msource = -b_local;
-        msource_local[i_local] = node->msource;
+        // msource_local[i_local] = node->msource;
         
         // Overwrite matrix row to enforce Dirichlet pressure BC
         for (int j = 0; j < n; ++j) {
+          if (j != i)
             MatSetValue(A, i, j, 0.0, INSERT_VALUES);
         }
         MatSetValue(A, i, i, 1.0, INSERT_VALUES);
+        std::cout << "inside pbound rank " << mpi::rank << " node " << node->identifier << " index " << i << std::endl;
 
         // Override b to enforce zero pressure correction (or another BC value)
         VecSetValue(b, i, 0.0, INSERT_VALUES);  // or desired pressure correction        
@@ -261,17 +274,15 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         else {
             node->msource = 0.;
 		}
-        msource_local[i_local] = node->msource;
+        // msource_local[i_local] = node->msource;
         b_local += node->msource;
         VecSetValue(b, i, b_local, INSERT_VALUES);
       }
 
+      std::cout << "rank " << mpi::rank << " node " << node->identifier << " index " << i << 
+        " A_local_node " << A_local_node << " b_local " << b_local << " A_local_iface " << 
+        A_local_iface << " A_local_oface " << A_local_oface << " Pbound " << node->fixed_var.count("P") << std::endl;
 
-      if (A_local_node < -1.E-6) { // Pending check if 0
-        // if ((show_warn && trans_sim) || !trans_sim) {
-          std::cout << "Warning: negative A coef. " << node->identifier << " " << A_local_node << std::endl;
-        // }
-      }
     }
 
 
@@ -281,16 +292,37 @@ MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
 VecAssemblyBegin(b);
 VecAssemblyEnd(b);
 
+
+
+// Print matrix A
+PetscViewer viewerA;
+PetscViewerASCIIOpen(PETSC_COMM_WORLD, "matrix_A.txt", &viewerA);
+PetscViewerPushFormat(viewerA, PETSC_VIEWER_ASCII_DENSE); // optional: DENSE format
+MatView(A, viewerA);
+PetscViewerPopFormat(viewerA);
+PetscViewerDestroy(&viewerA);
+
+// Print vector b
+PetscViewer viewerB;
+PetscViewerASCIIOpen(PETSC_COMM_WORLD, "vector_b.txt", &viewerB);
+VecView(b, viewerB);
+PetscViewerDestroy(&viewerB);
+
+
+
+
 KSPCreate(mpi::intracomm, &ksp);
 KSPSetOperators(ksp, A, A);
 KSPSetFromOptions(ksp);
 KSPSolve(ksp, b, pc);
 
-// PetscViewer viewer;
-// PetscViewerASCIIOpen(PETSC_COMM_WORLD, "pc_output.txt", &viewer);
-// VecView(pc, viewer);
-// PetscViewerDestroy(&viewer);
+PetscViewer viewer;
+PetscViewerASCIIOpen(PETSC_COMM_WORLD, "pc_output.txt", &viewer);
+VecView(pc, viewer);
+PetscViewerDestroy(&viewer);
 
+MPI_Abort(mpi::intracomm, 0);
+std::exit(0);
 
 int rows_per_rank = n / mpi::n_procs;
 
