@@ -180,7 +180,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     int end = (mpi::rank == mpi::n_procs - 1) ? n : start + (n / mpi::n_procs);
 
     double A_local_node, A_local_iface, A_local_oface;
-    Eigen::VectorXd b_local = Eigen::VectorXd::Zero(end - start);
+    double b_local = 0;
     std::vector<double> msource_local(end - start);
     MatCreate(mpi::intracomm, &A);
     MatSetSizes(A, PETSC_DECIDE, PETSC_DECIDE, n, n);
@@ -209,14 +209,14 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         A_local_node = trans_sim * B * node->ther_old->rhomass() / delt;
         D = trans_sim * node->volume * node->ther_old->first_partial_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
       }
-      b_local(i_local) = -trans_sim * B * node->ther_old->rhomass() / delt * (node->tpres_gues - node->ther_gues->rhomass() * std::pow(node->velocity, 2) / 2.0 - node->spres_old)
+      b_local = -trans_sim * B * node->ther_old->rhomass() / delt * (node->tpres_gues - node->ther_gues->rhomass() * std::pow(node->velocity, 2) / 2.0 - node->spres_old)
            - trans_sim * D * (node->senth_gues - node->senth_old) / delt;
 
       for (auto& iface : node->ifaces) {
         A_local_iface = -alpha_mom * (iface->aminus * iface->ther_gues->rhomass() + iface->bminus * iface->vflow_gues);
         MatSetValue(A, i, iface->unode->node_ind, A_local_iface, INSERT_VALUES);
         A_local_node = A_local_node - alpha_mom * (-iface->aplus * iface->ther_gues->rhomass() + iface->bplus * iface->vflow_gues);
-        b_local(i_local) += alpha_mom * (iface->ther_gues->rhomass() * iface->vflow_gues) + (1.0 - alpha_mom) * (iface->ther_old->rhomass() * iface->vflow_old);
+        b_local += alpha_mom * (iface->ther_gues->rhomass() * iface->vflow_gues) + (1.0 - alpha_mom) * (iface->ther_old->rhomass() * iface->vflow_old);
         if (A_local_iface > 0.0) {
           // if ((show_warn && trans_sim) || !trans_sim) {
             std::cout << "Warning: upstream coef negative. " << node->identifier << std::endl;
@@ -228,7 +228,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         A_local_oface = -alpha_mom * (oface->aplus * oface->ther_gues->rhomass() - oface->bplus * oface->vflow_gues);
         MatSetValue(A, i, oface->dnode->node_ind, A_local_oface, INSERT_VALUES);
         A_local_node += alpha_mom * (oface->aminus * oface->ther_gues->rhomass() + oface->bminus * oface->vflow_gues);
-        b_local(i_local) = b_local(i_local) - alpha_mom * (oface->ther_gues->rhomass() * oface->vflow_gues) - (1.0 - alpha_mom) * (oface->ther_old->rhomass() * oface->vflow_old);
+        b_local = b_local - alpha_mom * (oface->ther_gues->rhomass() * oface->vflow_gues) - (1.0 - alpha_mom) * (oface->ther_old->rhomass() * oface->vflow_old);
         if (A_local_oface > 1.E-6) { // Pending check if 0
           // if ((show_warn && trans_sim) || !trans_sim) {
             std::cout << "Warning: downstream coef negative. " << node->identifier << std::endl;
@@ -236,13 +236,13 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         }
       }
       MatSetValue(A, i, i, A_local_node, INSERT_VALUES);
-      VecSetValue(b, i, b_local(i_local), INSERT_VALUES);
+      VecSetValue(b, i, b_local, INSERT_VALUES);
 
       // if (node.fixed_var.count("P") && !dynamic_cast<cont.Reservoir*>(node)) {
       if (node->fixed_var.count("P")) {
         // node->msource = -b(i);
         // std::cout << "node" << node->identifier << " " << i_local << " " << b_local(i_local) << " " << mpi::rank << std::endl;
-        node->msource = -b_local(i_local);
+        node->msource = -b_local;
         msource_local[i_local] = node->msource;
         
         // Overwrite matrix row to enforce Dirichlet pressure BC
@@ -254,20 +254,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         // Override b to enforce zero pressure correction (or another BC value)
         VecSetValue(b, i, 0.0, INSERT_VALUES);  // or desired pressure correction        
         
-      }
-
-      if (A_local_node < -1.E-6) { // Pending check if 0
-        // if ((show_warn && trans_sim) || !trans_sim) {
-          std::cout << "Warning: negative A coef. " << node->identifier << " " << A_local_node << std::endl;
-        // }
-      }
-    }
-
-
-    for (int i = start; i < end; ++i) {
-      auto& node = circuit->nodes[i];
-      int i_local = i - start;
-      if (node->fixed_var.count("msource")) {
+      } else if (node->fixed_var.count("msource")) {
         if (time <= 20) {
             node->msource = -753.6*(20.-time)/20.;
 		}
@@ -275,8 +262,15 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
             node->msource = 0.;
 		}
         msource_local[i_local] = node->msource;
-        b_local(i_local) += node->msource;
-        VecSetValue(b, i, b_local(i_local), INSERT_VALUES);
+        b_local += node->msource;
+        VecSetValue(b, i, b_local, INSERT_VALUES);
+      }
+
+
+      if (A_local_node < -1.E-6) { // Pending check if 0
+        // if ((show_warn && trans_sim) || !trans_sim) {
+          std::cout << "Warning: negative A coef. " << node->identifier << " " << A_local_node << std::endl;
+        // }
       }
     }
 
