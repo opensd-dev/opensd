@@ -201,6 +201,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     for (auto& node : circuit->nodes_owned) {
       int i = node->node_ind;  // global row index
       // int i_local = i - start;
+	  bool pbound = node->fixed_var.count("P");
 
       double B, D;
       if (node->ther_old->phase() == 6) {
@@ -217,7 +218,8 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
       for (auto& iface : node->ifaces) {
         A_local_iface = -alpha_mom * (iface->aminus * iface->ther_gues->rhomass() + iface->bminus * iface->vflow_gues);
-        MatSetValue(A, i, iface->unode->node_ind, A_local_iface, INSERT_VALUES);
+        if (!pbound)
+          MatSetValue(A, i, iface->unode->node_ind, A_local_iface, INSERT_VALUES);
         A_local_node = A_local_node - alpha_mom * (-iface->aplus * iface->ther_gues->rhomass() + iface->bplus * iface->vflow_gues);
         b_local += alpha_mom * (iface->ther_gues->rhomass() * iface->vflow_gues) + (1.0 - alpha_mom) * (iface->ther_old->rhomass() * iface->vflow_old);
         if (A_local_iface > 0.0) {
@@ -229,7 +231,8 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
       for (auto& oface : node->ofaces) {
         A_local_oface = -alpha_mom * (oface->aplus * oface->ther_gues->rhomass() - oface->bplus * oface->vflow_gues);
-        MatSetValue(A, i, oface->dnode->node_ind, A_local_oface, INSERT_VALUES);
+    	if (!pbound)
+          MatSetValue(A, i, oface->dnode->node_ind, A_local_oface, INSERT_VALUES);
         A_local_node += alpha_mom * (oface->aminus * oface->ther_gues->rhomass() + oface->bminus * oface->vflow_gues);
         b_local = b_local - alpha_mom * (oface->ther_gues->rhomass() * oface->vflow_gues) - (1.0 - alpha_mom) * (oface->ther_old->rhomass() * oface->vflow_old);
         if (A_local_oface > 1.E-6) { // Pending check if 0
@@ -238,16 +241,6 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
           // }
         }
       }
-      if (not node->fixed_var.count("P")) {
-        MatSetValue(A, i, i, A_local_node, INSERT_VALUES);
-      }
-      VecSetValue(b, i, b_local, INSERT_VALUES);
-
-      if (A_local_node < -1.E-6) { // Pending check if 0
-        // if ((show_warn && trans_sim) || !trans_sim) {
-          std::cout << "Warning: negative A coef. " << node->identifier << " " << A_local_node << std::endl;
-        // }
-      }
 
       // if (node.fixed_var.count("P") && !dynamic_cast<cont.Reservoir*>(node)) {
       if (node->fixed_var.count("P")) {
@@ -255,17 +248,10 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         // std::cout << "node" << node->identifier << " " << i_local << " " << b_local(i_local) << " " << mpi::rank << std::endl;
         node->msource = -b_local;
         // msource_local[i_local] = node->msource;
-        
-        // Overwrite matrix row to enforce Dirichlet pressure BC
-        for (int j = 0; j < n; ++j) {
-          if (j != i)
-            MatSetValue(A, i, j, 0.0, INSERT_VALUES);
-        }
-        MatSetValue(A, i, i, 1.0, INSERT_VALUES);
-        std::cout << "inside pbound rank " << mpi::rank << " node " << node->identifier << " index " << i << std::endl;
 
-        // Override b to enforce zero pressure correction (or another BC value)
-        VecSetValue(b, i, 0.0, INSERT_VALUES);  // or desired pressure correction        
+        A_local_node = 1.0;
+
+		b_local = 0.0;
         
       } else if (node->fixed_var.count("msource")) {
         if (time <= 20) {
@@ -276,12 +262,22 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 		}
         // msource_local[i_local] = node->msource;
         b_local += node->msource;
-        VecSetValue(b, i, b_local, INSERT_VALUES);
       }
 
+      if (A_local_node < -1.E-6) { // Pending check if 0
+        // if ((show_warn && trans_sim) || !trans_sim) {
+          std::cout << "Warning: negative A coef. " << node->identifier << " " << A_local_node << std::endl;
+        // }
+      }
+
+      MatSetValue(A, i, i, A_local_node, INSERT_VALUES);
+      VecSetValue(b, i, b_local, INSERT_VALUES);
+
+	  
       std::cout << "rank " << mpi::rank << " node " << node->identifier << " index " << i << 
         " A_local_node " << A_local_node << " b_local " << b_local << " A_local_iface " << 
         A_local_iface << " A_local_oface " << A_local_oface << " Pbound " << node->fixed_var.count("P") << std::endl;
+	  
 
     }
 
