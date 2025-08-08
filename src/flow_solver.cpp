@@ -171,15 +171,15 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
     // Pressure corrections
     Mat A;
-    Vec b, pc;
+    Vec b, pc, m;
     KSP ksp;
-    std::vector<double> msource_global(circuit->nodes.size());
     PetscInt n = circuit->nodes.size(), i;
+    std::vector<double> msource_global(n);
 
     int start = mpi::rank * (n / mpi::n_procs);
     int end = (mpi::rank == mpi::n_procs - 1) ? n : start + (n / mpi::n_procs);
 
-    std::vector<double> msource_local(end - start);
+    std::vector<double> msource_local(n);
     MatCreate(mpi::intracomm, &A);
     MatSetSizes(A, PETSC_DECIDE, PETSC_DECIDE, n, n);
     MatSetFromOptions(A);
@@ -193,6 +193,10 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     VecSetSizes(pc, PETSC_DECIDE, n);
     VecSetFromOptions(pc);
     
+    VecCreate(mpi::intracomm, &m);
+    VecSetSizes(m, PETSC_DECIDE, n);
+    VecSetFromOptions(m);
+
     // for (int i = start; i < end; ++i) {
       // auto& node = circuit->nodes[i];
 
@@ -251,7 +255,8 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         // node->msource = -b(i);
         // std::cout << "node" << node->identifier << " " << i_local << " " << b_local(i_local) << " " << mpi::rank << std::endl;
         node->msource = -b_local;
-        // msource_local[i_local] = node->msource;
+        // msource_local[i] = node->msource;
+        VecSetValue(m, i, node->msource, INSERT_VALUES);
 
         A_local_node = 1.0;
 
@@ -264,7 +269,8 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         else {
             node->msource = 0.;
 		}
-        // msource_local[i_local] = node->msource;
+        // msource_local[i] = node->msource;
+        VecSetValue(m, i, node->msource, INSERT_VALUES);
         b_local += node->msource;
       }
 
@@ -277,12 +283,6 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       MatSetValue(A, i, i, A_local_node, INSERT_VALUES);
       VecSetValue(b, i, b_local, INSERT_VALUES);
 
-	  
-      std::cout << "rank " << mpi::rank << " node " << node->identifier << " index " << i << 
-        " A_local_node " << A_local_node << " b_local " << b_local << " A_local_iface " << 
-        A_local_iface << " A_local_oface " << A_local_oface << " Pbound " << node->fixed_var.count("P") << std::endl;
-	  
-
     }
 
 
@@ -292,9 +292,11 @@ MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
 VecAssemblyBegin(b);
 VecAssemblyEnd(b);
 
+VecAssemblyBegin(m);
+VecAssemblyEnd(m);
 
 
-// Print matrix A
+/* // Print matrix A
 PetscViewer viewerA;
 PetscViewerASCIIOpen(PETSC_COMM_WORLD, "matrix_A.txt", &viewerA);
 PetscViewerPushFormat(viewerA, PETSC_VIEWER_ASCII_DENSE); // optional: DENSE format
@@ -307,7 +309,7 @@ PetscViewer viewerB;
 PetscViewerASCIIOpen(PETSC_COMM_WORLD, "vector_b.txt", &viewerB);
 VecView(b, viewerB);
 PetscViewerDestroy(&viewerB);
-
+ */
 
 
 
@@ -321,8 +323,8 @@ PetscViewerASCIIOpen(PETSC_COMM_WORLD, "pc_output.txt", &viewer);
 VecView(pc, viewer);
 PetscViewerDestroy(&viewer);
 
-MPI_Abort(mpi::intracomm, 0);
-std::exit(0);
+// MPI_Abort(mpi::intracomm, 0);
+// std::exit(0);
 
 int rows_per_rank = n / mpi::n_procs;
 
@@ -381,6 +383,29 @@ VecGetArray(pc_full, &pc_array);
 
 
 
+// Get global size
+VecGetSize(m, &n);
+
+// Create sequential vector to hold full solution on all ranks
+Vec m_full;
+VecCreateSeq(PETSC_COMM_SELF, n, &m_full);
+
+// Create identity index sets
+IS from1, to1;
+ISCreateStride(PETSC_COMM_WORLD, n, 0, 1, &from1);
+ISCreateStride(PETSC_COMM_SELF,  n, 0, 1, &to1);
+
+// Create and execute scatter
+VecScatter scatter1;
+VecScatterCreate(m, from1, m_full, to1, &scatter1);
+VecScatterBegin(scatter1, m, m_full, INSERT_VALUES, SCATTER_FORWARD);
+VecScatterEnd(scatter1, m, m_full, INSERT_VALUES, SCATTER_FORWARD);
+
+// Access full m values on all ranks
+PetscScalar* m_array;
+VecGetArray(m_full, &m_array);
+
+
      // Flow rate corrections
     for (auto& face : circuit->faces) {
       if (!face->choked) {
@@ -396,7 +421,7 @@ VecGetArray(pc_full, &pc_array);
     for (int i = 0; i < n; ++i) {
       auto& node = circuit->nodes[i];
       // if (node.flowreg == "Slug") continue;
-      node->msource = msource_global[i];
+      node->msource = m_array[i];
       double relax = 0.6;
       // if (solver::relax_pres) {
         // relax = solver::relax_pres;
@@ -431,6 +456,7 @@ VecGetArray(pc_full, &pc_array);
 // fout.close();
 
 VecRestoreArray(pc_full, &pc_array);
+VecRestoreArray(pc_full, &m_array);
 
 // Clean up
 VecScatterDestroy(&scatter);
@@ -438,10 +464,17 @@ ISDestroy(&from);
 ISDestroy(&to);
 VecDestroy(&pc_full);
 
+VecScatterDestroy(&scatter1);
+ISDestroy(&from1);
+ISDestroy(&to1);
+VecDestroy(&m_full);
+
+
 KSPDestroy(&ksp);
 MatDestroy(&A);
 VecDestroy(&b);
 VecDestroy(&pc);
+VecDestroy(&m);
 
     for (auto& face : circuit->faces) {
       // if (!face->choked) {
