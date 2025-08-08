@@ -375,6 +375,35 @@ VecGetArray(m_full, &m_array);
     }
 
 
+PetscInt istart, iend;
+VecGetOwnershipRange(pc, &istart, &iend);
+
+for (auto& node : circuit->nodes) {
+  int idx = node->node_ind;
+  if (idx >= istart && idx < iend) {
+    circuit->nodes_owned1.push_back(node);
+    // circuit->indices_owned1.push_back(idx);
+  }
+}
+
+// Prepare file for writing (one file per rank)
+std::ofstream fout("tpres_rank_" + std::to_string(mpi::rank) + ".txt");
+
+for (auto& node : circuit->nodes_owned1) {
+  int i = node->node_ind;
+  double pc_val;
+  VecGetValues(pc, 1, &i, &pc_val);
+  double relax = 0.6;
+  // node->tpres_gues += relax * pc_val;
+  // std::cout << "rank " << mpi::rank << " tpres " << node->tpres_gues << std::endl;
+  // fout << "node " << i
+  //      << " tpres " << node->tpres_gues << "\n";
+}
+
+
+
+
+
     // Pressure and density corrections
     for (int i = 0; i < n; ++i) {
       auto& node = circuit->nodes[i];
@@ -405,6 +434,10 @@ VecGetArray(m_full, &m_array);
     // if (trans_sim) {
       // std::exit(1);
     // }
+
+fout.close();
+MPI_Abort(mpi::intracomm, 0);
+std::exit(0);
 
 
 // std::ofstream fout("tpres_rank" + std::to_string(mpi::rank) + ".txt");

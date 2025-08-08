@@ -39,6 +39,7 @@ public:
   double eps_p;
   vector<std::shared_ptr<Node>> nodes;
   vector<std::shared_ptr<Node>> nodes_owned;
+  vector<std::shared_ptr<Node>> nodes_owned1;
   // vector<int> indices_owned;
   vector<std::shared_ptr<Pipe>> pipes;
   vector<BC> bcs;
