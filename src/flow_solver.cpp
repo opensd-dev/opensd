@@ -174,12 +174,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     Vec b, pc, m;
     KSP ksp;
     PetscInt n = circuit->nodes.size(), i;
-    std::vector<double> msource_global(n);
 
-    int start = mpi::rank * (n / mpi::n_procs);
-    int end = (mpi::rank == mpi::n_procs - 1) ? n : start + (n / mpi::n_procs);
-
-    std::vector<double> msource_local(n);
     MatCreate(mpi::intracomm, &A);
     MatSetSizes(A, PETSC_DECIDE, PETSC_DECIDE, n, n);
     MatSetFromOptions(A);
@@ -197,12 +192,8 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     VecSetSizes(m, PETSC_DECIDE, n);
     VecSetFromOptions(m);
 
-    // for (int i = start; i < end; ++i) {
-      // auto& node = circuit->nodes[i];
-
     for (auto& node : circuit->nodes_owned) {
       int i = node->node_ind;  // global row index
-      // int i_local = i - start;
 	  bool pbound = node->fixed_var.count("P");
       double A_local_node = 0, A_local_iface, A_local_oface;
       double b_local;
@@ -252,14 +243,9 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
       // if (node.fixed_var.count("P") && !dynamic_cast<cont.Reservoir*>(node)) {
       if (node->fixed_var.count("P")) {
-        // node->msource = -b(i);
-        // std::cout << "node" << node->identifier << " " << i_local << " " << b_local(i_local) << " " << mpi::rank << std::endl;
         node->msource = -b_local;
-        // msource_local[i] = node->msource;
         VecSetValue(m, i, node->msource, INSERT_VALUES);
-
         A_local_node = 1.0;
-
 		b_local = 0.0;
         
       } else if (node->fixed_var.count("msource")) {
@@ -269,7 +255,6 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         else {
             node->msource = 0.;
 		}
-        // msource_local[i] = node->msource;
         VecSetValue(m, i, node->msource, INSERT_VALUES);
         b_local += node->msource;
       }
@@ -312,7 +297,6 @@ PetscViewerDestroy(&viewerB);
  */
 
 
-
 KSPCreate(mpi::intracomm, &ksp);
 KSPSetOperators(ksp, A, A);
 KSPSetFromOptions(ksp);
@@ -325,35 +309,9 @@ PetscViewerDestroy(&viewer);
 
 // MPI_Abort(mpi::intracomm, 0);
 // std::exit(0);
-
-int rows_per_rank = n / mpi::n_procs;
-
-std::vector<int> recvcounts_m(mpi::n_procs), displs_m(mpi::n_procs);
-
-for (int r = 0; r < mpi::n_procs; ++r) {
-  int r_rows = (r == mpi::n_procs - 1) ? n - r * rows_per_rank : rows_per_rank;
-  recvcounts_m[r] = r_rows;
-  displs_m[r] = (r == 0) ? 0 : displs_m[r - 1] + recvcounts_m[r - 1];
-}
-
-MPI_Gatherv(msource_local.data(), msource_local.size(), MPI_DOUBLE,
-            (mpi::rank == 0 ? msource_global.data() : nullptr), recvcounts_m.data(), displs_m.data(), MPI_DOUBLE,
-            0, mpi::intracomm);
-
-
-
-// Broadcast pc to all ranks
-// MPI_Bcast(pc.data(), pc.size() , MPI_DOUBLE, 0, mpi::intracomm);
-
-MPI_Bcast(msource_global.data(), msource_global.size(), MPI_DOUBLE, 0, mpi::intracomm);
-
-//    std::cout << "pc = \n" << pc << std::endl;
-    
 //    if (flow_iter == 1) {
 //      std::exit(0);
 //    }
-
-
 
 // Get global size
 VecGetSize(pc, &n);
