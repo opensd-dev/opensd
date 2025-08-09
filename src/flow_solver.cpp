@@ -380,15 +380,16 @@ for (auto& node : circuit->nodes) {
 // Prepare file for writing (one file per rank)
 std::ofstream fout("tpres_rank_" + std::to_string(mpi::rank) + ".txt");
 
-PetscScalar val;
+std::vector<PetscScalar> vals(circuit->indices_owned.size());
+VecGetValues(pc, circuit->indices_owned.size(), circuit->indices_owned.data(), vals.data());
+
+int k = 0;
 for (auto& node : circuit->nodes_owned) {
-  PetscInt i = circuit->old2new[node->node_ind];  // global index
-  VecGetValues(pc, 1, &i, &val);  // get single value
   double relax = 0.6;
-  node->tpres_gues += relax * val;
-  std::cout << "rank " << mpi::rank << " pc " << val << std::endl;
-  // fout << "node " << i
-  //      << " tpres " << node->tpres_gues << "\n";
+  node->tpres_gues += relax * vals[k++];
+  std::cout << "rank " << mpi::rank << " tpres " << node->tpres_gues << std::endl;
+  fout << "node " << node->identifier
+       << " tpres " << node->tpres_gues << "\n";
 }
 
 
@@ -404,9 +405,9 @@ for (auto& node : circuit->nodes_owned) {
       // if (solver::relax_pres) {
         // relax = solver::relax_pres;
       // }
-      node->tpres_gues += relax * pc_array[i];
-  fout << "node " << i
-       << " tpres " << node->tpres_gues << "\n";
+  //     node->tpres_gues += relax * pc_array[i];
+  // fout << "node " << i
+  //      << " tpres " << node->tpres_gues << "\n";
       if (node->tpres_gues < 0.0) {
         std::cerr << "Negative tpres " << node->identifier << " " << node->tpres_gues << " " << node->tpres_old << std::endl;
         std::cerr << pc << std::endl;

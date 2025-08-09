@@ -464,7 +464,7 @@ for (PetscInt i = 0; i < nvtxs; ++i) {
   for (auto& node : circuit->nodes) {
     if (part[node_to_vertex[node]] == mpi::rank) {
       circuit->nodes_owned.push_back(node);
-      // circuit->indices_owned.push_back(node->node_ind);
+      circuit->indices_owned.push_back(circuit->old2new[node->node_ind]);
     }
   }
 PetscInt local_nrows = counts[mpi::rank];

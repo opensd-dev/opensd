@@ -41,7 +41,7 @@ public:
   vector<std::shared_ptr<Node>> nodes;
   vector<std::shared_ptr<Node>> nodes_owned;
   vector<std::shared_ptr<Node>> nodes_owned1;
-  // vector<int> indices_owned;
+  vector<int> indices_owned;
   vector<PetscInt> old2new;
   vector<std::shared_ptr<Pipe>> pipes;
   vector<BC> bcs;
