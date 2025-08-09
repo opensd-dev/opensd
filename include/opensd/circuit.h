@@ -10,6 +10,7 @@
 #include "opensd/face.h"
 #include "opensd/vector.h"
 #include "hdf5_interface.h"
+#include <petscksp.h>
 
 namespace opensd {
 
@@ -45,7 +46,12 @@ public:
   vector<BC> bcs;
   vector<std::shared_ptr<Face>> faces;
   vector<int> Pbound_ind;
-
+  Mat A;
+  Vec b;
+  Vec pc;
+  Vec m;
+  KSP ksp;
+  
   void save_to_hdf5(hid_t group_id) const;
   void load_from_hdf5(hid_t group_id);
 

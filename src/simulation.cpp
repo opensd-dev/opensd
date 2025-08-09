@@ -20,6 +20,7 @@
 #include <metis.h>
 #include <unordered_map>
 #include <fstream>
+#include <petscksp.h>
 
 //==============================================================================
 // C API functions
@@ -249,6 +250,20 @@ int opensd_simulation_finalize()
   // Start finalization timer
   simulation::time_finalize.start();
 
+for (auto& circuit : model::circuits) {
+auto &A = circuit->A;  // alias
+auto &b = circuit->b;  // alias
+auto &pc = circuit->pc;  // alias
+auto &m = circuit->m;  // alias
+auto &ksp = circuit->ksp;  // alias
+
+KSPDestroy(&ksp);
+MatDestroy(&A);
+VecDestroy(&b);
+VecDestroy(&pc);
+VecDestroy(&m);
+}
+
 // #ifdef OPENMC_MPI
   // broadcast_results();
 // #endif
@@ -432,7 +447,32 @@ void calculate_work()
       // circuit->indices_owned.push_back(node->node_ind);
     }
   }
+
+
+    PetscInt n = circuit->nodes.size();
+
+    auto &A = circuit->A; 
+    MatCreate(mpi::intracomm, &A);
+    MatSetSizes(A, PETSC_DECIDE, PETSC_DECIDE, n, n);
+    MatSetFromOptions(A);
+    MatSetUp(A);
     
+    auto &b = circuit->b; 
+    VecCreate(mpi::intracomm, &b);
+    VecSetSizes(b, PETSC_DECIDE, n);
+    VecSetFromOptions(b);
+    
+    auto &pc = circuit->pc; 
+    VecCreate(mpi::intracomm, &pc);
+    VecSetSizes(pc, PETSC_DECIDE, n);
+    VecSetFromOptions(pc);
+    
+    auto &m = circuit->m; 
+    VecCreate(mpi::intracomm, &m);
+    VecSetSizes(m, PETSC_DECIDE, n);
+    VecSetFromOptions(m);
+
+
     
   }
 

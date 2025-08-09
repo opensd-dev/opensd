@@ -170,28 +170,15 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     guess_flow(time, delt, trans_sim, alpha_mom, main_iter, circuit);
 
     // Pressure corrections
-    Mat A;
-    Vec b, pc, m;
-    KSP ksp;
-    PetscInt n = circuit->nodes.size(), i;
+    auto &A = circuit->A; 
+    auto &b = circuit->b; 
+    auto &pc = circuit->pc; 
+    auto &m = circuit->m; 
 
-    MatCreate(mpi::intracomm, &A);
-    MatSetSizes(A, PETSC_DECIDE, PETSC_DECIDE, n, n);
-    MatSetFromOptions(A);
-    MatSetUp(A);
-    
-    VecCreate(mpi::intracomm, &b);
-    VecSetSizes(b, PETSC_DECIDE, n);
-    VecSetFromOptions(b);
-    
-    VecCreate(mpi::intracomm, &pc);
-    VecSetSizes(pc, PETSC_DECIDE, n);
-    VecSetFromOptions(pc);
-    
-    VecCreate(mpi::intracomm, &m);
-    VecSetSizes(m, PETSC_DECIDE, n);
-    VecSetFromOptions(m);
-
+    MatZeroEntries(A);
+    VecZeroEntries(b);
+    VecZeroEntries(pc);
+    VecZeroEntries(m);
     for (auto& node : circuit->nodes_owned) {
       int i = node->node_ind;  // global row index
 	  bool pbound = node->fixed_var.count("P");
@@ -296,6 +283,7 @@ VecView(b, viewerB);
 PetscViewerDestroy(&viewerB);
  */
 
+auto &ksp = circuit->ksp; 
 
 KSPCreate(mpi::intracomm, &ksp);
 KSPSetOperators(ksp, A, A);
@@ -314,6 +302,7 @@ PetscViewerDestroy(&viewer);
 //    }
 
 // Get global size
+PetscInt n = circuit->nodes.size();
 VecGetSize(pc, &n);
 
 // Create sequential vector to hold full solution on all ranks
@@ -414,6 +403,8 @@ for (auto& node : circuit->nodes_owned1) {
         // relax = solver::relax_pres;
       // }
       node->tpres_gues += relax * pc_array[i];
+  fout << "node " << i
+       << " tpres " << node->tpres_gues << "\n";
       if (node->tpres_gues < 0.0) {
         std::cerr << "Negative tpres " << node->identifier << " " << node->tpres_gues << " " << node->tpres_old << std::endl;
         std::cerr << pc << std::endl;
@@ -460,12 +451,6 @@ ISDestroy(&from1);
 ISDestroy(&to1);
 VecDestroy(&m_full);
 
-
-KSPDestroy(&ksp);
-MatDestroy(&A);
-VecDestroy(&b);
-VecDestroy(&pc);
-VecDestroy(&m);
 
     for (auto& face : circuit->faces) {
       // if (!face->choked) {
