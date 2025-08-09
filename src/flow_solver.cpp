@@ -355,30 +355,43 @@ PetscScalar* m_array;
 VecGetArray(m_full, &m_array);
 
 
+// Prepare file for writing (one file per rank)
+std::ofstream fout("vflow_rank_" + std::to_string(mpi::rank) + ".txt");
+
+// Create ghost vector
+PetscInt n_local = circuit->indices_owned.size();
+PetscInt nghost  = circuit->ghost_indices_owned.size();
+
+Vec pc_local;
+VecCreateGhost(mpi::intracomm, n_local, PETSC_DECIDE, nghost,
+               circuit->ghost_indices_owned.data(), &pc_local);
+// Scatter from global solution 'pc' to ghosted vector
+VecGhostUpdateBegin(pc_local, INSERT_VALUES, SCATTER_FORWARD);
+VecGhostUpdateEnd(pc_local, INSERT_VALUES, SCATTER_FORWARD);
+
+const PetscScalar* pc_array1;
+VecGetArrayRead(pc_local, &pc_array1);
+
      // Flow rate corrections
     for (auto& face : circuit->faces) {
       if (!face->choked) {
 
+  PetscInt i_u = circuit->old2new[face->unode->node_ind]; // could be owned or ghost
+  PetscInt i_v = circuit->old2new[face->dnode->node_ind];
+
         double vc = face->aminus * pc_array[face->unode->node_ind] - face->aplus * pc_array[face->dnode->node_ind];
+        std::cout << "rank " << mpi::rank <<
+        " u1 " << pc_array[face->unode->node_ind] <<
+        " d1 " << pc_array[face->dnode->node_ind] <<
+        " u2 " << pc_array1[i_u] <<
+        " d2 " << pc_array1[i_v] <<
+        std::endl;
         face->vflow_gues += vc;
       }
       face->update_velocity();
     }
 
 
-PetscInt istart, iend;
-VecGetOwnershipRange(pc, &istart, &iend);
-
-for (auto& node : circuit->nodes) {
-  int idx = node->node_ind;
-  if (idx >= istart && idx < iend) {
-    circuit->nodes_owned1.push_back(node);
-    // circuit->indices_owned1.push_back(idx);
-  }
-}
-
-// Prepare file for writing (one file per rank)
-std::ofstream fout("tpres_rank_" + std::to_string(mpi::rank) + ".txt");
 
 std::vector<PetscScalar> vals(circuit->indices_owned.size());
 VecGetValues(pc, circuit->indices_owned.size(), circuit->indices_owned.data(), vals.data());

@@ -421,7 +421,6 @@ for (PetscInt i = 0; i < nvtxs; ++i) {
     }
     
     std::map<int, std::vector<std::shared_ptr<Face>>> ghost_edges_to_recv_from_rank;
-    std::map<int, std::vector<std::shared_ptr<Node>>> ghost_nodes_to_recv_from_rank;
   
   
     for (auto& face : circuit->faces) {
@@ -434,7 +433,8 @@ for (PetscInt i = 0; i < nvtxs; ++i) {
           }
   		
   	if (v_rank != mpi::rank && u_rank == mpi::rank) {
-              ghost_nodes_to_recv_from_rank[v_rank].push_back(face->dnode);
+              circuit->ghost_nodes_owned[v_rank].push_back(face->dnode);
+              circuit->ghost_indices_owned.push_back(circuit->old2new[face->dnode->node_ind]); // global index
           }
   	}
   
@@ -446,7 +446,7 @@ for (PetscInt i = 0; i < nvtxs; ++i) {
     }
   
     std::ofstream ghost_debug("ghosts_rank_" + std::to_string(mpi::rank) + ".txt");
-    for (const auto& [rank, nodes] : ghost_nodes_to_recv_from_rank) {
+    for (const auto& [rank, nodes] : circuit->ghost_nodes_owned) {
         ghost_debug << "Need nodes from rank " << rank << ": ";
         for (auto node : nodes)
         ghost_debug << node->identifier << " ";
