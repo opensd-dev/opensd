@@ -180,7 +180,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     VecZeroEntries(pc);
     VecZeroEntries(m);
     for (auto& node : circuit->nodes_owned) {
-      int i = node->node_ind;  // global row index
+      int i = circuit->old2new[node->node_ind];  // global row index
 	  bool pbound = node->fixed_var.count("P");
       double A_local_node = 0, A_local_iface, A_local_oface;
       double b_local;
@@ -203,7 +203,8 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       for (auto& iface : node->ifaces) {
         if (!pbound) {
           A_local_iface = -alpha_mom * (iface->aminus * iface->ther_gues->rhomass() + iface->bminus * iface->vflow_gues);
-          MatSetValue(A, i, iface->unode->node_ind, A_local_iface, INSERT_VALUES);
+          int j = circuit->old2new[iface->unode->node_ind];
+          MatSetValue(A, i, j, A_local_iface, INSERT_VALUES);
           if (A_local_iface > 0.0) {
             // if ((show_warn && trans_sim) || !trans_sim) {
               std::cout << "Warning: upstream coef negative. " << node->identifier << std::endl;
@@ -217,7 +218,8 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       for (auto& oface : node->ofaces) {
     	if (!pbound) {
           A_local_oface = -alpha_mom * (oface->aplus * oface->ther_gues->rhomass() - oface->bplus * oface->vflow_gues);
-          MatSetValue(A, i, oface->dnode->node_ind, A_local_oface, INSERT_VALUES);
+          int j = circuit->old2new[oface->dnode->node_ind];
+          MatSetValue(A, i, j, A_local_oface, INSERT_VALUES);
           if (A_local_oface > 1.E-6) { // Pending check if 0
             // if ((show_warn && trans_sim) || !trans_sim) {
               std::cout << "Warning: downstream coef negative. " << node->identifier << std::endl;
@@ -378,13 +380,13 @@ for (auto& node : circuit->nodes) {
 // Prepare file for writing (one file per rank)
 std::ofstream fout("tpres_rank_" + std::to_string(mpi::rank) + ".txt");
 
-for (auto& node : circuit->nodes_owned1) {
-  int i = node->node_ind;
-  double pc_val;
-  VecGetValues(pc, 1, &i, &pc_val);
+PetscScalar val;
+for (auto& node : circuit->nodes_owned) {
+  PetscInt i = circuit->old2new[node->node_ind];  // global index
+  VecGetValues(pc, 1, &i, &val);  // get single value
   double relax = 0.6;
-  // node->tpres_gues += relax * pc_val;
-  // std::cout << "rank " << mpi::rank << " tpres " << node->tpres_gues << std::endl;
+  node->tpres_gues += relax * val;
+  std::cout << "rank " << mpi::rank << " pc " << val << std::endl;
   // fout << "node " << i
   //      << " tpres " << node->tpres_gues << "\n";
 }

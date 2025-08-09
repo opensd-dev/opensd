@@ -388,10 +388,30 @@ void calculate_work()
         // Assign everything to part 0
         std::fill(part.begin(), part.end(), 0);
     }
-    
+
+
+std::vector<PetscInt> counts(mpi::n_procs, 0);
+for (PetscInt i = 0; i < nvtxs; ++i) {
+    counts[part[i]]++;
+}
+
+// 2. Compute starting offsets for each rank
+std::vector<PetscInt> offsets(mpi::n_procs, 0);
+for (int r = 1; r < mpi::n_procs; ++r) {
+    offsets[r] = offsets[r-1] + counts[r-1];
+}
+// 3. Map old index → new contiguous index
+circuit->old2new.resize(nvtxs);
+std::vector<PetscInt> position = offsets; // running positions
+for (PetscInt i = 0; i < nvtxs; ++i) {
+    PetscInt r = part[i];
+    circuit->old2new[i] = position[r]++;
+}
+
+
     std::ofstream fout("partition_rank_" + std::to_string(mpi::rank) + ".txt");
     for (int i = 0; i < nvtxs; ++i) {
-        fout << "Node " << i << " -> Part " << part[i] << "\n";
+        fout << "Node " << i << " -> Part " << part[i] << " Petsc " << part[circuit->old2new[i]] << "\n";
     }
     fout.close();
     
@@ -447,29 +467,32 @@ void calculate_work()
       // circuit->indices_owned.push_back(node->node_ind);
     }
   }
+PetscInt local_nrows = counts[mpi::rank];
 
+// --- PETSc create matrix and vectors with METIS partition sizes ---
+PetscInt global_nrows = vertex_count; // same as nvtxs
 
     PetscInt n = circuit->nodes.size();
 
     auto &A = circuit->A; 
     MatCreate(mpi::intracomm, &A);
-    MatSetSizes(A, PETSC_DECIDE, PETSC_DECIDE, n, n);
+    MatSetSizes(A, local_nrows, local_nrows, global_nrows, global_nrows);
     MatSetFromOptions(A);
     MatSetUp(A);
     
     auto &b = circuit->b; 
     VecCreate(mpi::intracomm, &b);
-    VecSetSizes(b, PETSC_DECIDE, n);
+    VecSetSizes(b, local_nrows, global_nrows);
     VecSetFromOptions(b);
     
     auto &pc = circuit->pc; 
     VecCreate(mpi::intracomm, &pc);
-    VecSetSizes(pc, PETSC_DECIDE, n);
+    VecSetSizes(pc, local_nrows, global_nrows);
     VecSetFromOptions(pc);
     
     auto &m = circuit->m; 
     VecCreate(mpi::intracomm, &m);
-    VecSetSizes(m, PETSC_DECIDE, n);
+    VecSetSizes(m, local_nrows, global_nrows);
     VecSetFromOptions(m);
 
 
