@@ -427,6 +427,8 @@ for (PetscInt i = 0; i < nvtxs; ++i) {
       int u_rank = part[node_to_vertex[face->unode]];
       int v_rank = part[node_to_vertex[face->dnode]];
             face->owner = u_rank;
+			if (face->owner == mpi::rank)
+			  circuit->faces_owned.push_back(face);
   
   	if ((u_rank == mpi::rank || v_rank == mpi::rank) && face->owner != mpi::rank) {
               ghost_edges_to_recv_from_rank[face->owner].push_back(face);
@@ -468,6 +470,24 @@ for (PetscInt i = 0; i < nvtxs; ++i) {
     }
   }
 PetscInt local_nrows = counts[mpi::rank];
+
+// Debug print faces_owned per rank
+{
+  std::ofstream fout("faces_owned_rank_" + std::to_string(mpi::rank) + ".txt");
+
+  fout << "Rank " << mpi::rank << " owns " << circuit->faces_owned.size() << " faces\n";
+  for (auto& face : circuit->faces_owned) {
+    fout << "Face " << face->faceno
+         << " upstream node: " << face->unode->identifier
+         << " (rank " << part[node_to_vertex[face->unode]] << ")"
+         << " downstream node: " << face->dnode->identifier
+         << " (rank " << part[node_to_vertex[face->dnode]] << ")"
+         << " => Owner: " << face->owner << "\n";
+  }
+}
+
+
+
 
 // --- PETSc create matrix and vectors with METIS partition sizes ---
 PetscInt global_nrows = vertex_count; // same as nvtxs

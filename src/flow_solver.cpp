@@ -95,7 +95,7 @@ Eigen::VectorXd insertZerosAtIndices(const Eigen::VectorXd& vec, const std::vect
 //==============================================================================
 
 void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int main_iter, std::shared_ptr<Circuit> circuit) {
-
+  std::ofstream fout1("vflow_rank_" + std::to_string(mpi::rank) + ".txt");
   // for (auto& branch : circuit->branches) { // Guess flow rate calculation
   for (auto& face : circuit->faces) {
     // branch.choked = false;
@@ -156,8 +156,13 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
         // }
       // }
       face->update_abcoef(time, delt, trans_sim, alpha_mom);
+      fout1 << "face " << face->faceno
+       << " vflow " << face->vflow_gues << "\n";
+
       // std::cout << face->vflow_gues << std::endl;
   }
+  fout1.close();
+
 }
   
 void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, int main_iter, int flow_iter) {
@@ -356,7 +361,7 @@ VecGetArray(m_full, &m_array);
 
 
 // Prepare file for writing (one file per rank)
-std::ofstream fout("vflow_rank_" + std::to_string(mpi::rank) + ".txt");
+// std::ofstream fout("vflow_rank_" + std::to_string(mpi::rank) + ".txt");
 
 // Create ghost vector
 PetscInt n_local = circuit->indices_owned.size();
@@ -380,13 +385,10 @@ VecGetArrayRead(pc_local, &pc_array1);
   PetscInt i_v = circuit->old2new[face->dnode->node_ind];
 
         double vc = face->aminus * pc_array[face->unode->node_ind] - face->aplus * pc_array[face->dnode->node_ind];
-        std::cout << "rank " << mpi::rank <<
-        " u1 " << pc_array[face->unode->node_ind] <<
-        " d1 " << pc_array[face->dnode->node_ind] <<
-        " u2 " << pc_array1[i_u] <<
-        " d2 " << pc_array1[i_v] <<
-        std::endl;
         face->vflow_gues += vc;
+		// fout << "face " << face->faceno
+       // << " vflow " << face->vflow_gues << "\n";
+
       }
       face->update_velocity();
     }
@@ -401,8 +403,6 @@ for (auto& node : circuit->nodes_owned) {
   double relax = 0.6;
   node->tpres_gues += relax * vals[k++];
   std::cout << "rank " << mpi::rank << " tpres " << node->tpres_gues << std::endl;
-  fout << "node " << node->identifier
-       << " tpres " << node->tpres_gues << "\n";
 }
 
 
@@ -442,7 +442,7 @@ for (auto& node : circuit->nodes_owned) {
       // std::exit(1);
     // }
 
-fout.close();
+// fout.close();
 MPI_Abort(mpi::intracomm, 0);
 std::exit(0);
 

@@ -47,6 +47,7 @@ public:
   vector<std::shared_ptr<Pipe>> pipes;
   vector<BC> bcs;
   vector<std::shared_ptr<Face>> faces;
+  vector<std::shared_ptr<Face>> faces_owned;
   vector<int> Pbound_ind;
   Mat A;
   Vec b;
