@@ -97,7 +97,7 @@ Eigen::VectorXd insertZerosAtIndices(const Eigen::VectorXd& vec, const std::vect
 void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int main_iter, std::shared_ptr<Circuit> circuit) {
   std::ofstream fout1("vflow_rank_" + std::to_string(mpi::rank) + ".txt");
   // for (auto& branch : circuit->branches) { // Guess flow rate calculation
-  for (auto& face : circuit->faces) {
+  for (auto& face : circuit->faces_owned) {
     // branch.choked = false;
     // for (auto face = branch.faces.rbegin(); face != branch.faces.rend(); ++face) { // Reverse iteration
       // face.choked = false;
@@ -162,6 +162,18 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
       // std::cout << face->vflow_gues << std::endl;
   }
   fout1.close();
+
+std::unordered_map<int, std::vector<double>> send_vflow, send_aplus, send_bplus;
+
+for (auto& [owner_rank, faces] : circuit->ghost_faces_owned) {
+    for (auto& face : faces) {
+        send_vflow[owner_rank].push_back(face->vflow_gues);
+        send_aplus[owner_rank].push_back(face->aplus);
+        send_bplus[owner_rank].push_back(face->bplus);
+    }
+}
+
+
 
 }
   

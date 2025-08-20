@@ -349,7 +349,7 @@ void calculate_work()
       adjncy[current[v]++] = u;
     }
   
-    std::cout << "xadj:\n";
+/*     std::cout << "xadj:\n";
     for (size_t i = 0; i < xadj.size(); ++i)
         std::cout << "  xadj[" << i << "] = " << xadj[i] << "\n";
     
@@ -367,7 +367,7 @@ void calculate_work()
             std::cout << "Edge: " << i << " -- " << adjncy[j] << "\n";
         }
     }
-    
+ */    
     idx_t nvtxs = vertex_count;
     idx_t ncon = 1;
     idx_t nparts = mpi::n_procs;  // Set this to number of partitions
@@ -420,9 +420,6 @@ for (PetscInt i = 0; i < nvtxs; ++i) {
         std::cerr << "METIS partition debug print complete.\n";
     }
     
-    std::map<int, std::vector<std::shared_ptr<Face>>> ghost_edges_to_recv_from_rank;
-  
-  
     for (auto& face : circuit->faces) {
       int u_rank = part[node_to_vertex[face->unode]];
       int v_rank = part[node_to_vertex[face->dnode]];
@@ -431,7 +428,7 @@ for (PetscInt i = 0; i < nvtxs; ++i) {
 			  circuit->faces_owned.push_back(face);
   
   	if ((u_rank == mpi::rank || v_rank == mpi::rank) && face->owner != mpi::rank) {
-              ghost_edges_to_recv_from_rank[face->owner].push_back(face);
+              circuit->ghost_faces_owned[face->owner].push_back(face);
           }
   		
   	if (v_rank != mpi::rank && u_rank == mpi::rank) {
@@ -440,12 +437,12 @@ for (PetscInt i = 0; i < nvtxs; ++i) {
           }
   	}
   
-    for (auto& face : circuit->faces) {
-        std::cout << "Face " << face->faceno
-                  << " connects nodes " << face->unode->identifier
-                  << " and " << face->dnode->identifier
-                  << " => Owner: " << face->owner << "\n";
-    }
+    // for (auto& face : circuit->faces) {
+        // std::cout << "Face " << face->faceno
+                  // << " connects nodes " << face->unode->identifier
+                  // << " and " << face->dnode->identifier
+                  // << " => Owner: " << face->owner << "\n";
+    // }
   
     std::ofstream ghost_debug("ghosts_rank_" + std::to_string(mpi::rank) + ".txt");
     for (const auto& [rank, nodes] : circuit->ghost_nodes_owned) {
@@ -454,7 +451,7 @@ for (PetscInt i = 0; i < nvtxs; ++i) {
         ghost_debug << node->identifier << " ";
         ghost_debug << "\n";
     }
-    for (const auto& [rank, faces] : ghost_edges_to_recv_from_rank) {
+    for (const auto& [rank, faces] : circuit->ghost_faces_owned) {
         ghost_debug << "Need faces from rank " << rank << ": ";
         for (auto face : faces)
         ghost_debug << face->faceno << " ";
