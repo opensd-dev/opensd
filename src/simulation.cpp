@@ -420,21 +420,26 @@ for (PetscInt i = 0; i < nvtxs; ++i) {
         std::cerr << "METIS partition debug print complete.\n";
     }
     
+    size_t i = 0;
     for (auto& face : circuit->faces) {
       int u_rank = part[node_to_vertex[face->unode]];
       int v_rank = part[node_to_vertex[face->dnode]];
             face->owner = u_rank;
-			if (face->owner == mpi::rank)
+			if (face->owner == mpi::rank) {
 			  circuit->faces_owned.push_back(face);
-  
+              circuit->face_indices_owned.push_back(i);
+            }
+
   	if ((u_rank == mpi::rank || v_rank == mpi::rank) && face->owner != mpi::rank) {
               circuit->ghost_faces_owned[face->owner].push_back(face);
+              circuit->ghost_face_indices_owned.push_back(i);
           }
   		
   	if (v_rank != mpi::rank && u_rank == mpi::rank) {
               circuit->ghost_nodes_owned[v_rank].push_back(face->dnode);
               circuit->ghost_indices_owned.push_back(circuit->old2new[face->dnode->node_ind]); // global index
           }
+      ++i;
   	}
   
     // for (auto& face : circuit->faces) {

@@ -43,7 +43,9 @@ public:
   std::map<int, std::vector<std::shared_ptr<Node>>> ghost_nodes_owned;
   std::map<int, std::vector<std::shared_ptr<Face>>> ghost_faces_owned;
   vector<int> indices_owned;
+  vector<int> face_indices_owned;
   vector<PetscInt> ghost_indices_owned;
+  vector<PetscInt> ghost_face_indices_owned;
   vector<PetscInt> old2new;
   vector<std::shared_ptr<Pipe>> pipes;
   vector<BC> bcs;
