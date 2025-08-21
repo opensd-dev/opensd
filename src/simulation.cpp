@@ -319,9 +319,9 @@ void calculate_work()
       vertex_to_node.push_back(node);
     }
   
-    std::cout << "vertex_to_node:\n";
-    for (size_t i = 0; i < vertex_to_node.size(); ++i)
-      std::cout << "  vertex " << i << " -> node " << vertex_to_node[i]->identifier << "\n";
+    // std::cout << "vertex_to_node:\n";
+    // for (size_t i = 0; i < vertex_to_node.size(); ++i)
+    //   std::cout << "  vertex " << i << " -> node " << vertex_to_node[i]->identifier << "\n";
     
     // Adjacency graph (CSR format)
     std::vector<idx_t> xadj(vertex_count + 1, 0);
@@ -411,7 +411,11 @@ for (PetscInt i = 0; i < nvtxs; ++i) {
 
     std::ofstream fout("partition_rank_" + std::to_string(mpi::rank) + ".txt");
     for (int i = 0; i < nvtxs; ++i) {
-        fout << "Node " << i << " -> Part " << part[i] << " Petsc " << part[circuit->old2new[i]] << "\n";
+        fout << circuit->nodes[i]->identifier
+     << " old=" << i
+     << " part=" << part[i]
+     << " petsc=" << circuit->old2new[i] << "\n";
+
     }
     fout.close();
     

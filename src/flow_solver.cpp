@@ -95,7 +95,7 @@ Eigen::VectorXd insertZerosAtIndices(const Eigen::VectorXd& vec, const std::vect
 //==============================================================================
 
 void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int main_iter, std::shared_ptr<Circuit> circuit) {
-  std::ofstream fout("vflow_rank_" + std::to_string(mpi::rank) + ".txt");
+  // std::ofstream fout("vflow_rank_" + std::to_string(mpi::rank) + ".txt");
   // for (auto& branch : circuit->branches) { // Guess flow rate calculation
   for (auto& face : circuit->faces_owned) {
     // branch.choked = false;
@@ -156,12 +156,12 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
         // }
       // }
       face->update_abcoef(time, delt, trans_sim, alpha_mom);
-      fout << "face " << face->faceno
-       << " aminus " << face->aminus << "\n";
+      // fout << "face " << face->faceno
+      //  << " aminus " << face->aminus << "\n";
 
       // std::cout << face->vflow_gues << std::endl;
   }
-  fout.close();
+  // fout.close();
 PetscInt n_faces_owned = circuit->face_indices_owned.size();
 PetscInt n_faces_ghost = circuit->ghost_face_indices_owned.size();
 
@@ -262,13 +262,13 @@ for (size_t j = 0; j < circuit->ghost_face_indices_owned.size(); ++j) {
   face->bplus      = bplus_array_read[n_faces_owned + j];
   face->bminus     = bminus_array_read[n_faces_owned + j];
 
-  std::cout << "flag1 " << mpi::rank
-            << " face=" << face->faceno
-            << " aminus=" << face->aminus
-            << " aplus=" << face->aplus
-            << " bplus=" << face->bplus
-            << " bminus=" << face->bminus
-            << std::endl;
+  // std::cout << "flag1 " << mpi::rank
+  //           << " face=" << face->faceno
+  //           << " aminus=" << face->aminus
+  //           << " aplus=" << face->aplus
+  //           << " bplus=" << face->bplus
+  //           << " bminus=" << face->bminus
+  //           << std::endl;
 }
 
 VecRestoreArrayRead(vflow_gues_local, &vflow_array_read);
@@ -287,7 +287,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     // if (!trans_sim && !circuit->solveSS) continue;
     // std::cout << circuit->identifier << std::endl;
     guess_flow(time, delt, trans_sim, alpha_mom, main_iter, circuit);
-    std::ofstream fout("abcoef_rank_" + std::to_string(mpi::rank) + ".txt");
+    // std::ofstream fout("abcoef_rank_" + std::to_string(mpi::rank) + ".txt");
 
     // Pressure corrections
     auto &A = circuit->A; 
@@ -379,7 +379,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
     }
 
-    fout.close();
+    // fout.close();
 
 
 MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
@@ -458,35 +458,52 @@ VecGetArray(pc_full, &pc_array);
 VecGetSize(m, &n);
 
 // Create sequential vector to hold full solution on all ranks
-Vec m_full;
-VecCreateSeq(PETSC_COMM_SELF, n, &m_full);
+// Vec m_full;
+// VecCreateSeq(PETSC_COMM_SELF, n, &m_full);
 
 // Create identity index sets
-IS from1, to1;
-ISCreateStride(PETSC_COMM_WORLD, n, 0, 1, &from1);
-ISCreateStride(PETSC_COMM_SELF,  n, 0, 1, &to1);
+// IS from1, to1;
+// ISCreateStride(PETSC_COMM_WORLD, n, 0, 1, &from1);
+// ISCreateStride(PETSC_COMM_SELF,  n, 0, 1, &to1);
 
 // Create and execute scatter
-VecScatter scatter1;
-VecScatterCreate(m, from1, m_full, to1, &scatter1);
-VecScatterBegin(scatter1, m, m_full, INSERT_VALUES, SCATTER_FORWARD);
-VecScatterEnd(scatter1, m, m_full, INSERT_VALUES, SCATTER_FORWARD);
+// VecScatter scatter1;
+// VecScatterCreate(m, from1, m_full, to1, &scatter1);
+// VecScatterBegin(scatter1, m, m_full, INSERT_VALUES, SCATTER_FORWARD);
+// VecScatterEnd(scatter1, m, m_full, INSERT_VALUES, SCATTER_FORWARD);
 
 // Access full m values on all ranks
-PetscScalar* m_array;
-VecGetArray(m_full, &m_array);
+// PetscScalar* m_array;
+// VecGetArray(m_full, &m_array);
 
 
 // Prepare file for writing (one file per rank)
-// std::ofstream fout("vflow_rank_" + std::to_string(mpi::rank) + ".txt");
+std::ofstream fout("vflow_rank_" + std::to_string(mpi::rank) + ".txt");
 
 // Create ghost vector
 PetscInt n_local = circuit->indices_owned.size();
 PetscInt nghost  = circuit->ghost_indices_owned.size();
 
 Vec pc_local;
+
 VecCreateGhost(mpi::intracomm, n_local, PETSC_DECIDE, nghost,
                circuit->ghost_indices_owned.data(), &pc_local);
+
+
+
+
+PetscScalar* loc = nullptr;
+VecGetArray(pc_local, &loc);
+
+// fill owned slots [0..n_local-1] from global 'pc'
+std::vector<PetscScalar> vals_owned(n_local);
+VecGetValues(pc, n_local, circuit->indices_owned.data(), vals_owned.data());
+for (PetscInt i = 0; i < n_local; ++i) loc[i] = vals_owned[i];
+
+VecRestoreArray(pc_local, &loc);
+
+
+
 // Scatter from global solution 'pc' to ghosted vector
 VecGhostUpdateBegin(pc_local, INSERT_VALUES, SCATTER_FORWARD);
 VecGhostUpdateEnd(pc_local, INSERT_VALUES, SCATTER_FORWARD);
@@ -494,44 +511,76 @@ VecGhostUpdateEnd(pc_local, INSERT_VALUES, SCATTER_FORWARD);
 const PetscScalar* pc_array1;
 VecGetArrayRead(pc_local, &pc_array1);
 
-     // Flow rate corrections
-    for (auto& face : circuit->faces) {
+
+
+
+PetscInt n_local1;
+PetscInt start, end;
+VecGetLocalSize(pc_local, &n_local1);   // n_local + nghost actually (ghosted vec)
+VecGetOwnershipRange(pc_local, &start, &end); // owned global indices [start,end)
+
+PetscInt n_total = n_local1;  // includes ghosts for ghosted vectors
+std::ofstream pout("pc_array_rank_" + std::to_string(mpi::rank) + ".txt");
+
+pout << "Rank " << mpi::rank << " local+ghost size = " << n_total << "\n";
+pout << "Rank " << mpi::rank
+     << " local size = " << n_local
+     << " ghost size = " << nghost << "\n";
+
+// Print owned entries
+for (PetscInt i = 0; i < n_local; ++i) {
+  pout << "pc_array[" << i << "] (global "
+       << circuit->indices_owned[i] << ") = "
+       << pc_array1[i] << "\n";
+}
+
+// Print ghost entries
+for (PetscInt j = 0; j < nghost; ++j) {
+  pout << "pc_array[" << (n_local + j) << "] (global "
+       << circuit->ghost_indices_owned[j] << ") = "
+       << pc_array1[n_local + j] << "\n";
+}
+pout.close();
+
+
+std::unordered_map<PetscInt, PetscInt> global_to_local;
+
+for (PetscInt i = 0; i < n_local; ++i)
+  global_to_local[circuit->indices_owned[i]] = i;
+
+for (PetscInt j = 0; j < nghost; ++j)
+  global_to_local[circuit->ghost_indices_owned[j]] = n_local + j;
+
+
+
+int l = 0;
+// Flow rate corrections
+    for (auto& face : circuit->faces_owned) {
       if (!face->choked) {
 
-  PetscInt i_u = circuit->old2new[face->unode->node_ind]; // could be owned or ghost
-  PetscInt i_v = circuit->old2new[face->dnode->node_ind];
+  PetscInt i_u = global_to_local[circuit->old2new[face->unode->node_ind]]; // could be owned or ghost
+  PetscInt i_v = global_to_local[circuit->old2new[face->dnode->node_ind]];
 
-        double vc = face->aminus * pc_array[face->unode->node_ind] - face->aplus * pc_array[face->dnode->node_ind];
+
+        double vc = face->aminus * pc_array1[i_u] - face->aplus * pc_array1[i_v];
         face->vflow_gues += vc;
-		// fout << "face " << face->faceno
-       // << " vflow " << face->vflow_gues << "\n";
+        fout << "face " << "i_u " << i_u << " i_v " << i_v << " " << face->vflow_gues << "\n";
 
       }
       face->update_velocity();
     }
 
 
-
-std::vector<PetscScalar> vals(circuit->indices_owned.size());
-VecGetValues(pc, circuit->indices_owned.size(), circuit->indices_owned.data(), vals.data());
-
+    // Pressure and density corrections
 int k = 0;
 for (auto& node : circuit->nodes_owned) {
   double relax = 0.6;
-  node->tpres_gues += relax * vals[k++];
-  std::cout << "rank " << mpi::rank << " tpres " << node->tpres_gues << std::endl;
-}
+  node->tpres_gues += relax * pc_array1[k++];
+  // std::cout << "rank " << mpi::rank << " tpres " << node->tpres_gues << std::endl;
 
-
-
-
-
-    // Pressure and density corrections
-    for (int i = 0; i < n; ++i) {
-      auto& node = circuit->nodes[i];
       // if (node.flowreg == "Slug") continue;
-      node->msource = m_array[i];
-      double relax = 0.6;
+      // node->msource = m_array[i];
+      // fout << "node " << node->identifier << "msource " << node->msource << std::endl;
       // if (solver::relax_pres) {
         // relax = solver::relax_pres;
       // }
@@ -559,34 +608,33 @@ for (auto& node : circuit->nodes_owned) {
       // std::exit(1);
     // }
 
-// fout.close();
-MPI_Abort(mpi::intracomm, 0);
-std::exit(0);
+fout.close();
 
 
-// std::ofstream fout("tpres_rank" + std::to_string(mpi::rank) + ".txt");
-// for (auto& node : circuit->nodes) {
-  // fout << node->identifier << " " << node->tpres_gues << " " << node->tpres_old << "\n";
-// }
-// fout.close();
+std::ofstream fout1("tpres_rank_" + std::to_string(mpi::rank) + ".txt");
+for (auto& node : circuit->nodes_owned) {
+  fout1 << node->identifier << " " << node->tpres_gues << " " << node->tpres_old << "\n";
+}
+fout1.close();
 
 VecRestoreArray(pc_full, &pc_array);
-VecRestoreArray(pc_full, &m_array);
+// VecRestoreArray(pc_full, &m_array);
+VecRestoreArrayRead(pc_local, &pc_array1);
 
 // Clean up
 VecScatterDestroy(&scatter);
 ISDestroy(&from);
 ISDestroy(&to);
 VecDestroy(&pc_full);
-// VecDestroy(&pc_local);
+VecDestroy(&pc_local);
 
-VecScatterDestroy(&scatter1);
-ISDestroy(&from1);
-ISDestroy(&to1);
-VecDestroy(&m_full);
+// VecScatterDestroy(&scatter1);
+// ISDestroy(&from1);
+// ISDestroy(&to1);
+// VecDestroy(&m_full);
 
 
-    for (auto& face : circuit->faces) {
+    for (auto& face : circuit->faces_owned) {
       // if (!face->choked) {
         face->update_statevar();
         face->ther_gues->update();
@@ -599,6 +647,8 @@ VecDestroy(&m_full);
         // face->vflow_gues = face->G * face->cfarea / face->ther_gues.rhomass();
       // }
     }
+MPI_Abort(mpi::intracomm, 0);
+std::exit(0);
 
 }
 simulation::time_massmom.stop();
