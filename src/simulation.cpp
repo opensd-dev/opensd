@@ -67,11 +67,41 @@ int opensd_run()
         exec_massmom(simulation::current_time, simulation::delt, trans_sim, alpha_mom, main_iter, flow_iter);
         // if (mpi::rank == 0) {
           std::tuple<bool, std::tuple<double, double>> result = check_conv(simulation::current_time, simulation::delt, trans_sim, alpha_mom, "massmom");
-          converged = std::get<0>(result);
+          bool converged_local = std::get<0>(result);
           std::tie(eps_m, eps_p) = std::get<1>(result);
 		// }
-		
-		MPI_Bcast(&converged, 1, MPI_C_BOOL, 0, mpi::intracomm);
+
+        std::ofstream fout("convergence_rank_" + std::to_string(mpi::rank) + ".txt");
+        fout << "massmom iteration " << flow_iter + 1 << " eps_m=" << eps_m << " eps_p=" << eps_p << std::endl;
+        fout.close();
+
+        PetscReal eps_m_local = eps_m;
+        PetscReal eps_p_local = eps_p;
+        PetscReal eps_m_global, eps_p_global;
+
+        MPI_Allreduce(&eps_m_local, &eps_m_global, 1, MPIU_REAL, MPIU_MAX, mpi::intracomm);
+        MPI_Allreduce(&eps_p_local, &eps_p_global, 1, MPIU_REAL, MPIU_MAX, mpi::intracomm);
+
+        eps_m = eps_m_global;
+        eps_p = eps_p_global;
+
+        int conv_local  = converged_local ? 1 : 0;
+        int conv_global = 0;
+        MPI_Allreduce(&conv_local, &conv_global, 1, MPI_INT, MPI_LAND, mpi::intracomm);
+        if (mpi::rank == 0) {
+        std::cerr << "rank " << mpi::rank << " massmom iteration " << flow_iter + 1 << " " << eps_m << " " << eps_p << std::endl;
+        }
+
+        converged = (conv_global != 0);
+
+        if (flow_iter == 30) {
+          MPI_Abort(mpi::intracomm, 0);
+          std::exit(0);
+        }
+
+
+
+        MPI_Bcast(&converged, 1, MPI_C_BOOL, 0, mpi::intracomm);
 		
 		if (mpi::rank == 0) {
           if (converged) {
@@ -441,6 +471,7 @@ for (PetscInt i = 0; i < nvtxs; ++i) {
   		
   	if (v_rank != mpi::rank && u_rank == mpi::rank) {
               circuit->ghost_nodes_owned[v_rank].push_back(face->dnode);
+              circuit->ghost_nodes_owned1.push_back(face->dnode);
               circuit->ghost_indices_owned.push_back(circuit->old2new[face->dnode->node_ind]); // global index
           }
       ++i;

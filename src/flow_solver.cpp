@@ -608,11 +608,18 @@ for (auto& node : circuit->nodes_owned) {
       // std::exit(1);
     // }
 
+    for (auto& node : circuit->ghost_nodes_owned1) {
+      double relax = 0.6;
+      node->tpres_gues = node->tpres_gues + relax * pc_array1[k++];
+      std::cout << "rank " << mpi::rank << " tpres " << node->tpres_gues << std::endl;
+    }
+
+
 fout.close();
 
 
 std::ofstream fout1("tpres_rank_" + std::to_string(mpi::rank) + ".txt");
-for (auto& node : circuit->nodes_owned) {
+for (auto& node : circuit->ghost_nodes_owned1) {
   fout1 << node->identifier << " " << node->tpres_gues << " " << node->tpres_old << "\n";
 }
 fout1.close();
@@ -647,8 +654,6 @@ VecDestroy(&pc_local);
         // face->vflow_gues = face->G * face->cfarea / face->ther_gues.rhomass();
       // }
     }
-MPI_Abort(mpi::intracomm, 0);
-std::exit(0);
 
 }
 simulation::time_massmom.stop();
