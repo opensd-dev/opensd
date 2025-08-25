@@ -664,38 +664,53 @@ VecDestroy(&pc_local);
 PetscInt n_faces_owned = circuit->face_indices_owned.size();
 PetscInt n_faces_ghost = circuit->ghost_face_indices_owned.size();
 
-Vec vflow_gues_local;
+Vec vflow_gues_local, rhomass_local;
 
 VecCreateGhost(mpi::intracomm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
                circuit->ghost_face_indices_owned.data(), &vflow_gues_local);
+VecCreateGhost(mpi::intracomm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
+               circuit->ghost_face_indices_owned.data(), &rhomass_local);
 
 PetscScalar* vflow_array;
 VecGetArray(vflow_gues_local, &vflow_array);
+PetscScalar* rhomass_array;
+VecGetArray(rhomass_local, &rhomass_array);
 for (PetscInt i = 0; i < n_faces_owned; ++i) {
     vflow_array[i] = circuit->faces_owned[i]->vflow_gues;
 }
 VecRestoreArray(vflow_gues_local, &vflow_array);
+for (PetscInt i = 0; i < n_faces_owned; ++i) {
+    rhomass_array[i] = circuit->faces_owned[i]->ther_gues->rhomass();
+}
+VecRestoreArray(rhomass_local, &rhomass_array);
 
 VecGhostUpdateBegin(vflow_gues_local, INSERT_VALUES, SCATTER_FORWARD);
 VecGhostUpdateEnd(vflow_gues_local, INSERT_VALUES, SCATTER_FORWARD);
 
+VecGhostUpdateBegin(rhomass_local, INSERT_VALUES, SCATTER_FORWARD);
+VecGhostUpdateEnd(rhomass_local, INSERT_VALUES, SCATTER_FORWARD);
+
 const PetscScalar* vflow_array_read;
 VecGetArrayRead(vflow_gues_local, &vflow_array_read);
+
+const PetscScalar* rhomass_array_read;
+VecGetArrayRead(rhomass_local, &rhomass_array_read);
 
 for (size_t j = 0; j < circuit->ghost_face_indices_owned.size(); ++j) {
   auto idx = circuit->ghost_face_indices_owned[j];
   auto& face = circuit->faces[idx];
   face->vflow_gues = vflow_array_read[n_faces_owned + j];
+  face->ther_gues->set_rhomass(rhomass_array_read[n_faces_owned + j]);
 
-  // std::cout << "flag1 " << mpi::rank
-  //           << " face=" << face->faceno
-  //           << " vflow_gues=" << face->vflow_gues
-  //           << std::endl;
+  std::cout << "flag1 " << mpi::rank
+            << " face=" << face->faceno
+            << " vflow_gues=" << face->vflow_gues
+            << " rhomass=" << face->ther_gues->rhomass()
+            << std::endl;
 }
 
 VecRestoreArrayRead(vflow_gues_local, &vflow_array_read);
-
-
+VecRestoreArrayRead(rhomass_local, &rhomass_array_read);
 
 }
 simulation::time_massmom.stop();

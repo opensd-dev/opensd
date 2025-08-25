@@ -35,6 +35,7 @@ public:
   // void update(FlState* flstate=nullptr);
   void update();
   // void update_sat(double p=nullptr);
+  void set_rhomass(double val) { _rhomass = val; }
   double rhomass();
   double cpmass();
   double viscosity();
