@@ -268,6 +268,7 @@ for (size_t j = 0; j < circuit->ghost_face_indices_owned.size(); ++j) {
   //           << " aplus=" << face->aplus
   //           << " bplus=" << face->bplus
   //           << " bminus=" << face->bminus
+  //           << " vflow_gues=" << face->vflow_gues
   //           << std::endl;
 }
 
@@ -553,7 +554,6 @@ for (PetscInt j = 0; j < nghost; ++j)
 
 
 
-int l = 0;
 // Flow rate corrections
     for (auto& face : circuit->faces_owned) {
       if (!face->choked) {
@@ -576,7 +576,9 @@ int k = 0;
 for (auto& node : circuit->nodes_owned) {
   double relax = 0.6;
   node->tpres_gues += relax * pc_array1[k++];
-  // std::cout << "rank " << mpi::rank << " tpres " << node->tpres_gues << std::endl;
+  // if (node->identifier == "node2") {
+  //  std::cout << "rank " << mpi::rank << " tpres " << node->tpres_gues << std::endl;
+  // }
 
       // if (node.flowreg == "Slug") continue;
       // node->msource = m_array[i];
@@ -611,7 +613,7 @@ for (auto& node : circuit->nodes_owned) {
     for (auto& node : circuit->ghost_nodes_owned1) {
       double relax = 0.6;
       node->tpres_gues = node->tpres_gues + relax * pc_array1[k++];
-      std::cout << "rank " << mpi::rank << " tpres " << node->tpres_gues << std::endl;
+      // std::cout << "rank " << mpi::rank << " tpres " << node->tpres_gues << std::endl;
     }
 
 
@@ -619,8 +621,11 @@ fout.close();
 
 
 std::ofstream fout1("tpres_rank_" + std::to_string(mpi::rank) + ".txt");
-for (auto& node : circuit->ghost_nodes_owned1) {
+for (auto& node : circuit->nodes_owned) {
   fout1 << node->identifier << " " << node->tpres_gues << " " << node->tpres_old << "\n";
+}
+for (auto& node : circuit->ghost_nodes_owned1) {
+  fout1 << "(ghost) " << node->identifier << " " << node->tpres_gues << " " << node->tpres_old << "\n";
 }
 fout1.close();
 
@@ -654,6 +659,43 @@ VecDestroy(&pc_local);
         // face->vflow_gues = face->G * face->cfarea / face->ther_gues.rhomass();
       // }
     }
+
+
+PetscInt n_faces_owned = circuit->face_indices_owned.size();
+PetscInt n_faces_ghost = circuit->ghost_face_indices_owned.size();
+
+Vec vflow_gues_local;
+
+VecCreateGhost(mpi::intracomm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
+               circuit->ghost_face_indices_owned.data(), &vflow_gues_local);
+
+PetscScalar* vflow_array;
+VecGetArray(vflow_gues_local, &vflow_array);
+for (PetscInt i = 0; i < n_faces_owned; ++i) {
+    vflow_array[i] = circuit->faces_owned[i]->vflow_gues;
+}
+VecRestoreArray(vflow_gues_local, &vflow_array);
+
+VecGhostUpdateBegin(vflow_gues_local, INSERT_VALUES, SCATTER_FORWARD);
+VecGhostUpdateEnd(vflow_gues_local, INSERT_VALUES, SCATTER_FORWARD);
+
+const PetscScalar* vflow_array_read;
+VecGetArrayRead(vflow_gues_local, &vflow_array_read);
+
+for (size_t j = 0; j < circuit->ghost_face_indices_owned.size(); ++j) {
+  auto idx = circuit->ghost_face_indices_owned[j];
+  auto& face = circuit->faces[idx];
+  face->vflow_gues = vflow_array_read[n_faces_owned + j];
+
+  // std::cout << "flag1 " << mpi::rank
+  //           << " face=" << face->faceno
+  //           << " vflow_gues=" << face->vflow_gues
+  //           << std::endl;
+}
+
+VecRestoreArrayRead(vflow_gues_local, &vflow_array_read);
+
+
 
 }
 simulation::time_massmom.stop();

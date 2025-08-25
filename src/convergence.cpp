@@ -6,6 +6,7 @@
 #include <tuple>
 
 #include "opensd/initialize.h"
+#include "opensd/message_passing.h"
 #include "opensd/settings.h"
 
 namespace opensd {
@@ -16,8 +17,9 @@ std::tuple<bool, std::tuple<double, double>> check_conv(double time, double delt
   for (auto& circuit : model::circuits) {
     
     vector<double> eps_mlist;
-    for (auto& node : circuit->nodes) {
+    for (auto& node : circuit->nodes_owned) {
       node->mresidue = node->eqn_cont(time,delt,trans_sim,alpha_mom);
+      // std::cout << "rank " << mpi::rank << " " << node->identifier << " " << node->mresidue << std::endl;
       // if (dynamic_cast<comp::Reservoir*>(&node)) node.mresidue = 0;
       if (std::abs(node->mflow_in) > 1.E-5 || std::abs(node->mflow_out) > 1.E-5) {
         eps_mlist.push_back(std::abs(node->mresidue));
@@ -26,8 +28,9 @@ std::tuple<bool, std::tuple<double, double>> check_conv(double time, double delt
 
     circuit->eps_p = 0.0;
     std::vector<double> e_mass;
-    for (auto& face : circuit->faces) {
+    for (auto& face : circuit->faces_owned) {
       face->presidue = face->eqn_mom(face->vflow_gues, time, delt, trans_sim, alpha_mom);
+      // std::cout << "rank " << mpi::rank << " face " << face->faceno << " " << face->presidue << std::endl;
       circuit->eps_p += std::abs(face->presidue) / face->tpres_gues;
       face->mflow = face->vflow_gues * face->ther_gues->rhomass();
       if (std::abs(face->mflow) > 1.0E-5) {
@@ -38,6 +41,12 @@ std::tuple<bool, std::tuple<double, double>> check_conv(double time, double delt
     for (auto& pipe : circuit->pipes) {
       // pipe.update_mflow();
     }
+    for (auto& face : circuit->faces_owned) {
+      std::cout << "rank " << mpi::rank << " vflow face " << face->faceno << " " << face->mflow << std::endl;
+    }
+    // for (auto& node : circuit->nodes_owned) {
+    //   std::cout << "rank " << mpi::rank << " " << node->identifier << " " << node->tpres_gues << std::endl;
+    // }
 
 
     if (e_mass.empty()) {

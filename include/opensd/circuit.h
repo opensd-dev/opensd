@@ -40,6 +40,7 @@ public:
   double eps_p;
   vector<std::shared_ptr<Node>> nodes;
   vector<std::shared_ptr<Node>> nodes_owned;
+  vector<std::shared_ptr<Node>> ghost_nodes_owned1;
   std::map<int, std::vector<std::shared_ptr<Node>>> ghost_nodes_owned;
   std::map<int, std::vector<std::shared_ptr<Face>>> ghost_faces_owned;
   vector<int> indices_owned;
