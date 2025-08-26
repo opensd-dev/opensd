@@ -284,14 +284,20 @@ for (auto& circuit : model::circuits) {
 auto &A = circuit->A;  // alias
 auto &b = circuit->b;  // alias
 auto &pc = circuit->pc;  // alias
-auto &m = circuit->m;  // alias
 auto &ksp = circuit->ksp;  // alias
 
 KSPDestroy(&ksp);
 MatDestroy(&A);
 VecDestroy(&b);
 VecDestroy(&pc);
-VecDestroy(&m);
+VecDestroy(&circuit->pc_local);
+
+VecDestroy(&circuit->vflow_gues_local);
+VecDestroy(&circuit->aminus_local);
+VecDestroy(&circuit->aplus_local);
+VecDestroy(&circuit->bplus_local);
+VecDestroy(&circuit->bminus_local);
+
 }
 
 // #ifdef OPENMC_MPI
@@ -547,12 +553,30 @@ PetscInt global_nrows = vertex_count; // same as nvtxs
     VecSetSizes(pc, local_nrows, global_nrows);
     VecSetFromOptions(pc);
     
-    auto &m = circuit->m; 
-    VecCreate(mpi::intracomm, &m);
-    VecSetSizes(m, local_nrows, global_nrows);
-    VecSetFromOptions(m);
 
+    PetscInt n_faces_owned = circuit->face_indices_owned.size();
+    PetscInt n_faces_ghost = circuit->ghost_face_indices_owned.size();
 
+    // Create ghost vectors
+    VecCreateGhost(mpi::intracomm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
+                   circuit->ghost_face_indices_owned.data(), &circuit->vflow_gues_local);
+    VecCreateGhost(mpi::intracomm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
+                   circuit->ghost_face_indices_owned.data(), &circuit->aminus_local);
+    VecCreateGhost(mpi::intracomm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
+                   circuit->ghost_face_indices_owned.data(), &circuit->aplus_local);
+    VecCreateGhost(mpi::intracomm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
+                   circuit->ghost_face_indices_owned.data(), &circuit->bplus_local);
+    VecCreateGhost(mpi::intracomm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
+                   circuit->ghost_face_indices_owned.data(), &circuit->bminus_local);
+
+    VecCreateGhost(mpi::intracomm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
+               circuit->ghost_face_indices_owned.data(), &circuit->rhomass_local);
+
+	PetscInt n_local = circuit->indices_owned.size();
+    PetscInt nghost  = circuit->ghost_indices_owned.size();
+		   
+    VecCreateGhost(mpi::intracomm, n_local, PETSC_DECIDE, nghost,
+               circuit->ghost_indices_owned.data(), &circuit->pc_local);
     
   }
 

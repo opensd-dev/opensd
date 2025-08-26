@@ -56,8 +56,10 @@ public:
   Mat A;
   Vec b;
   Vec pc;
-  Vec m;
   KSP ksp;
+  Vec vflow_gues_local, aminus_local, aplus_local, bplus_local, bminus_local;
+  Vec rhomass_local;
+  Vec pc_local;
   
   void save_to_hdf5(hid_t group_id) const;
   void load_from_hdf5(hid_t group_id);
