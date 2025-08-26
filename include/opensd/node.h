@@ -3,6 +3,7 @@
 #ifndef OPENSD_NODE_H
 #define OPENSD_NODE_H
 
+#include <optional>
 #include "pugixml.hpp"
 
 // #include "opensd/circuit.h"
@@ -74,7 +75,7 @@ public:
   double eqn_cont(double time, double delt, bool trans_sim, double alpha_mom);
   void update_gues();
   void assign_staticvar();
-  void update_staticvar();
+  void update_staticvar(std::optional<double> velocity_in = std::nullopt);
   void assign_prop();
   void update_old();
 

@@ -95,7 +95,7 @@ Eigen::VectorXd insertZerosAtIndices(const Eigen::VectorXd& vec, const std::vect
 //==============================================================================
 
 void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int main_iter, std::shared_ptr<Circuit> circuit) {
-  // std::ofstream fout("vflow_rank_" + std::to_string(mpi::rank) + ".txt");
+  std::ofstream fout("vflow_rank" + std::to_string(mpi::rank) + ".txt");
   // for (auto& branch : circuit->branches) { // Guess flow rate calculation
   for (auto& face : circuit->faces_owned) {
     // branch.choked = false;
@@ -156,12 +156,12 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
         // }
       // }
       face->update_abcoef(time, delt, trans_sim, alpha_mom);
-      // fout << "face " << face->faceno
-      //  << " aminus " << face->aminus << "\n";
+      fout << "face " << face->faceno << " " << std::setprecision(12) << std::fixed
+       << " vflow " << face->ther_gues->rhomass() << "\n";
 
       // std::cout << face->vflow_gues << std::endl;
   }
-  // fout.close();
+  fout.close();
 PetscInt n_faces_owned = circuit->face_indices_owned.size();
 PetscInt n_faces_ghost = circuit->ghost_face_indices_owned.size();
 
@@ -457,11 +457,38 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
       double vc = face->aminus * pc_array1[i_u] - face->aplus * pc_array1[i_v];
       face->vflow_gues += vc;
-      fout << "face " << "i_u " << i_u << " i_v " << i_v << " " << face->vflow_gues << "\n";
+      // fout << "face " << face->faceno << " " << std::setprecision(8) << std::fixed << face->vflow_gues << "\n";
 
       }
       face->update_velocity();
     }
+
+    PetscInt n_faces_owned = circuit->face_indices_owned.size();
+    PetscInt n_faces_ghost = circuit->ghost_face_indices_owned.size();
+
+    auto &vflow_gues_local = circuit->vflow_gues_local;
+
+    PetscScalar* vflow_array;
+    VecGetArray(vflow_gues_local, &vflow_array);
+    for (PetscInt i = 0; i < n_faces_owned; ++i) {
+        vflow_array[i] = circuit->faces_owned[i]->vflow_gues;
+    }
+    VecRestoreArray(vflow_gues_local, &vflow_array);
+
+    VecGhostUpdateBegin(vflow_gues_local, INSERT_VALUES, SCATTER_FORWARD);
+    VecGhostUpdateEnd(vflow_gues_local, INSERT_VALUES, SCATTER_FORWARD);
+
+    const PetscScalar* vflow_array_read;
+    VecGetArrayRead(vflow_gues_local, &vflow_array_read);
+
+    for (size_t j = 0; j < circuit->ghost_face_indices_owned.size(); ++j) {
+      auto idx = circuit->ghost_face_indices_owned[j];
+      auto& face = circuit->faces[idx];
+      face->vflow_gues = vflow_array_read[n_faces_owned + j];
+      face->update_velocity();
+    }
+
+    VecRestoreArrayRead(vflow_gues_local, &vflow_array_read);
 
 
     // Pressure and density corrections
@@ -503,22 +530,76 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       // std::exit(1);
     // }
 
+
+
+// ----------------------------------------------------------------------
+// COMMUNICATE velocity from owned to ghost nodes (temporary Vec)
+// ----------------------------------------------------------------------
+
+// 1. Create ghosted vector for velocity
+Vec velocity_local;
+
+VecCreateGhost(mpi::intracomm,
+               n_local,                        // local owned entries
+               PETSC_DECIDE,                   // let PETSc determine global size
+               nghost,                         // number of ghost entries
+               (const PetscInt*) circuit->ghost_indices_owned.data(),  // ghost indices
+               &velocity_local);
+
+// 2. Fill owned slots
+PetscScalar* velocity_arr = nullptr;
+VecGetArray(velocity_local, &velocity_arr);
+
+for (PetscInt i = 0; i < n_local; ++i)
+  velocity_arr[i] = circuit->nodes_owned[i]->velocity;
+
+VecRestoreArray(velocity_local, &velocity_arr);
+
+// 3. Scatter to ghost entries
+VecGhostUpdateBegin(velocity_local, INSERT_VALUES, SCATTER_FORWARD);
+VecGhostUpdateEnd(velocity_local, INSERT_VALUES, SCATTER_FORWARD);
+
+// 4. Copy ghost values into ghost node objects
+const PetscScalar* velocity_arr_read;
+VecGetArrayRead(velocity_local, &velocity_arr_read);
+
+PetscInt offset = n_local;
+for (PetscInt j = 0; j < nghost; ++j)
+  circuit->ghost_nodes_owned1[j]->velocity = velocity_arr_read[offset + j];
+
+VecRestoreArrayRead(velocity_local, &velocity_arr_read);
+
+// 5. Destroy temporary Vec
+VecDestroy(&velocity_local);
+
+
+
+
+
+
+
+
+
+
+
     for (auto& node : circuit->ghost_nodes_owned1) {
       double relax = 0.6;
       node->tpres_gues = node->tpres_gues + relax * pc_array1[k++];
       // std::cout << "rank " << mpi::rank << " tpres " << node->tpres_gues << std::endl;
+      node->update_staticvar(node->velocity);
+      node->ther_gues->update(CoolProp::HmassP_INPUTS, node->senth_gues, node->spres_gues);
     }
 
 
-    fout.close();
+    // fout.close();
 
 
     std::ofstream fout1("tpres_rank_" + std::to_string(mpi::rank) + ".txt");
     for (auto& node : circuit->nodes_owned) {
-      fout1 << node->identifier << " " << node->tpres_gues << " " << node->tpres_old << "\n";
+      fout1 << node->identifier << " " << std::setprecision(8) << std::fixed << node->ther_gues->rhomass() << " " << node->tpres_old << "\n";
     }
     for (auto& node : circuit->ghost_nodes_owned1) {
-      fout1 << "(ghost) " << node->identifier << " " << node->tpres_gues << " " << node->tpres_old << "\n";
+      fout1 << "(ghost) " << node->identifier << " " << node->ther_gues->rhomass() << " " << node->tpres_old << "\n";
     }
     fout1.close();
     
@@ -540,33 +621,18 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     }
 
 
-    PetscInt n_faces_owned = circuit->face_indices_owned.size();
-    PetscInt n_faces_ghost = circuit->ghost_face_indices_owned.size();
     
-    auto &vflow_gues_local = circuit->vflow_gues_local;
     auto &rhomass_local = circuit->rhomass_local;
     
-    PetscScalar* vflow_array;
-    VecGetArray(vflow_gues_local, &vflow_array);
     PetscScalar* rhomass_array;
     VecGetArray(rhomass_local, &rhomass_array);
-    for (PetscInt i = 0; i < n_faces_owned; ++i) {
-        vflow_array[i] = circuit->faces_owned[i]->vflow_gues;
-    }
-    VecRestoreArray(vflow_gues_local, &vflow_array);
     for (PetscInt i = 0; i < n_faces_owned; ++i) {
         rhomass_array[i] = circuit->faces_owned[i]->ther_gues->rhomass();
     }
     VecRestoreArray(rhomass_local, &rhomass_array);
     
-    VecGhostUpdateBegin(vflow_gues_local, INSERT_VALUES, SCATTER_FORWARD);
-    VecGhostUpdateEnd(vflow_gues_local, INSERT_VALUES, SCATTER_FORWARD);
-    
     VecGhostUpdateBegin(rhomass_local, INSERT_VALUES, SCATTER_FORWARD);
     VecGhostUpdateEnd(rhomass_local, INSERT_VALUES, SCATTER_FORWARD);
-    
-    const PetscScalar* vflow_array_read;
-    VecGetArrayRead(vflow_gues_local, &vflow_array_read);
     
     const PetscScalar* rhomass_array_read;
     VecGetArrayRead(rhomass_local, &rhomass_array_read);
@@ -574,18 +640,23 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     for (size_t j = 0; j < circuit->ghost_face_indices_owned.size(); ++j) {
       auto idx = circuit->ghost_face_indices_owned[j];
       auto& face = circuit->faces[idx];
-      face->vflow_gues = vflow_array_read[n_faces_owned + j];
       face->ther_gues->set_rhomass(rhomass_array_read[n_faces_owned + j]);
     
-      std::cout << "flag1 " << mpi::rank
-                << " face=" << face->faceno
-                << " vflow_gues=" << face->vflow_gues
-                << " rhomass=" << face->ther_gues->rhomass()
-                << std::endl;
+      // std::cout << "flag1 " << mpi::rank
+      //           << " face=" << face->faceno
+      //           << " vflow_gues=" << face->vflow_gues
+      //           << " rhomass=" << face->ther_gues->rhomass()
+      //           << std::endl;
+
     }
     
-    VecRestoreArrayRead(vflow_gues_local, &vflow_array_read);
+    for (auto& face : circuit->faces_owned) {
+      fout << "face " << face->faceno << " " << std::setprecision(12) << std::fixed << face->ther_gues->rhomass() << std::endl;
+    }
+
     VecRestoreArrayRead(rhomass_local, &rhomass_array_read);
+
+    fout.close();
 
   }
   simulation::time_massmom.stop();

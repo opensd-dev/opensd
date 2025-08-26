@@ -94,13 +94,13 @@ int opensd_run()
 
         converged = (conv_global != 0);
 
-        if (flow_iter == 30) {
+        if (flow_iter == 0) {
           MPI_Abort(mpi::intracomm, 0);
           std::exit(0);
         }
 
 
-
+        MPI_Barrier(mpi::intracomm);
         MPI_Bcast(&converged, 1, MPI_C_BOOL, 0, mpi::intracomm);
 		
 		if (mpi::rank == 0) {

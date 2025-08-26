@@ -153,11 +153,15 @@ void Node::assign_prop() {
   ther_old->update(CoolProp::HmassP_INPUTS,senth_old,spres_old);
 }
 
-void Node::update_staticvar() {
+void Node::update_staticvar(std::optional<double> velocity_in) {
   // if (pressure < 0) {
     double pressure = tpres_gues;
   // }
 
+  if (velocity_in.has_value()) {
+    // directly use provided velocity
+    velocity = velocity_in.value();
+  } else {
   if (std::find(fixed_var.begin(), fixed_var.end(), "P") != fixed_var.end()) {
     velocity = 0.0;
   } else {
@@ -177,7 +181,7 @@ void Node::update_staticvar() {
       velocity = 0.0;
     }
   }
-
+  }
   spres_gues = pressure - 0.5 * ther_gues->rhomass() * velocity * velocity;
   stemp_gues = ttemp_gues - 0.5 * velocity * velocity / ther_gues->cpmass();
   senth_gues = tenth_gues - 0.5 * velocity * velocity;
