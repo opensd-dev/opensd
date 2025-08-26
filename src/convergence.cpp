@@ -3,6 +3,7 @@
 #include "opensd/convergence.h"
 
 #include <iostream>
+#include <iomanip>
 #include <tuple>
 
 #include "opensd/initialize.h"
@@ -30,7 +31,7 @@ std::tuple<bool, std::tuple<double, double>> check_conv(double time, double delt
     std::vector<double> e_mass;
     for (auto& face : circuit->faces_owned) {
       face->presidue = face->eqn_mom(face->vflow_gues, time, delt, trans_sim, alpha_mom);
-      std::cout << "rank " << mpi::rank << " face " << face->faceno << " " << face->presidue << std::endl;
+      // std::cout << "rank " << mpi::rank << " " << std::setprecision(12) << std::fixed << " face " << face->faceno << " " << face->presidue << std::endl;
       circuit->eps_p += std::abs(face->presidue) / face->tpres_gues;
       face->mflow = face->vflow_gues * face->ther_gues->rhomass();
       if (std::abs(face->mflow) > 1.0E-5) {

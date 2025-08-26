@@ -88,20 +88,17 @@ int opensd_run()
         int conv_local  = converged_local ? 1 : 0;
         int conv_global = 0;
         MPI_Allreduce(&conv_local, &conv_global, 1, MPI_INT, MPI_LAND, mpi::intracomm);
-        if (mpi::rank == 0) {
-        std::cerr << "rank " << mpi::rank << " massmom iteration " << flow_iter + 1 << " " << eps_m << " " << eps_p << std::endl;
-        }
 
         converged = (conv_global != 0);
 
-        if (flow_iter == 0) {
-          MPI_Abort(mpi::intracomm, 0);
-          std::exit(0);
-        }
+        // if (flow_iter == 30) {
+        //   MPI_Abort(mpi::intracomm, 0);
+        //   std::exit(0);
+        // }
 
 
-        MPI_Barrier(mpi::intracomm);
-        MPI_Bcast(&converged, 1, MPI_C_BOOL, 0, mpi::intracomm);
+        // MPI_Barrier(mpi::intracomm);
+        // MPI_Bcast(&converged, 1, MPI_C_BOOL, 0, mpi::intracomm);
 		
 		if (mpi::rank == 0) {
           if (converged) {
