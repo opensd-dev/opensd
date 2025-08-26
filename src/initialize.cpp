@@ -10,8 +10,7 @@
 #include "opensd/message_passing.h"
 #include <petscsys.h>
 
-int opensd_init(int argc, char* argv[], const void* intracomm)
-{
+int opensd_init(int argc, char* argv[], const void* intracomm) {
   using namespace opensd;
 
 #ifdef OPENSD_MPI

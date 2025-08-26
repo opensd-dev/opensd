@@ -175,9 +175,9 @@ int opensd_run()
     std::cout << "Execution time = " << (std::clock() - start_time) / (double)CLOCKS_PER_SEC << std::endl;
   }
 
-  if (mpi::rank == 0) {
   try {
-    hid_t file_id = opensd::create_or_open_file("circuits.h5");
+    std::string fname = "circuit_rank" + std::to_string(mpi::rank) + ".h5";
+    hid_t file_id = opensd::create_or_open_file(fname.c_str());
   
     // Create /circuits group if it doesn't exist
     if (!H5Lexists(file_id, "/circuits", H5P_DEFAULT)) {
@@ -201,7 +201,6 @@ int opensd_run()
   
   } catch (const std::exception& e) {
     std::cerr << "HDF5 error during save: " << e.what() << std::endl;
-  }
   }
 
   opensd_simulation_finalize();
@@ -294,6 +293,7 @@ VecDestroy(&circuit->aminus_local);
 VecDestroy(&circuit->aplus_local);
 VecDestroy(&circuit->bplus_local);
 VecDestroy(&circuit->bminus_local);
+VecDestroy(&circuit->velocity_local);
 
 }
 
@@ -574,7 +574,10 @@ PetscInt global_nrows = vertex_count; // same as nvtxs
 		   
     VecCreateGhost(mpi::intracomm, n_local, PETSC_DECIDE, nghost,
                circuit->ghost_indices_owned.data(), &circuit->pc_local);
-    
+
+    VecCreateGhost(mpi::intracomm, n_local, PETSC_DECIDE, nghost,
+               circuit->ghost_indices_owned.data(), &circuit->velocity_local);
+
   }
 
 }

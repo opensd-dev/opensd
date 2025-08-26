@@ -174,10 +174,10 @@ void Circuit::save_to_hdf5(hid_t group_id) const {
 
    // Save Nodes
   hid_t node_group = H5Gcreate(group_id, "nodes", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-  for (size_t i = 0; i < nodes.size(); ++i) {
+  for (size_t i = 0; i < nodes_owned.size(); ++i) {
     std::string name = "node_" + std::to_string(i);
     hid_t ngrp = H5Gcreate(node_group, name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    nodes[i]->save_to_hdf5(ngrp);
+    nodes_owned[i]->save_to_hdf5(ngrp);
     H5Gclose(ngrp);
   }
   H5Gclose(node_group);
@@ -204,10 +204,10 @@ void Circuit::save_to_hdf5(hid_t group_id) const {
 
   // Save Faces
   hid_t face_group = H5Gcreate(group_id, "faces", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-  for (size_t i = 0; i < faces.size(); ++i) {
+  for (size_t i = 0; i < faces_owned.size(); ++i) {
     std::string name = "face_" + std::to_string(i);
     hid_t fgrp = H5Gcreate(face_group, name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    faces[i]->save_to_hdf5(fgrp);
+    faces_owned[i]->save_to_hdf5(fgrp);
     H5Gclose(fgrp);
   }
    H5Gclose(face_group);

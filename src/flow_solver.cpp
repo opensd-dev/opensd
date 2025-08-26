@@ -531,55 +531,27 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     // }
 
 
+    auto &velocity_local = circuit->velocity_local;
 
-// ----------------------------------------------------------------------
-// COMMUNICATE velocity from owned to ghost nodes (temporary Vec)
-// ----------------------------------------------------------------------
+    PetscScalar* velocity_arr = nullptr;
+    VecGetArray(velocity_local, &velocity_arr);
 
-// 1. Create ghosted vector for velocity
-Vec velocity_local;
+    for (PetscInt i = 0; i < n_local; ++i)
+      velocity_arr[i] = circuit->nodes_owned[i]->velocity;
 
-VecCreateGhost(mpi::intracomm,
-               n_local,                        // local owned entries
-               PETSC_DECIDE,                   // let PETSc determine global size
-               nghost,                         // number of ghost entries
-               (const PetscInt*) circuit->ghost_indices_owned.data(),  // ghost indices
-               &velocity_local);
+    VecRestoreArray(velocity_local, &velocity_arr);
 
-// 2. Fill owned slots
-PetscScalar* velocity_arr = nullptr;
-VecGetArray(velocity_local, &velocity_arr);
+    VecGhostUpdateBegin(velocity_local, INSERT_VALUES, SCATTER_FORWARD);
+    VecGhostUpdateEnd(velocity_local, INSERT_VALUES, SCATTER_FORWARD);
 
-for (PetscInt i = 0; i < n_local; ++i)
-  velocity_arr[i] = circuit->nodes_owned[i]->velocity;
+    const PetscScalar* velocity_arr_read;
+    VecGetArrayRead(velocity_local, &velocity_arr_read);
 
-VecRestoreArray(velocity_local, &velocity_arr);
+    PetscInt offset = n_local;
+    for (PetscInt j = 0; j < nghost; ++j)
+      circuit->ghost_nodes_owned1[j]->velocity = velocity_arr_read[offset + j];
 
-// 3. Scatter to ghost entries
-VecGhostUpdateBegin(velocity_local, INSERT_VALUES, SCATTER_FORWARD);
-VecGhostUpdateEnd(velocity_local, INSERT_VALUES, SCATTER_FORWARD);
-
-// 4. Copy ghost values into ghost node objects
-const PetscScalar* velocity_arr_read;
-VecGetArrayRead(velocity_local, &velocity_arr_read);
-
-PetscInt offset = n_local;
-for (PetscInt j = 0; j < nghost; ++j)
-  circuit->ghost_nodes_owned1[j]->velocity = velocity_arr_read[offset + j];
-
-VecRestoreArrayRead(velocity_local, &velocity_arr_read);
-
-// 5. Destroy temporary Vec
-VecDestroy(&velocity_local);
-
-
-
-
-
-
-
-
-
+    VecRestoreArrayRead(velocity_local, &velocity_arr_read);
 
 
     for (auto& node : circuit->ghost_nodes_owned1) {
