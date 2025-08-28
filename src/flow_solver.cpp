@@ -157,7 +157,7 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
       // }
       face->update_abcoef(time, delt, trans_sim, alpha_mom);
       fout << "face " << face->faceno << " " << std::setprecision(12) << std::fixed
-       << " vflow " << face->ther_gues->rhomass() << "\n";
+       << " vflow " << face->vflow_gues << "\n";
 
       // std::cout << face->vflow_gues << std::endl;
   }
@@ -348,12 +348,12 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 		b_local = 0.0;
         
       } else if (node->fixed_var.count("msource")) {
-        if (time <= 20) {
-            node->msource = -753.6*(20.-time)/20.;
-		}
-        else {
-            node->msource = 0.;
-		}
+        // if (time <= 20) {
+            // node->msource = -753.6*(20.-time)/20.;
+		// }
+        // else {
+            // node->msource = 0.;
+		// }
         b_local += node->msource;
       }
 
@@ -568,10 +568,10 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
     std::ofstream fout1("tpres_rank_" + std::to_string(mpi::rank) + ".txt");
     for (auto& node : circuit->nodes_owned) {
-      fout1 << node->identifier << " " << std::setprecision(8) << std::fixed << node->ther_gues->rhomass() << " " << node->tpres_old << "\n";
+      fout1 << node->identifier << " " << std::setprecision(8) << std::fixed << node->tpres_gues << " " << node->tpres_old << "\n";
     }
     for (auto& node : circuit->ghost_nodes_owned1) {
-      fout1 << "(ghost) " << node->identifier << " " << node->ther_gues->rhomass() << " " << node->tpres_old << "\n";
+      fout1 << "(ghost) " << node->identifier << " " << node->tpres_gues << " " << node->tpres_old << "\n";
     }
     fout1.close();
     
