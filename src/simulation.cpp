@@ -91,9 +91,9 @@ int opensd_run()
 
         converged = (conv_global != 0);
 
-        // if (flow_iter == 30) {
-        //   MPI_Abort(mpi::intracomm, 0);
-        //   std::exit(0);
+        // if (flow_iter == 0) {
+          // MPI_Abort(mpi::intracomm, 0);
+          // std::exit(0);
         // }
 
 

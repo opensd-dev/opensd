@@ -164,10 +164,10 @@ class Circuit:
         for BC in self.bcs:
             if BC.enabled and BC.var == 'P':
                 if 'T' in BC.node.fixed_var:
-                    BC.node.tenth_old = BC.node.self.calc_enth(CoolProp.PT_INPUTS,BC.node.tpres_old,BC.node.ttemp_old)
+                    BC.node.tenth_old = self.calc_enth(CoolProp.PT_INPUTS,BC.node.tpres_old,BC.node.ttemp_old)
                     hlist.append(BC.node.tenth_old)
                 elif 'H' in BC.node.fixed_var:
-                    BC.node.ttemp_old = BC.node.self.calc_temp(CoolProp.HmassP_INPUTS,BC.node.tenth_old,BC.node.tpres_old)
+                    BC.node.ttemp_old = self.calc_temp(CoolProp.HmassP_INPUTS,BC.node.tenth_old,BC.node.tpres_old)
                     tlist.append(BC.node.ttemp_old)
 
         if len(plist) == 0:
