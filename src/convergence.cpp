@@ -75,12 +75,12 @@ std::tuple<bool, std::tuple<double, double>> check_conv(double time, double delt
     
     
     for (auto& circuit : model::circuits) {
-    for (auto& node : circuit->nodes) {
+    for (auto& node : circuit->nodes_owned) {
       node->update_old();
       // std::cout << node->identifier << " " << node->tpres_gues/1.E6 << std::endl;
     }
 
-    for (auto& face : circuit->faces) {
+    for (auto& face : circuit->faces_owned) {
       if (not face->choked) {
         face->ther_gues->update();
       }
