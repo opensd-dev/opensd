@@ -436,8 +436,8 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     VecGhostUpdateBegin(pc_local, INSERT_VALUES, SCATTER_FORWARD);
     VecGhostUpdateEnd(pc_local, INSERT_VALUES, SCATTER_FORWARD);
     
-    const PetscScalar* pc_array1;
-    VecGetArrayRead(pc_local, &pc_array1);
+    const PetscScalar* pc_array;
+    VecGetArrayRead(pc_local, &pc_array);
     
     std::unordered_map<PetscInt, PetscInt> global_to_local;
     
@@ -455,7 +455,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       PetscInt i_v = global_to_local[circuit->old2new[face->dnode->node_ind]];
 
 
-      double vc = face->aminus * pc_array1[i_u] - face->aplus * pc_array1[i_v];
+      double vc = face->aminus * pc_array[i_u] - face->aplus * pc_array[i_v];
       face->vflow_gues += vc;
       // fout << "face " << face->faceno << " " << std::setprecision(8) << std::fixed << face->vflow_gues << "\n";
 
@@ -495,7 +495,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     int k = 0;
     for (auto& node : circuit->nodes_owned) {
       double relax = 0.6;
-      node->tpres_gues += relax * pc_array1[k++];
+      node->tpres_gues += relax * pc_array[k++];
       // if (node->identifier == "node2") {
       //  std::cout << "rank " << mpi::rank << " tpres " << node->tpres_gues << std::endl;
       // }
@@ -556,7 +556,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
     for (auto& node : circuit->ghost_nodes_owned1) {
       double relax = 0.6;
-      node->tpres_gues = node->tpres_gues + relax * pc_array1[k++];
+      node->tpres_gues = node->tpres_gues + relax * pc_array[k++];
       // std::cout << "rank " << mpi::rank << " tpres " << node->tpres_gues << std::endl;
       node->update_staticvar(node->velocity);
       node->ther_gues->update(CoolProp::HmassP_INPUTS, node->senth_gues, node->spres_gues);
@@ -575,7 +575,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     }
     fout1.close();
     
-    VecRestoreArrayRead(pc_local, &pc_array1);
+    VecRestoreArrayRead(pc_local, &pc_array);
 
 
     for (auto& face : circuit->faces_owned) {
