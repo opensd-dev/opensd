@@ -101,17 +101,28 @@ void discretize_pipes() {
 	    }
       }
 	  
-      vector<std::shared_ptr<Node>> nodes;
-      //for (int i = 0; i < pipe->ncell-1; ++i) {
-        // Node node = Node();
-        // node->identifier = identifier + "_node" + std::to_string(i);
-        // node->height = unode->height + (dnode->height - unode->height) * (i + 1) / ncell;
-        // nodes.push_back(node);
-      //}
-      double ufrac;
-      double dfrac;
       double cfarea = PI*std::pow(pipe->diameter,2)/4.;
       double delx = pipe->length/pipe->ncell;
+
+      for (int i = 0; i < pipe->ncell - 1; ++i) {
+        auto node = std::make_shared<Node>();
+        node->identifier = pipe->identifier + "_node" + std::to_string(i);
+        node->tpres_old = pipe->unode->tpres_old+(pipe->dnode->tpres_old-pipe->unode->tpres_old)*(i+1)/pipe->ncell;
+        node->ttemp_old = pipe->unode->ttemp_old+(pipe->dnode->ttemp_old-pipe->unode->ttemp_old)*(i+1)/pipe->ncell;
+        node->tenth_old = std::max(pipe->unode->tenth_old,pipe->dnode->tenth_old);
+        node->volume = delx*cfarea;
+        node->msource = 0.;
+        node->mresidue = 0.;
+        node->mflow_in = 1.E-4;
+
+        // node->height = pipe->unode->height + (pipe->dnode->height - pipe->unode->height) * (i + 1) / pipe->ncell;
+        circuit->nodes.push_back(node);
+        circuit->nodes.back()->node_ind = circuit->nodes.size() - 1;
+        pipe->nodes.push_back(node);
+      }
+
+      double ufrac;
+      double dfrac;
       double delz = 0.;
       double fricopt;
 
@@ -119,18 +130,18 @@ void discretize_pipes() {
         if (i == 0 && pipe->ncell == 1) {
           pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->unode, ufrac, pipe->dnode, dfrac, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
         } else if (i == 0) {
-          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->unode, ufrac, circuit->nodes[2], -1, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
+          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->unode, ufrac, pipe->nodes[0], -1, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
         } else if (i == pipe->ncell-1) {
-          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, circuit->nodes[pipe->ncell-2+2], -1, pipe->dnode, dfrac, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
+          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->nodes[pipe->ncell-2], -1, pipe->dnode, dfrac, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
         } else {
-          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, circuit->nodes[i+2-1], -1, circuit->nodes[i+2], -1, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
+          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->nodes[i-1], -1, pipe->nodes[i], -1, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
         }
         circuit->faces.push_back(pipe->faces.back());
       }
 
       for (int i = 0; i < pipe->ncell-1; ++i) {
-        circuit->nodes[i+2]->ifaces.push_back(pipe->faces[i]);
-        circuit->nodes[i+2]->ofaces.push_back(pipe->faces[i+1]);
+        pipe->nodes[i]->ifaces.push_back(pipe->faces[i]);
+        pipe->nodes[i]->ofaces.push_back(pipe->faces[i+1]);
       }
      
 

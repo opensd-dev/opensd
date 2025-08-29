@@ -34,6 +34,7 @@ public:
   std::shared_ptr<Node> dnode;
   std::shared_ptr<Circuit> circuit;
   vector<std::shared_ptr<PFace>> faces;
+  vector<std::shared_ptr<Node>> nodes;
   double ufrac;
   double dfrac;
   int npar;
