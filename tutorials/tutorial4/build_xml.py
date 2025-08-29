@@ -15,11 +15,11 @@ node5 = circuit1.add_node("node5")
 node6 = circuit1.add_node("node6")
 
 #pipe inputs
-pipe1=circuit1.add_pipe("pipe1",0.5,10.,"node1","node5",0.02,0.,1)
-pipe2=circuit1.add_pipe("pipe2",0.5,10.,"node5","node6",0.02,0.,1)
-pipe3=circuit1.add_pipe("pipe3",0.5,10.,"node6","node2",0.02,0.,1)
-pipe4=circuit1.add_pipe("pipe4",0.5,10.,"node5","node3",0.02,0.,1)
-pipe5=circuit1.add_pipe("pipe5",0.5,10.,"node6","node4",0.02,0.,1)
+pipe1=circuit1.add_pipe("pipe1",0.5,10.,"node1","node5",0.02,0.,10)
+pipe2=circuit1.add_pipe("pipe2",0.5,10.,"node5","node6",0.02,0.,10)
+pipe3=circuit1.add_pipe("pipe3",0.5,10.,"node6","node2",0.02,0.,10)
+pipe4=circuit1.add_pipe("pipe4",0.5,10.,"node5","node3",0.02,0.,10)
+pipe5=circuit1.add_pipe("pipe5",0.5,10.,"node6","node4",0.02,0.,10)
 
 #boundary conditions
 circuit1.add_BC("bc1","node1",'P',7.E5)
@@ -49,7 +49,8 @@ geometry.export_to_xml()
 
 settings = opensd.Settings()
 settings.verbosity = 3
+settings.temp_solve = False
+settings.run_mode = "steady"
 settings.export_to_xml()
-# settings.temp_solve = False
 
-opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/c/codes/opensd/build/opensd')
+opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/home/vikram/Codes/opensd/build/opensd')

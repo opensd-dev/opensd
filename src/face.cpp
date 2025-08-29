@@ -266,7 +266,7 @@ void PFace::update_velocity() {
 }
 
 void PFace::update_fricfact() {
-  fricfact_gues = 0.03;
+  fricfact_gues = 0.02;
   // if (fricopt == "HW") {
     // fricfact_gues = 10.78 * M_PI * M_PI * constants::grav / 8.0 * std::pow(diameter, 0.13) /
                     // (std::pow(roughness, 1.852) * std::pow(std::abs(vflow_gues), 0.148));

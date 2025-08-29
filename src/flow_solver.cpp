@@ -348,11 +348,11 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 		b_local = 0.0;
         
       } else if (node->fixed_var.count("msource")) {
-        // if (time <= 20) {
-            // node->msource = -753.6*(20.-time)/20.;
+  //       if (time <= 20) {
+  //           node->msource = -753.6*(20.-time)/20.;
 		// }
-        // else {
-            // node->msource = 0.;
+  //       else {
+  //           node->msource = 0.;
 		// }
         b_local += node->msource;
       }
@@ -379,20 +379,20 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
 
 
-    /* // Print matrix A
-    PetscViewer viewerA;
-    PetscViewerASCIIOpen(PETSC_COMM_WORLD, "matrix_A.txt", &viewerA);
-    PetscViewerPushFormat(viewerA, PETSC_VIEWER_ASCII_DENSE); // optional: DENSE format
-    MatView(A, viewerA);
-    PetscViewerPopFormat(viewerA);
-    PetscViewerDestroy(&viewerA);
+     // Print matrix A
+    // PetscViewer viewerA;
+    // PetscViewerASCIIOpen(PETSC_COMM_WORLD, "matrix_A.txt", &viewerA);
+    // PetscViewerPushFormat(viewerA, PETSC_VIEWER_ASCII_DENSE); // optional: DENSE format
+    // MatView(A, viewerA);
+    // PetscViewerPopFormat(viewerA);
+    // PetscViewerDestroy(&viewerA);
     
     // Print vector b
-    PetscViewer viewerB;
-    PetscViewerASCIIOpen(PETSC_COMM_WORLD, "vector_b.txt", &viewerB);
-    VecView(b, viewerB);
-    PetscViewerDestroy(&viewerB);
-     */
+    // PetscViewer viewerB;
+    // PetscViewerASCIIOpen(PETSC_COMM_WORLD, "vector_b.txt", &viewerB);
+    // VecView(b, viewerB);
+    // PetscViewerDestroy(&viewerB);
+
 
     auto &ksp = circuit->ksp; 
     
@@ -401,11 +401,11 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     KSPSetFromOptions(ksp);
     KSPSolve(ksp, b, pc);
     
-    /* PetscViewer viewer;
-    PetscViewerASCIIOpen(PETSC_COMM_WORLD, "pc_output.txt", &viewer);
-    VecView(pc, viewer);
-    PetscViewerDestroy(&viewer);
-     */
+    // PetscViewer viewer;
+    // PetscViewerASCIIOpen(PETSC_COMM_WORLD, "pc_output.txt", &viewer);
+    // VecView(pc, viewer);
+    // PetscViewerDestroy(&viewer);
+    //
     // MPI_Abort(mpi::intracomm, 0);
     // std::exit(0);
     //    if (flow_iter == 1) {
