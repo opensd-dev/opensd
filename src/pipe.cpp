@@ -46,11 +46,11 @@ Pipe::Pipe(pugi::xml_node pipe_node)
   this->dnode_str = get_node_value(pipe_node, "dnode");
   this->unode_str = get_node_value(pipe_node, "unode");
   this->ncell     = stod(get_node_value(pipe_node, "ncell"));
+  this->cfarea    = stod(get_node_value(pipe_node, "cfarea"));
   this->unode = nullptr;
   this->dnode = nullptr;
   double ufrac;
   double dfrac;
-  double cfarea;
   double delx;
   double delz;
   this->roughness = stod(get_node_value(pipe_node, "roughness"));

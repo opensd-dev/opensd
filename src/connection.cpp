@@ -1,12 +1,14 @@
 //! \file connection.cpp
 #include "opensd/connection.h"
 
+#include "opensd/circuit.h"
+
 namespace opensd {
     
 Connection::Connection(std::shared_ptr<Node> node, double frac, double height) : node(node), frac(frac), height(height) {}
 
  void Connection::update_gues() {
-  if (node->ther_gues->phase() == 6) {
+  if (node->circuit->fltype != FluidType::INCOMPRESSIBLE && node->ther_gues->phase() == 6) {
     // if (node instanceof TPTank) {
       // drho_dp_consth = 0.;
     // } else {

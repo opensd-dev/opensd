@@ -1,3 +1,4 @@
+from enum import Enum
 import numpy as np
 import lxml.etree as ET
 import CoolProp
@@ -7,6 +8,11 @@ from opensd.bc import BC
 from opensd.project import get_comp
 from opensd.settings import Settings
 from opensd.branch import Branch
+
+class FluidType(Enum):
+    COMPRESSIBLE = 'compressible'
+    INCOMPRESSIBLE = 'incompressible'
+    TWO_PHASE = 'two_phase'
 
 class Circuit:
     """Flow circuit representing a collection of nodes, pipes, and other flow elements.
@@ -24,8 +30,8 @@ class Circuit:
         Whether to solve SS (default is 'True')
     flname : str
         Fluid identifier (as per CoolProp Nomenclature)
-    flap_tp : bool
-        Whether to solve two-phase (default is 'False')
+    fltype : {'compressible', 'incompressible', 'two_phase'}
+        The type of fluid to solve (default is 'compressible')
 
     """
     _registry = []
@@ -47,12 +53,16 @@ class Circuit:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-    def assign_fluid(self,flname,flag_tp=False):
+    def assign_fluid(self,flname,fltype="compressible"):
         self._flname = flname
-        self._flag_tp = flag_tp
+        self._fltype = FluidType(fltype)
         
         # if fllib=="CoolProp":
-        self.flstate=CoolProp.AbstractState("BICUBIC&HEOS",self._flname)
+        if self._fltype == FluidType.INCOMPRESSIBLE:
+            self.flstate = CoolProp.AbstractState("INCOMP",self._flname)
+        else:
+            self.flstate = CoolProp.AbstractState("BICUBIC&HEOS",self._flname)
+        
         # elif fllib=="thiravam":
             # self.flstate=thiravam.state(self.flname)
         # elif fllib=="User":
@@ -300,8 +310,8 @@ class Circuit:
         if self.solveSS:
             element.set("solveSS", "true")
 
-        if self._flag_tp:
-            element.set("flag_tp", "true")
+        # if self._flag_tp:
+            # element.set("flag_tp", "true")
         
         element.set("Pbound_ind", ",".join(map(str, self.Pbound_ind)))
         
@@ -310,6 +320,9 @@ class Circuit:
             subelement.text = self._flname
         else:
             raise ValueError(f'Fluid has not been assigned for circuit {self.identifier}!')
+            
+        subelement = ET.SubElement(element, "fltype")
+        subelement.text = self._fltype.value
 
         if self.nodes:
             for node in self.nodes:

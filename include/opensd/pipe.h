@@ -43,7 +43,7 @@ public:
   double Kforward = 0.;
   double heat_input;
   double mflow;
-  double cfarea1;
+  double cfarea;
   double roughness;
 
   void save_to_hdf5(hid_t group_id) const;

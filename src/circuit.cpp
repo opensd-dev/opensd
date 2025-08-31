@@ -29,7 +29,7 @@ vector<std::shared_ptr<Circuit>> circuits;
 // Circuit implementation
 //==============================================================================
 
-Circuit::Circuit(pugi::xml_node cir_node)
+Circuit::Circuit(pugi::xml_node cir_node) : fltype(FluidType::UNSET)
 {
   if (check_for_node(cir_node, "identifier")) {
     this->identifier = get_node_value(cir_node, "identifier");
@@ -39,11 +39,30 @@ Circuit::Circuit(pugi::xml_node cir_node)
         
   // Read the circuit fluid
   this->flname = get_node_value(cir_node, "flname");
+
+
+  if (fltype == FluidType::UNSET) {
+    if (check_for_node(cir_node, "fltype")) {
+      std::string temp_str = get_node_value(cir_node, "fltype", true, true);
+      if (temp_str == "compressible") {
+        fltype = FluidType::COMPRESSIBLE;
+      } else if (temp_str == "incompressible") {
+        fltype = FluidType::INCOMPRESSIBLE;
+      } else if (temp_str == "two_phase") {
+        fltype = FluidType::TWO_PHASE;
+      } else {
+        fatal_error("Unrecognized fluid type: " + temp_str);
+      }
+    }
+  }
+
+
   
   // Read the fluid nodes, pipes and bcs
   for (pugi::xml_node flnode_node : cir_node.children("node")) {
     this->nodes.push_back(std::make_shared<Node>(flnode_node));
     this->nodes.back()->node_ind = this->nodes.size() - 1;
+	this->nodes.back()->circuit = this;
   }
 
   for (pugi::xml_node pipe : cir_node.children("pipe")) {
@@ -101,7 +120,6 @@ void discretize_pipes() {
 	    }
       }
 	  
-      double cfarea = PI*std::pow(pipe->diameter,2)/4.;
       double delx = pipe->length/pipe->ncell;
 
       for (int i = 0; i < pipe->ncell - 1; ++i) {
@@ -110,10 +128,11 @@ void discretize_pipes() {
         node->tpres_old = pipe->unode->tpres_old+(pipe->dnode->tpres_old-pipe->unode->tpres_old)*(i+1)/pipe->ncell;
         node->ttemp_old = pipe->unode->ttemp_old+(pipe->dnode->ttemp_old-pipe->unode->ttemp_old)*(i+1)/pipe->ncell;
         node->tenth_old = std::max(pipe->unode->tenth_old,pipe->dnode->tenth_old);
-        node->volume = delx*cfarea;
+        node->volume = delx*pipe->cfarea;
         node->msource = 0.;
         node->mresidue = 0.;
         node->mflow_in = 1.E-4;
+		node->circuit = circuit.get();
 
         // node->height = pipe->unode->height + (pipe->dnode->height - pipe->unode->height) * (i + 1) / pipe->ncell;
         circuit->nodes.push_back(node);
@@ -128,13 +147,13 @@ void discretize_pipes() {
 
       for (int i = 0; i < pipe->ncell; ++i) {
         if (i == 0 && pipe->ncell == 1) {
-          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->unode, ufrac, pipe->dnode, dfrac, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
+          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->unode, ufrac, pipe->dnode, dfrac, pipe->diameter, pipe->cfarea, delx, delz, fricopt, pipe->roughness));
         } else if (i == 0) {
-          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->unode, ufrac, pipe->nodes[0], -1, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
+          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->unode, ufrac, pipe->nodes[0], -1, pipe->diameter, pipe->cfarea, delx, delz, fricopt, pipe->roughness));
         } else if (i == pipe->ncell-1) {
-          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->nodes[pipe->ncell-2], -1, pipe->dnode, dfrac, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
+          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->nodes[pipe->ncell-2], -1, pipe->dnode, dfrac, pipe->diameter, pipe->cfarea, delx, delz, fricopt, pipe->roughness));
         } else {
-          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->nodes[i-1], -1, pipe->nodes[i], -1, pipe->diameter, cfarea, delx, delz, fricopt, pipe->roughness));
+          pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->nodes[i-1], -1, pipe->nodes[i], -1, pipe->diameter, pipe->cfarea, delx, delz, fricopt, pipe->roughness));
         }
         circuit->faces.push_back(pipe->faces.back());
       }
@@ -177,6 +196,7 @@ for (auto& circuit : model::circuits) {
 void Circuit::save_to_hdf5(hid_t group_id) const {
   write_string(group_id, "identifier", identifier);
   write_string(group_id, "flname", flname);
+  write_string(group_id, "fltype", fluid_type_to_string(fltype));
   write_scalar(group_id, "eps_m", eps_m);
   write_scalar(group_id, "mean_flow", mean_flow);
   write_scalar(group_id, "eps_h", eps_h);
@@ -228,6 +248,8 @@ void Circuit::save_to_hdf5(hid_t group_id) const {
 void Circuit::load_from_hdf5(hid_t group_id) {
   identifier = read_string(group_id, "identifier");
   flname = read_string(group_id, "flname");
+  std::string fltype_str = read_string(group_id, "fltype");
+  fltype = string_to_fluid_type(fltype_str);
   eps_m = read_scalar(group_id, "eps_m");
   mean_flow = read_scalar(group_id, "mean_flow");
   eps_h = read_scalar(group_id, "eps_h");

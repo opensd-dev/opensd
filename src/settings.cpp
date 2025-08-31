@@ -78,7 +78,7 @@ void read_settings_xml(pugi::xml_node root)
   using namespace pugi;
 
   // Check run mode if it hasn't been set from the command line
-  xml_node node_mode;
+  // xml_node node_mode;
   if (run_mode == RunMode::UNSET) {
     if (check_for_node(root, "run_mode")) {
       std::string temp_str = get_node_value(root, "run_mode", true, true);

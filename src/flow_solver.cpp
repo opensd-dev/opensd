@@ -297,7 +297,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       double b_local;
 
       double B, D;
-      if (node->ther_old->phase() == 6) {
+      if (circuit->fltype != FluidType::INCOMPRESSIBLE && node->ther_old->phase() == 6) {
         B = node->B1 + node->volume * node->ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node->ther_old->rhomass();
         if (!pbound) 
           A_local_node = trans_sim * B * node->ther_old->rhomass() / delt;
@@ -623,7 +623,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     }
     
     for (auto& face : circuit->faces_owned) {
-      fout << "face " << face->faceno << " " << std::setprecision(12) << std::fixed << face->ther_gues->rhomass() << std::endl;
+      fout << "face " << face->faceno << " " << std::setprecision(12) << std::fixed << face->velocity << std::endl;
     }
 
     VecRestoreArrayRead(rhomass_local, &rhomass_array_read);

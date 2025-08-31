@@ -18,7 +18,7 @@ namespace opensd {
 //==============================================================================
 // Global variables
 //==============================================================================
-
+class Circuit;
 class Face;
 
 //==============================================================================
@@ -34,7 +34,7 @@ public:
   vector<std::shared_ptr<Face>> ofaces;
   double mflow_in;
   double mflow_out;
-  // Circuit* circuit;
+  Circuit* circuit;
   int node_ind;
   
   double tpres_old;

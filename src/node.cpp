@@ -6,6 +6,7 @@
 
 #include "opensd/error.h"
 #include "opensd/xml_interface.h"
+#include "opensd/circuit.h"
 #include "opensd/face.h"
 
 namespace opensd {
@@ -84,7 +85,7 @@ double Node::eqn_cont(double time, double delt, bool trans_sim, double alpha_mom
 
 
   double B, D;
-  if (ther_old->phase() == 6) {
+  if (circuit->fltype != FluidType::INCOMPRESSIBLE && ther_old->phase() == 6) {
     B = B1 + volume * ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / ther_old->rhomass();
     D = volume * ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
   } else {
@@ -116,7 +117,7 @@ void Node::update_gues() {
 	  auto pface = std::dynamic_pointer_cast<PFace>(iface);
 	  if (pface) {
       // if (pface->has_wall()) {  // Assuming has_wall() is a method that checks for wall existence
-          isum += pface->diameter * (pface->delx * pface->cfarea) * c1
+          isum += pface->diameter * (pface->delx * pface->cfarea) * c1 //pending may not applicable only for shell side flow (add warning)
                   / (2.0 * 0.019 * youngs_modulus); //pface->wall->thk
       // }
 	}
@@ -148,8 +149,14 @@ void Node::assign_staticvar() {
 }
 
 void Node::assign_prop() {
+	if (circuit->fltype != FluidType::INCOMPRESSIBLE) {
   ther_gues = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("BICUBIC&HEOS", "He"));
   ther_old = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("BICUBIC&HEOS", "He"));
+	}
+	else {
+  ther_gues = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("INCOMP","LiqNa"));
+  ther_old = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("INCOMP","LiqNa"));
+	}
   ther_old->update(CoolProp::HmassP_INPUTS,senth_old,spres_old);
 }
 

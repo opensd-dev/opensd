@@ -4,6 +4,7 @@
 #define OPENSD_CIRCUIT_H
 
 #include "pugixml.hpp"
+#include "opensd/constants.h"
 #include "opensd/node.h"
 #include "opensd/pipe.h"
 #include "opensd/bc.h"
@@ -32,6 +33,7 @@ class Circuit {
 public:
   std::string identifier; //!< User-defined identifier
   std::string flname;
+  FluidType fltype;       //!< Fluid Type ('compressible', 'incompressible', 'two_phase')
   explicit Circuit(pugi::xml_node cir_node);
   Circuit() = default;
   double eps_m;

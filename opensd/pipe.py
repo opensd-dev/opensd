@@ -33,7 +33,7 @@ class Pipe(object):
         if cfarea is None:
             cfarea=math.pi*diameter**2/4.
             
-        cfarea = cfarea * npar
+        self.cfarea = cfarea * npar
             
         self.heat_input = heat_input
         self.roughness = roughness
@@ -81,6 +81,7 @@ class Pipe(object):
         subelement.set("unode",      str(self.unode.identifier))
         subelement.set("dnode",      str(self.dnode.identifier))
         subelement.set("roughness",  str(self.roughness))
+        subelement.set("cfarea",     str(self.cfarea))
 
 class Wall(object):
     def __init__(self,thk,solname,sollib,restraint):
