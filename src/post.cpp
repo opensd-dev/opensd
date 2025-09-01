@@ -56,9 +56,9 @@ void writeHeader() {
     for (const auto& item : node_items) {
       for (const auto& node : circuit->nodes) {
         if (item.size() == 1) {
-          f1 << " " << item[0] << ":" << node->identifier;
+          f1 << "," << item[0] << ":" << node->identifier;
         } else if (item.size() == 2) {
-          f1 << " " << item[1] << ":" << node->identifier;
+          f1 << "," << item[1] << ":" << node->identifier;
         }
       }
     }
@@ -67,7 +67,7 @@ void writeHeader() {
 }
 
 void writeValue(double time, double delt) {
-  f1 << std::setw(10) << std::setprecision(4) << time << " ";
+  f1 << std::setw(10) << std::setprecision(4) << time << ",";
 
   // Placeholder for the items in the original code
   std::vector<std::string> pipe_items = {"mflow"};
@@ -85,10 +85,10 @@ void writeValue(double time, double delt) {
           auto it = nodeAttributeMap.find(item[0]);
           if (it != nodeAttributeMap.end()) {
             double value = it->second(*node);
-            f1 << std::setprecision(7) << value << " ";
+            f1 << std::setprecision(7) << value << ",";
           }
         } else if (item.size() == 2) {
-          f1 << " " << std::setw(7) << std::setprecision(7) << 0.0; // Replace 0.0 with the actual value
+          f1 << "," << std::setw(7) << std::setprecision(7) << 0.0; // Replace 0.0 with the actual value
         }
       }
     }

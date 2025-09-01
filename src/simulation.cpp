@@ -341,12 +341,14 @@ bool initialized {false};
 void calculate_work()
 {
 	
-  // Build a map from Node* to contiguous METIS vertex ID
-  std::unordered_map<std::shared_ptr<Node>, idx_t> node_to_vertex;
-  std::vector<std::shared_ptr<Node>> vertex_to_node;
-  idx_t vertex_count = 0;
-  
+
+
   for (auto& circuit : model::circuits) {
+    // Build a map from Node* to contiguous METIS vertex ID
+    std::unordered_map<std::shared_ptr<Node>, idx_t> node_to_vertex;
+    std::vector<std::shared_ptr<Node>> vertex_to_node;
+    idx_t vertex_count = 0;
+
     for (auto& node : circuit->nodes) {
       node_to_vertex[node] = vertex_count++;
       vertex_to_node.push_back(node);
