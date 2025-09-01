@@ -338,12 +338,158 @@ bool initialized {false};
 // Non-member functions
 //==============================================================================
 
+struct Allocation {
+  std::vector<int> ranks_for_c;  // number of ranks assigned to each circuit
+  std::vector<int> start;        // starting rank for each circuit
+};
+
+// ------------------------------------------------------
+// Weighted allocator: works even if #circuits > #procs
+// ------------------------------------------------------
+Allocation allocate_circuits(int P, const std::vector<long long>& work) {
+  int C = (int)work.size();
+  Allocation alloc;
+  alloc.ranks_for_c.assign(C, 0);
+  alloc.start.assign(C, 0);
+
+  // -----------------------------------
+  // Case 1: Enough ranks (C <= P)
+  // -----------------------------------
+  if (C <= P) {
+    long double total = 0.0L;
+    for (auto w : work) total += (long double)std::max(1LL, w);
+
+    // initial floor
+    for (int i = 0; i < C; ++i) {
+      long double exact = (long double)P * ((long double)std::max(1LL, work[i]) / total);
+      int k = (int)std::floor(exact);
+      alloc.ranks_for_c[i] = std::max(1, k);
+    }
+
+    // fix sum with largest remainders
+    int sum = 0; for (int k : alloc.ranks_for_c) sum += k;
+    struct R { int i; long double frac; };
+    std::vector<R> rem; rem.reserve(C);
+
+    for (int i = 0; i < C; ++i) {
+      long double exact = (long double)P * ((long double)std::max(1LL, work[i]) / total);
+      rem.push_back({i, exact - (long double)std::floor(exact)});
+    }
+
+    if (sum < P) {
+      std::sort(rem.begin(), rem.end(), [](auto& a, auto& b){ return a.frac > b.frac; });
+      for (int t = 0; t < P - sum; ++t) alloc.ranks_for_c[rem[t].i] += 1;
+    } else if (sum > P) {
+      std::sort(rem.begin(), rem.end(), [](auto& a, auto& b){ return a.frac < b.frac; });
+      for (int t = 0; t < sum - P; ++t) alloc.ranks_for_c[rem[t].i] -= 1;
+    }
+
+    // prefix sums -> [lo,hi) ranges
+    for (int i = 1; i < C; ++i)
+      alloc.start[i] = alloc.start[i-1] + alloc.ranks_for_c[i-1];
+  }
+
+  // -----------------------------------
+  // Case 2: Not enough ranks (C > P)
+  // -----------------------------------
+  else {
+    struct Bin { long long load = 0; std::vector<int> circuits; };
+    std::vector<Bin> bins(P);
+
+    // Sort circuits by descending work
+    std::vector<int> order(C);
+    std::iota(order.begin(), order.end(), 0);
+    std::sort(order.begin(), order.end(),
+              [&](int a, int b){ return work[a] > work[b]; });
+
+    for (int ci : order) {
+      // pick bin with least load
+      auto it = std::min_element(bins.begin(), bins.end(),
+                                 [](auto& x, auto& y){ return x.load < y.load; });
+      it->circuits.push_back(ci);
+      it->load += work[ci];
+    }
+
+    // each circuit gets exactly 1 rank, possibly shared
+    for (int r = 0; r < P; ++r) {
+      for (int ci : bins[r].circuits) {
+        alloc.ranks_for_c[ci] = 1;
+        alloc.start[ci] = r;   // directly assign rank id
+      }
+    }
+  }
+
+  return alloc;
+}
+
 void calculate_work()
 {
 	
 
+  // build work metric
+std::vector<long long> work;
+work.reserve(model::circuits.size());
+for (auto& c : model::circuits) {
+  long long nodes = (long long)c->nodes.size();
+  long long faces = (long long)c->faces.size();
+  work.push_back(10LL*faces + 2LL*nodes);
+}
 
-  for (auto& circuit : model::circuits) {
+// allocate
+Allocation alloc = allocate_circuits(mpi::n_procs, work);
+auto& ranks_for_c = alloc.ranks_for_c;
+auto& start       = alloc.start;
+
+  for (size_t cidx = 0; cidx < model::circuits.size(); ++cidx) {
+    auto& circuit = model::circuits[cidx];
+    // std::cout << circuit->identifier << std::endl;
+
+
+
+
+int world_rank = mpi::rank; // 0..P-1
+int color = MPI_UNDEFINED;
+int key   = 0;
+
+  int lo = start[cidx];
+  int hi = start[cidx] + ranks_for_c[cidx];
+  if (world_rank >= lo && world_rank < hi) {
+    color = (int)cidx;                  // one color per circuit
+    key   = world_rank - lo;         // rank inside that circuit
+  }
+
+MPI_Comm circuit_comm = MPI_COMM_NULL;
+MPI_Comm_split(mpi::intracomm, color, key, &circuit_comm);
+
+std::cout << "Rank " << world_rank
+          << " checking circuit " << circuit->identifier
+          << " lo=" << lo << " hi=" << hi
+          << " color=" << color << " key=" << key
+          << std::endl;
+
+// if this process is NOT part of this circuit, skip it entirely
+    if (circuit_comm == MPI_COMM_NULL) {
+      // Remember to set these so other code knows this process doesn't participate.
+      circuit->comm = MPI_COMM_NULL;
+      continue;
+    }
+
+// store communicator and local rank/size
+  circuit->comm = circuit_comm;
+  int cir_rank=-1, cir_size=-1;
+  MPI_Comm_rank(circuit_comm, &cir_rank);
+  MPI_Comm_size(circuit_comm, &cir_size);
+  circuit->rank_in_comm = cir_rank;
+  circuit->comm_size    = cir_size;
+
+std::cout << "Global rank " << mpi::rank
+          << " -> Circuit " << circuit->identifier
+          << " | circuit rank: " << circuit->rank_in_comm
+          << " / " << (circuit->comm_size - 1)
+          << " (comm_size=" << circuit->comm_size << ")"
+          << std::endl;
+
+
     // Build a map from Node* to contiguous METIS vertex ID
     std::unordered_map<std::shared_ptr<Node>, idx_t> node_to_vertex;
     std::vector<std::shared_ptr<Node>> vertex_to_node;
@@ -405,7 +551,7 @@ void calculate_work()
  */    
     idx_t nvtxs = vertex_count;
     idx_t ncon = 1;
-    idx_t nparts = mpi::n_procs;  // Set this to number of partitions
+    idx_t nparts = cir_size;  // Set this to number of partitions
     std::vector<idx_t> part(vertex_count);  // Output
     
     idx_t objval;
@@ -425,14 +571,14 @@ void calculate_work()
     }
 
 
-std::vector<PetscInt> counts(mpi::n_procs, 0);
+std::vector<PetscInt> counts(cir_size, 0);
 for (PetscInt i = 0; i < nvtxs; ++i) {
     counts[part[i]]++;
 }
 
 // 2. Compute starting offsets for each rank
-std::vector<PetscInt> offsets(mpi::n_procs, 0);
-for (int r = 1; r < mpi::n_procs; ++r) {
+std::vector<PetscInt> offsets(cir_size, 0);
+for (int r = 1; r < cir_size; ++r) {
     offsets[r] = offsets[r-1] + counts[r-1];
 }
 // 3. Map old index → new contiguous index
@@ -444,7 +590,7 @@ for (PetscInt i = 0; i < nvtxs; ++i) {
 }
 
 
-    std::ofstream fout("partition_rank_" + std::to_string(mpi::rank) + ".txt");
+    std::ofstream fout("partition_c" + std::to_string(cidx) + "_rank_" + std::to_string(cir_rank) + ".txt");
     for (int i = 0; i < nvtxs; ++i) {
         fout << circuit->nodes[i]->identifier
      << " old=" << i
@@ -454,42 +600,50 @@ for (PetscInt i = 0; i < nvtxs; ++i) {
     }
     fout.close();
     
-    MPI_Barrier(mpi::intracomm);
-    if (mpi::rank == 0) {
+    MPI_Barrier(circuit_comm);
+    if (cir_rank == 0) {
         std::cerr << "METIS partition debug print complete.\n";
     }
     
     size_t i = 0;
+    circuit->faces_owned.clear();
+    circuit->face_indices_owned.clear();
+    circuit->ghost_faces_owned.clear();
+    circuit->ghost_face_indices_owned.clear();
+    circuit->ghost_nodes_owned.clear();
+    circuit->ghost_nodes_owned1.clear();
+    circuit->ghost_indices_owned.clear();
+
     for (auto& face : circuit->faces) {
       int u_rank = part[node_to_vertex[face->unode]];
       int v_rank = part[node_to_vertex[face->dnode]];
-            face->owner = u_rank;
-			if (face->owner == mpi::rank) {
-			  circuit->faces_owned.push_back(face);
-              circuit->face_indices_owned.push_back(i);
-            }
+      face->owner = u_rank;
+      if (face->owner == cir_rank) {
+        circuit->faces_owned.push_back(face);
+        circuit->face_indices_owned.push_back(i);
+      }
 
-  	if ((u_rank == mpi::rank || v_rank == mpi::rank) && face->owner != mpi::rank) {
+  	if ((u_rank == cir_rank || v_rank == cir_rank) && face->owner != cir_rank) {
               circuit->ghost_faces_owned[face->owner].push_back(face);
               circuit->ghost_face_indices_owned.push_back(i);
           }
   		
-  	if (v_rank != mpi::rank && u_rank == mpi::rank) {
+  	if (v_rank != cir_rank && u_rank == cir_rank) {
               circuit->ghost_nodes_owned[v_rank].push_back(face->dnode);
               circuit->ghost_nodes_owned1.push_back(face->dnode);
-              circuit->ghost_indices_owned.push_back(circuit->old2new[face->dnode->node_ind]); // global index
+              circuit->ghost_indices_owned.push_back(circuit->old2new[face->dnode->node_ind]); // convert face->dnode->node_ind (old vertex index) to circuit-local index via old2new
           }
       ++i;
   	}
-  
-    // for (auto& face : circuit->faces) {
+
+  	// for (auto& face : circuit->faces) {
         // std::cout << "Face " << face->faceno
                   // << " connects nodes " << face->unode->identifier
                   // << " and " << face->dnode->identifier
                   // << " => Owner: " << face->owner << "\n";
     // }
   
-    std::ofstream ghost_debug("ghosts_rank_" + std::to_string(mpi::rank) + ".txt");
+    std::ofstream ghost_debug("ghosts_circuit" + std::to_string(cidx) + "_rank_" + std::to_string(cir_rank) + ".txt");
     for (const auto& [rank, nodes] : circuit->ghost_nodes_owned) {
         ghost_debug << "Need nodes from rank " << rank << ": ";
         for (auto node : nodes)
@@ -506,16 +660,16 @@ for (PetscInt i = 0; i < nvtxs; ++i) {
     ghost_debug.close();
     
   for (auto& node : circuit->nodes) {
-    if (part[node_to_vertex[node]] == mpi::rank) {
+    if (part[node_to_vertex[node]] == cir_rank) {
       circuit->nodes_owned.push_back(node);
       circuit->indices_owned.push_back(circuit->old2new[node->node_ind]);
     }
   }
-PetscInt local_nrows = counts[mpi::rank];
+PetscInt local_nrows = counts[cir_rank];
 
 // Debug print faces_owned per rank
 {
-  std::ofstream fout("faces_owned_rank_" + std::to_string(mpi::rank) + ".txt");
+  std::ofstream fout("faces_owned_c" + std::to_string(cidx) + "_rank_" + std::to_string(cir_rank)+ ".txt");
 
   fout << "Rank " << mpi::rank << " owns " << circuit->faces_owned.size() << " faces\n";
   for (auto& face : circuit->faces_owned) {
@@ -537,18 +691,18 @@ PetscInt global_nrows = vertex_count; // same as nvtxs
     PetscInt n = circuit->nodes.size();
 
     auto &A = circuit->A; 
-    MatCreate(mpi::intracomm, &A);
+    MatCreate(circuit_comm, &A);
     MatSetSizes(A, local_nrows, local_nrows, global_nrows, global_nrows);
     MatSetFromOptions(A);
     MatSetUp(A);
     
     auto &b = circuit->b; 
-    VecCreate(mpi::intracomm, &b);
+    VecCreate(circuit_comm, &b);
     VecSetSizes(b, local_nrows, global_nrows);
     VecSetFromOptions(b);
     
     auto &pc = circuit->pc; 
-    VecCreate(mpi::intracomm, &pc);
+    VecCreate(circuit_comm, &pc);
     VecSetSizes(pc, local_nrows, global_nrows);
     VecSetFromOptions(pc);
     
@@ -557,27 +711,27 @@ PetscInt global_nrows = vertex_count; // same as nvtxs
     PetscInt n_faces_ghost = circuit->ghost_face_indices_owned.size();
 
     // Create ghost vectors
-    VecCreateGhost(mpi::intracomm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
+    VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
                    circuit->ghost_face_indices_owned.data(), &circuit->vflow_gues_local);
-    VecCreateGhost(mpi::intracomm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
+    VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
                    circuit->ghost_face_indices_owned.data(), &circuit->aminus_local);
-    VecCreateGhost(mpi::intracomm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
+    VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
                    circuit->ghost_face_indices_owned.data(), &circuit->aplus_local);
-    VecCreateGhost(mpi::intracomm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
+    VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
                    circuit->ghost_face_indices_owned.data(), &circuit->bplus_local);
-    VecCreateGhost(mpi::intracomm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
+    VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
                    circuit->ghost_face_indices_owned.data(), &circuit->bminus_local);
 
-    VecCreateGhost(mpi::intracomm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
+    VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
                circuit->ghost_face_indices_owned.data(), &circuit->rhomass_local);
 
 	PetscInt n_local = circuit->indices_owned.size();
     PetscInt nghost  = circuit->ghost_indices_owned.size();
 		   
-    VecCreateGhost(mpi::intracomm, n_local, PETSC_DECIDE, nghost,
+    VecCreateGhost(circuit_comm, n_local, PETSC_DECIDE, nghost,
                circuit->ghost_indices_owned.data(), &circuit->pc_local);
 
-    VecCreateGhost(mpi::intracomm, n_local, PETSC_DECIDE, nghost,
+    VecCreateGhost(circuit_comm, n_local, PETSC_DECIDE, nghost,
                circuit->ghost_indices_owned.data(), &circuit->velocity_local);
 
   }

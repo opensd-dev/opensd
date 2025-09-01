@@ -396,7 +396,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
     auto &ksp = circuit->ksp; 
     
-    KSPCreate(mpi::intracomm, &ksp);
+    KSPCreate(circuit->comm, &ksp);
     KSPSetOperators(ksp, A, A);
     KSPSetFromOptions(ksp);
     KSPSolve(ksp, b, pc);

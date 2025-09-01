@@ -63,6 +63,8 @@ public:
   Vec rhomass_local;
   Vec pc_local;
   Vec velocity_local;
+  MPI_Comm comm;
+  int rank_in_comm, comm_size;
 
   void save_to_hdf5(hid_t group_id) const;
   void load_from_hdf5(hid_t group_id);
