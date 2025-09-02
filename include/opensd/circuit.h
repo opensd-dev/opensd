@@ -21,6 +21,7 @@ namespace opensd {
 
 namespace model {
 extern vector<std::shared_ptr<Circuit>> circuits;
+extern vector<std::shared_ptr<Circuit>> circuits_owned;
 } // namespace model
 
 class Circuit;

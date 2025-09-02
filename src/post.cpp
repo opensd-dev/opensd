@@ -47,7 +47,7 @@ void writeHeader() {
   // std::vector<std::string> pipe_items = {"mflow"};
   std::vector<std::vector<std::string>> node_items = {{"tpres_gues"}, {"spres_gues"}, {"ttemp_gues"}, {"tenth_gues"}, {"ther_gues", "rhomass"}, {"msource"}, {"esource"} };
   
-  for (const auto& circuit : model::circuits) {
+  for (const auto& circuit : model::circuits_owned) {
     // for (const auto& pipe : circuit.pipes) {
       // for (const auto& item : pipe_items) {
         // f1 << " " << item << ":" << pipe.identifier;
@@ -73,7 +73,7 @@ void writeValue(double time, double delt) {
   std::vector<std::string> pipe_items = {"mflow"};
   std::vector<std::vector<std::string>> node_items = {{"tpres_gues"}, {"spres_gues"}, {"ttemp_gues"}, {"tenth_gues"}, {"ther_gues", "rhomass"}, {"msource"}, {"esource"} };
 
-  for (const auto& circuit : model::circuits) {
+  for (const auto& circuit : model::circuits_owned) {
     // for (const auto& pipe : circuit.pipes) {
       // for (const auto& item : pipe_items) {
         // f1 << " " << std::setw(7) << std::setprecision(7) << 0.0; // Replace 0.0 with the actual value

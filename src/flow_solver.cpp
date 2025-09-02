@@ -275,8 +275,8 @@ VecRestoreArrayRead(bminus_local, &bminus_array_read);
 void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, int main_iter, int flow_iter) {
   
   simulation::time_massmom.start();
-  
-  for (auto& circuit : model::circuits) {
+
+  for (auto& circuit : model::circuits_owned) {
     // if (!trans_sim && !circuit->solveSS) continue;
     // std::cout << circuit->identifier << std::endl;
     guess_flow(time, delt, trans_sim, alpha_mom, main_iter, circuit);
@@ -636,7 +636,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
 void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, int main_iter) {
   
-  for (auto& circuit : model::circuits) {
+  for (auto& circuit : model::circuits_owned) {
     // if (!trans_sim && !circuit.solveSS) continue;
 
     int n = circuit->nodes.size();

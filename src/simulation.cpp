@@ -276,7 +276,7 @@ int opensd_simulation_finalize()
   // Start finalization timer
   simulation::time_finalize.start();
 
-for (auto& circuit : model::circuits) {
+for (auto& circuit : model::circuits_owned) {
 auto &A = circuit->A;  // alias
 auto &b = circuit->b;  // alias
 auto &pc = circuit->pc;  // alias
@@ -432,13 +432,16 @@ work.reserve(model::circuits.size());
 for (auto& c : model::circuits) {
   long long nodes = (long long)c->nodes.size();
   long long faces = (long long)c->faces.size();
-  work.push_back(10LL*faces + 2LL*nodes);
+  work.push_back(10LL*faces + 2LL*nodes); //arbitrary
 }
 
 // allocate
 Allocation alloc = allocate_circuits(mpi::n_procs, work);
 auto& ranks_for_c = alloc.ranks_for_c;
 auto& start       = alloc.start;
+
+
+model::circuits_owned.clear();
 
   for (size_t cidx = 0; cidx < model::circuits.size(); ++cidx) {
     auto& circuit = model::circuits[cidx];
@@ -488,6 +491,21 @@ std::cout << "Global rank " << mpi::rank
           << " / " << (circuit->comm_size - 1)
           << " (comm_size=" << circuit->comm_size << ")"
           << std::endl;
+ model::circuits_owned.push_back(circuit);
+  }
+
+
+  for (size_t cidx = 0; cidx < model::circuits.size(); ++cidx) {
+    auto& circuit = model::circuits[cidx];
+
+  MPI_Comm circuit_comm = circuit->comm;
+  int cir_rank = circuit->rank_in_comm;
+  int cir_size = circuit->comm_size;
+
+
+    if (circuit_comm == MPI_COMM_NULL) {
+      continue;
+    }
 
 
     // Build a map from Node* to contiguous METIS vertex ID

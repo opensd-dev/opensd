@@ -15,7 +15,7 @@ namespace opensd {
 std::tuple<bool, std::tuple<double, double>> check_conv(double time, double delt, bool trans_sim, double alpha_mom, std::string opt) {
   double eps_mtot = 0.0, eps_ptot = 0.0, eps_htot = 0.0, eps_ttot = 0.0;
 
-  for (auto& circuit : model::circuits) {
+  for (auto& circuit : model::circuits_owned) {
     
     vector<double> eps_mlist;
     for (auto& node : circuit->nodes_owned) {
@@ -74,7 +74,7 @@ std::tuple<bool, std::tuple<double, double>> check_conv(double time, double delt
   if (condition) {
     
     
-    for (auto& circuit : model::circuits) {
+    for (auto& circuit : model::circuits_owned) {
     for (auto& node : circuit->nodes_owned) {
       node->update_old();
       // std::cout << node->identifier << " " << node->tpres_gues/1.E6 << std::endl;
