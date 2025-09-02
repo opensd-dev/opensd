@@ -150,12 +150,12 @@ void Node::assign_staticvar() {
 
 void Node::assign_prop() {
 	if (circuit->fltype != FluidType::INCOMPRESSIBLE) {
-  ther_gues = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("BICUBIC&HEOS", "He"));
-  ther_old = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("BICUBIC&HEOS", "He"));
+  ther_gues = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("BICUBIC&HEOS", circuit->flname));
+  ther_old = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("BICUBIC&HEOS", circuit->flname));
 	}
 	else {
-  ther_gues = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("INCOMP","LiqNa"));
-  ther_old = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("INCOMP","LiqNa"));
+  ther_gues = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("INCOMP",circuit->flname));
+  ther_old = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("INCOMP",circuit->flname));
 	}
   ther_old->update(CoolProp::HmassP_INPUTS,senth_old,spres_old);
 }
