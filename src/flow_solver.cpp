@@ -157,7 +157,7 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
       // }
       face->update_abcoef(time, delt, trans_sim, alpha_mom);
       fout << "face " << face->faceno << " " << std::setprecision(12) << std::fixed
-       << " vflow " << face->vflow_gues << "\n";
+       << " vflow_gues " << face->vflow_gues << " vflow_old " << face->vflow_old << "\n";
 
       // std::cout << face->vflow_gues << std::endl;
   }
@@ -254,14 +254,16 @@ for (size_t j = 0; j < circuit->ghost_face_indices_owned.size(); ++j) {
   face->bplus      = bplus_array_read[n_faces_owned + j];
   face->bminus     = bminus_array_read[n_faces_owned + j];
 
-  // std::cout << "flag1 " << mpi::rank
-  //           << " face=" << face->faceno
-  //           << " aminus=" << face->aminus
-  //           << " aplus=" << face->aplus
-  //           << " bplus=" << face->bplus
-  //           << " bminus=" << face->bminus
-  //           << " vflow_gues=" << face->vflow_gues
-  //           << std::endl;
+  std::cout << "flag1 " << mpi::rank
+  << std::setprecision(12) << std::fixed
+            << " face=" << face->faceno
+            << " aminus=" << face->aminus
+            << " aplus=" << face->aplus
+            << " bplus=" << face->bplus
+            << " bminus=" << face->bminus
+            << " vflow_gues=" << face->vflow_gues
+            << " vflow_old=" << face->vflow_old
+            << std::endl;
 }
 
 VecRestoreArrayRead(vflow_gues_local, &vflow_array_read);
@@ -324,6 +326,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
           A_local_node = A_local_node - alpha_mom * (-iface->aplus * iface->ther_gues->rhomass() + iface->bplus * iface->vflow_gues);
         }
         b_local += alpha_mom * (iface->ther_gues->rhomass() * iface->vflow_gues) + (1.0 - alpha_mom) * (iface->ther_old->rhomass() * iface->vflow_old);
+        // std::cout << "b_local " << iface->faceno << " " << iface->vflow_gues << std::endl;
       }
 
       for (auto& oface : node->ofaces) {
@@ -408,9 +411,10 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     //
     // MPI_Abort(mpi::intracomm, 0);
     // std::exit(0);
-    //    if (flow_iter == 1) {
-    //      std::exit(0);
-    //    }
+       // if (flow_iter == 1) {
+       //   MPI_Abort(mpi::intracomm, 0);
+       //   std::exit(0);
+       // }
 
 
     // Prepare file for writing (one file per rank)

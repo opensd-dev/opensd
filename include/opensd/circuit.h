@@ -50,7 +50,9 @@ public:
   vector<int> face_indices_owned;
   vector<PetscInt> ghost_indices_owned;
   vector<PetscInt> ghost_face_indices_owned;
+  vector<PetscInt> ghost_face_global_indices;
   vector<PetscInt> old2new;
+  vector<PetscInt> face_old2new;
   vector<std::shared_ptr<Pipe>> pipes;
   vector<BC> bcs;
   vector<std::shared_ptr<Face>> faces;

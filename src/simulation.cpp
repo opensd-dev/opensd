@@ -176,7 +176,7 @@ int opensd_run()
   }
 
   try {
-    std::string fname = "circuit_rank" + std::to_string(mpi::rank) + ".h5";
+    std::string fname = "circuits.h5";
     hid_t file_id = opensd::create_or_open_file(fname.c_str());
   
     // Create /circuits group if it doesn't exist
@@ -701,6 +701,67 @@ PetscInt local_nrows = counts[cir_rank];
 }
 
 
+// ---- Build face_old2new for faces (contiguous per owner rank) ----
+{
+  // 1) Count faces per rank
+  std::vector<PetscInt> face_counts(cir_size, 0);
+  for (size_t f = 0; f < circuit->faces.size(); ++f) {
+    int owner = circuit->faces[f]->owner;  // set earlier as u_rank
+    if (owner >= 0 && owner < cir_size) face_counts[owner]++;
+  }
+
+  // 2) Offsets per rank
+  std::vector<PetscInt> face_offsets(cir_size, 0);
+  for (int r = 1; r < cir_size; ++r) {
+    face_offsets[r] = face_offsets[r-1] + face_counts[r-1];
+  }
+
+  // 3) Map old face index -> new contiguous index
+  circuit->face_old2new.assign(circuit->faces.size(), -1);
+  std::vector<PetscInt> face_position = face_offsets; // running insertion points
+
+  for (size_t f = 0; f < circuit->faces.size(); ++f) {
+    int owner = circuit->faces[f]->owner;
+    if (owner >= 0 && owner < cir_size) {
+      circuit->face_old2new[f] = face_position[owner]++;
+    }
+  }
+
+  // 4) Convenience: local list of owned face local indices (for this rank)
+  // circuit->face_local_indices_owned.clear();
+  // for (size_t idx = 0; idx < circuit->face_indices_owned.size(); ++idx) {
+  //   size_t f_old = circuit->face_indices_owned[idx];            // old/global-in-circuit face index
+  //   PetscInt f_local = circuit->face_old2new[f_old];            // contiguous index within circuit by owner-grouping
+  //   circuit->face_local_indices_owned.push_back(f_local);
+  // }
+
+  // (Optional) If you want local indices for ghost faces too:
+  // circuit->ghost_face_local_indices_owned.clear();
+  // for (size_t idx = 0; idx < circuit->ghost_face_indices_owned.size(); ++idx) {
+  //   size_t f_old = circuit->ghost_face_indices_owned[idx];
+  //   PetscInt f_local = circuit->face_old2new[f_old];
+  //   circuit->ghost_face_local_indices_owned.push_back(f_local);
+  // }
+
+  // Debug dump
+  {
+    std::ofstream fdbg("face_reindex_c" + std::to_string(cidx) +
+                       "_rank_" + std::to_string(cir_rank) + ".txt");
+    fdbg << "Rank " << cir_rank << ": face_counts/offsets\n";
+    for (int r = 0; r < cir_size; ++r) {
+      fdbg << "  r=" << r << " count=" << face_counts[r]
+           << " off=" << face_offsets[r] << "\n";
+    }
+    fdbg << "\nold -> new (by owner):\n";
+    for (size_t f = 0; f < circuit->faces.size(); ++f) {
+      const auto& face = circuit->faces[f];
+      fdbg << "  face_old=" << f
+           << " faceno=" << face->faceno
+           << " owner=" << face->owner
+           << " new=" << circuit->face_old2new[f] << "\n";
+    }
+  }
+}
 
 
 // --- PETSc create matrix and vectors with METIS partition sizes ---
@@ -726,22 +787,27 @@ PetscInt global_nrows = vertex_count; // same as nvtxs
     
 
     PetscInt n_faces_owned = circuit->face_indices_owned.size();
-    PetscInt n_faces_ghost = circuit->ghost_face_indices_owned.size();
+// ghost indices in PETSc global numbering
+circuit->ghost_face_global_indices.clear();
+for (auto f_old : circuit->ghost_face_indices_owned) {
+  circuit->ghost_face_global_indices.push_back(circuit->face_old2new[f_old]);
+}
+PetscInt n_faces_ghost = circuit->ghost_face_global_indices.size();
 
     // Create ghost vectors
     VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
-                   circuit->ghost_face_indices_owned.data(), &circuit->vflow_gues_local);
+                   circuit->ghost_face_global_indices.data(), &circuit->vflow_gues_local);
     VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
-                   circuit->ghost_face_indices_owned.data(), &circuit->aminus_local);
+                   circuit->ghost_face_global_indices.data(), &circuit->aminus_local);
     VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
-                   circuit->ghost_face_indices_owned.data(), &circuit->aplus_local);
+                   circuit->ghost_face_global_indices.data(), &circuit->aplus_local);
     VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
-                   circuit->ghost_face_indices_owned.data(), &circuit->bplus_local);
+                   circuit->ghost_face_global_indices.data(), &circuit->bplus_local);
     VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
-                   circuit->ghost_face_indices_owned.data(), &circuit->bminus_local);
+                   circuit->ghost_face_global_indices.data(), &circuit->bminus_local);
 
     VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
-               circuit->ghost_face_indices_owned.data(), &circuit->rhomass_local);
+               circuit->ghost_face_global_indices.data(), &circuit->rhomass_local);
 
 	PetscInt n_local = circuit->indices_owned.size();
     PetscInt nghost  = circuit->ghost_indices_owned.size();
