@@ -159,7 +159,7 @@ double PFace::eqn_mom(double x, double time, double delt, bool trans_sim, double
   }
 */
   double delp_gr = ther_gues->rhomass() * grav * delz; 
-  double term_old = ((1. - alpha_mom) * ((dnode->tpres_gues - unode->tpres_gues) //downstream.tpres_old - upstream.tpres_old
+  double term_old = ((1. - alpha_mom) * ((dnode->tpres_old - unode->tpres_old) //downstream.tpres_old - upstream.tpres_old
                     - vflow_old * vflow_old / (2. * cfarea * cfarea) * 0. //(downstream.rhomass_old - upstream.rhomass_old)
                     + ther_old->rhomass() * grav * delz
                     + fricfact_old * delx * ther_old->rhomass() * vflow_old * std::abs(vflow_old) / (2. * diameter * cfarea * cfarea)));

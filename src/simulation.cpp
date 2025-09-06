@@ -89,7 +89,7 @@ int opensd_run()
         int conv_global = 0;
         MPI_Allreduce(&conv_local, &conv_global, 1, MPI_INT, MPI_LAND, mpi::intracomm);
 
-        converged = (conv_global != 0);
+        converged = (conv_global != 0) and flow_iter > 10;
 
         // if (flow_iter == 0) {
           // MPI_Abort(mpi::intracomm, 0);
@@ -132,7 +132,7 @@ int opensd_run()
             // time, delt, trans_sim, alpha_mom, alpha_ener, "all", alpha_heat);
       }
 
-      if (converged) {
+      if (converged and main_iter > 10) {
         if (settings::temp_solve) {
           if (settings::verbosity >= 1 || (settings::verbosity >= 0 && !trans_sim)) {
               eps_h = 0.;
@@ -289,6 +289,7 @@ VecDestroy(&pc);
 VecDestroy(&circuit->pc_local);
 
 VecDestroy(&circuit->vflow_gues_local);
+VecDestroy(&circuit->vflow_old_local);
 VecDestroy(&circuit->aminus_local);
 VecDestroy(&circuit->aplus_local);
 VecDestroy(&circuit->bplus_local);
@@ -797,6 +798,8 @@ PetscInt n_faces_ghost = circuit->ghost_face_global_indices.size();
     // Create ghost vectors
     VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
                    circuit->ghost_face_global_indices.data(), &circuit->vflow_gues_local);
+    VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
+                   circuit->ghost_face_global_indices.data(), &circuit->vflow_old_local);
     VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
                    circuit->ghost_face_global_indices.data(), &circuit->aminus_local);
     VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
