@@ -62,7 +62,7 @@ public:
   Vec b;
   Vec pc;
   KSP ksp;
-  Vec vflow_gues_local, vflow_old_local, aminus_local, aplus_local, bplus_local, bminus_local;
+  Vec vflow_gues_local, aminus_local, aplus_local, bplus_local, bminus_local;
   Vec rhomass_local;
   Vec pc_local;
   Vec velocity_local;

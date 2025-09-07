@@ -293,7 +293,6 @@ VecDestroy(&pc);
 VecDestroy(&circuit->pc_local);
 
 VecDestroy(&circuit->vflow_gues_local);
-VecDestroy(&circuit->vflow_old_local);
 VecDestroy(&circuit->aminus_local);
 VecDestroy(&circuit->aplus_local);
 VecDestroy(&circuit->bplus_local);
@@ -803,8 +802,6 @@ PetscInt n_faces_ghost = circuit->ghost_face_global_indices.size();
     VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
                    circuit->ghost_face_global_indices.data(), &circuit->vflow_gues_local);
     VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
-                   circuit->ghost_face_global_indices.data(), &circuit->vflow_old_local);
-    VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
                    circuit->ghost_face_global_indices.data(), &circuit->aminus_local);
     VecCreateGhost(circuit_comm, n_faces_owned, PETSC_DECIDE, n_faces_ghost,
                    circuit->ghost_face_global_indices.data(), &circuit->aplus_local);
@@ -821,9 +818,6 @@ PetscInt n_faces_ghost = circuit->ghost_face_global_indices.size();
 		   
     VecCreateGhost(circuit_comm, n_local, PETSC_DECIDE, nghost,
                circuit->ghost_indices_owned.data(), &circuit->pc_local);
-
-    VecCreateGhost(circuit_comm, n_local, PETSC_DECIDE, nghost,
-               circuit->ghost_indices_owned.data(), &circuit->velocity_local);
 
     VecCreateGhost(circuit_comm, n_local, PETSC_DECIDE, nghost,
                circuit->ghost_indices_owned.data(), &circuit->velocity_local);

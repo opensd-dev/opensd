@@ -101,30 +101,15 @@ void update_old() {
       // std::cout << face->vflow_gues*face->ther_gues->rhomass() << std::endl;
     }
 
-PetscInt n_faces_owned = circuit->face_indices_owned.size();
-PetscInt n_faces_ghost = circuit->ghost_face_indices_owned.size();
-
-	  auto &vflow_old_local = circuit->vflow_old_local;
-      
-	  PetscScalar* vflow_old_array;
-      VecGetArray(vflow_old_local, &vflow_old_array);
-      for (PetscInt i = 0; i < n_faces_owned; ++i) {
-          vflow_old_array[i] = circuit->faces_owned[i]->vflow_old;
-      }
-      VecRestoreArray(vflow_old_local, &vflow_old_array);
-	  
-	  VecGhostUpdateBegin(vflow_old_local, INSERT_VALUES, SCATTER_FORWARD);
-      VecGhostUpdateEnd(vflow_old_local, INSERT_VALUES, SCATTER_FORWARD);
-	  
-	  const PetscScalar* vflow_old_array_read;
-      VecGetArrayRead(vflow_old_local, &vflow_old_array_read);
-
-for (size_t j = 0; j < circuit->ghost_face_indices_owned.size(); ++j) {
-  auto idx = circuit->ghost_face_indices_owned[j];
-  auto& face = circuit->faces[idx];
-  face->vflow_old  = vflow_old_array_read[n_faces_owned + j];
-}
-VecRestoreArrayRead(vflow_old_local, &vflow_old_array_read);
+    for (size_t j = 0; j < circuit->ghost_face_indices_owned.size(); ++j) {
+      auto idx = circuit->ghost_face_indices_owned[j];
+      auto& face = circuit->faces[idx];
+      // if (not face->choked) {
+        // face->ther_gues->update();
+      // }
+      // face->update_old();
+	  face->vflow_old = face->vflow_gues;
+    }
     
 	}
 }
