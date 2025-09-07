@@ -618,6 +618,13 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       auto& face = circuit->faces[idx];
       face->ther_gues->set_rhomass(rhomass_array_read[n_faces_owned + j]);
     
+  std::cout << "flag1 " << mpi::rank
+  << std::setprecision(12) << std::fixed
+            << " face=" << face->faceno
+            << " ther_gues_rhomass=" << face->ther_gues->rhomass()
+            << " ther_old_rhomass=" << face->ther_old->rhomass()
+            << std::endl;
+
       // std::cout << "flag1 " << mpi::rank
       //           << " face=" << face->faceno
       //           << " vflow_gues=" << face->vflow_gues

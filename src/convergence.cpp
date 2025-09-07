@@ -109,6 +109,7 @@ void update_old() {
       // }
       // face->update_old();
 	  face->vflow_old = face->vflow_gues;
+	  face->ther_old->set_rhomass(face->ther_gues->rhomass());
     }
     
 	}
