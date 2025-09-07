@@ -9,6 +9,7 @@
 namespace opensd {
     
 std::tuple<bool, std::tuple<double, double>> check_conv(double time, double delt, bool trans_sim, double alpha_mom, std::string opt = "all");
+void update_old();
 
 }
 

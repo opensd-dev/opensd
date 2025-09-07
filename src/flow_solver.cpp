@@ -254,16 +254,16 @@ for (size_t j = 0; j < circuit->ghost_face_indices_owned.size(); ++j) {
   face->bplus      = bplus_array_read[n_faces_owned + j];
   face->bminus     = bminus_array_read[n_faces_owned + j];
 
-  std::cout << "flag1 " << mpi::rank
-  << std::setprecision(12) << std::fixed
-            << " face=" << face->faceno
-            << " aminus=" << face->aminus
-            << " aplus=" << face->aplus
-            << " bplus=" << face->bplus
-            << " bminus=" << face->bminus
-            << " vflow_gues=" << face->vflow_gues
-            << " vflow_old=" << face->vflow_old
-            << std::endl;
+  // std::cout << "flag1 " << mpi::rank
+  // << std::setprecision(12) << std::fixed
+            // << " face=" << face->faceno
+            // << " aminus=" << face->aminus
+            // << " aplus=" << face->aplus
+            // << " bplus=" << face->bplus
+            // << " bminus=" << face->bminus
+            // << " vflow_gues=" << face->vflow_gues
+            // << " vflow_old=" << face->vflow_old
+            // << std::endl;
 }
 
 VecRestoreArrayRead(vflow_gues_local, &vflow_array_read);
@@ -561,7 +561,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     for (auto& node : circuit->ghost_nodes_owned1) {
       double relax = 0.6;
       node->tpres_gues = node->tpres_gues + relax * pc_array[k++];
-      // std::cout << "rank " << mpi::rank << " tpres " << node->tpres_gues << std::endl;
+      // std::cout << std::defaultfloat << std::setprecision(15) << "flag2 rank " << mpi::rank << " tpres_gues " << node->tpres_gues << " tpres_old " << node->tpres_old << std::endl;
       node->update_staticvar(node->velocity);
       node->ther_gues->update(CoolProp::HmassP_INPUTS, node->senth_gues, node->spres_gues);
     }

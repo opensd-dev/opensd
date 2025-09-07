@@ -89,7 +89,11 @@ int opensd_run()
         int conv_global = 0;
         MPI_Allreduce(&conv_local, &conv_global, 1, MPI_INT, MPI_LAND, mpi::intracomm);
 
-        converged = (conv_global != 0) and flow_iter > 10;
+        converged = (conv_global != 0);
+		
+		if (converged) {
+			update_old();
+		}
 
         // if (flow_iter == 0) {
           // MPI_Abort(mpi::intracomm, 0);
@@ -132,7 +136,7 @@ int opensd_run()
             // time, delt, trans_sim, alpha_mom, alpha_ener, "all", alpha_heat);
       }
 
-      if (converged and main_iter > 10) {
+      if (converged) {
         if (settings::temp_solve) {
           if (settings::verbosity >= 1 || (settings::verbosity >= 0 && !trans_sim)) {
               eps_h = 0.;
@@ -820,6 +824,12 @@ PetscInt n_faces_ghost = circuit->ghost_face_global_indices.size();
 
     VecCreateGhost(circuit_comm, n_local, PETSC_DECIDE, nghost,
                circuit->ghost_indices_owned.data(), &circuit->velocity_local);
+
+    VecCreateGhost(circuit_comm, n_local, PETSC_DECIDE, nghost,
+               circuit->ghost_indices_owned.data(), &circuit->velocity_local);
+
+    VecCreateGhost(circuit_comm, n_local, PETSC_DECIDE, nghost,
+               circuit->ghost_indices_owned.data(), &circuit->tpres_old_local);
 
   }
 

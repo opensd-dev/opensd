@@ -30,7 +30,7 @@ pkg_check_modules(PETSC REQUIRED IMPORTED_TARGET petsc)
 
 find_package(fmt REQUIRED)
 
-set(COOLPROP_STATIC_LIBRARY true)
+set(COOLPROP_STATIC_LIBRARY ON CACHE BOOL "Build static CoolProp library" FORCE)
 SET(EXENAME opensd)
 
 

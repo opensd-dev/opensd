@@ -72,6 +72,14 @@ std::tuple<bool, std::tuple<double, double>> check_conv(double time, double delt
   std::tuple<double, double> ret_args = std::make_tuple(eps_mtot, eps_ptot);
 
   if (condition) {
+    return std::make_tuple(true, ret_args);
+  } else {
+    return std::make_tuple(false, ret_args);
+  }
+
+}
+
+void update_old() {
     
     
     for (auto& circuit : model::circuits_owned) {
@@ -79,6 +87,32 @@ std::tuple<bool, std::tuple<double, double>> check_conv(double time, double delt
       node->update_old();
       // std::cout << node->identifier << " " << node->tpres_gues/1.E6 << std::endl;
     }
+	
+	PetscInt n_local = circuit->indices_owned.size();
+    PetscInt nghost  = circuit->ghost_indices_owned.size();
+	
+    auto &tpres_old_local = circuit->tpres_old_local;
+
+    PetscScalar* tpres_old_arr = nullptr;
+    VecGetArray(tpres_old_local, &tpres_old_arr);
+
+    for (PetscInt i = 0; i < n_local; ++i)
+      tpres_old_arr[i] = circuit->nodes_owned[i]->tpres_old;
+
+    VecRestoreArray(tpres_old_local, &tpres_old_arr);
+
+    VecGhostUpdateBegin(tpres_old_local, INSERT_VALUES, SCATTER_FORWARD);
+    VecGhostUpdateEnd(tpres_old_local, INSERT_VALUES, SCATTER_FORWARD);
+
+    const PetscScalar* tpres_old_arr_read;
+    VecGetArrayRead(tpres_old_local, &tpres_old_arr_read);
+
+    PetscInt offset = n_local;
+    for (PetscInt j = 0; j < nghost; ++j)
+      circuit->ghost_nodes_owned1[j]->tpres_old = tpres_old_arr_read[offset + j];
+
+    VecRestoreArrayRead(tpres_old_local, &tpres_old_arr_read);
+
 
     for (auto& face : circuit->faces_owned) {
       if (not face->choked) {
@@ -86,7 +120,8 @@ std::tuple<bool, std::tuple<double, double>> check_conv(double time, double delt
       }
       face->update_old();
       // std::cout << face->vflow_gues*face->ther_gues->rhomass() << std::endl;
-	  
+    }
+
 PetscInt n_faces_owned = circuit->face_indices_owned.size();
 PetscInt n_faces_ghost = circuit->ghost_face_indices_owned.size();
 
@@ -111,19 +146,8 @@ for (size_t j = 0; j < circuit->ghost_face_indices_owned.size(); ++j) {
   face->vflow_old  = vflow_old_array_read[n_faces_owned + j];
 }
 VecRestoreArrayRead(vflow_old_local, &vflow_old_array_read);
-
-
-	  
-    }
-
-
-    }
-
     
-    return std::make_tuple(true, ret_args);
-  } else {
-    return std::make_tuple(false, ret_args);
-  }
+	}
 }
 
 }
