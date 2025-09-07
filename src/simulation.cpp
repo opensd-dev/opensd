@@ -828,9 +828,6 @@ PetscInt n_faces_ghost = circuit->ghost_face_global_indices.size();
     VecCreateGhost(circuit_comm, n_local, PETSC_DECIDE, nghost,
                circuit->ghost_indices_owned.data(), &circuit->velocity_local);
 
-    VecCreateGhost(circuit_comm, n_local, PETSC_DECIDE, nghost,
-               circuit->ghost_indices_owned.data(), &circuit->tpres_old_local);
-
   }
 
 }

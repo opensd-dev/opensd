@@ -88,30 +88,9 @@ void update_old() {
       // std::cout << node->identifier << " " << node->tpres_gues/1.E6 << std::endl;
     }
 	
-	PetscInt n_local = circuit->indices_owned.size();
-    PetscInt nghost  = circuit->ghost_indices_owned.size();
-	
-    auto &tpres_old_local = circuit->tpres_old_local;
-
-    PetscScalar* tpres_old_arr = nullptr;
-    VecGetArray(tpres_old_local, &tpres_old_arr);
-
-    for (PetscInt i = 0; i < n_local; ++i)
-      tpres_old_arr[i] = circuit->nodes_owned[i]->tpres_old;
-
-    VecRestoreArray(tpres_old_local, &tpres_old_arr);
-
-    VecGhostUpdateBegin(tpres_old_local, INSERT_VALUES, SCATTER_FORWARD);
-    VecGhostUpdateEnd(tpres_old_local, INSERT_VALUES, SCATTER_FORWARD);
-
-    const PetscScalar* tpres_old_arr_read;
-    VecGetArrayRead(tpres_old_local, &tpres_old_arr_read);
-
-    PetscInt offset = n_local;
-    for (PetscInt j = 0; j < nghost; ++j)
-      circuit->ghost_nodes_owned1[j]->tpres_old = tpres_old_arr_read[offset + j];
-
-    VecRestoreArrayRead(tpres_old_local, &tpres_old_arr_read);
+    for (auto& node : circuit->ghost_nodes_owned1) {
+      node->update_old();
+    }
 
 
     for (auto& face : circuit->faces_owned) {

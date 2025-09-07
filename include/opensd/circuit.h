@@ -66,7 +66,6 @@ public:
   Vec rhomass_local;
   Vec pc_local;
   Vec velocity_local;
-  Vec tpres_old_local;
   MPI_Comm comm;
   int rank_in_comm, comm_size;
 
