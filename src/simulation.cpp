@@ -169,11 +169,11 @@ int opensd_run()
 
     // post.update_calcs(time, delt);
 
-    // if (flag_write) {
+    if (settings::flag_write) {
 	if (mpi::rank == 0) {
       writeOutput(simulation::current_time, simulation::delt);
 	}
-    // }
+    }
   }
   if (mpi::rank == 0) {
     std::cout << "Execution time = " << (std::clock() - start_time) / (double)CLOCKS_PER_SEC << std::endl;

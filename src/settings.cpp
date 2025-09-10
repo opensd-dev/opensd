@@ -23,6 +23,7 @@ namespace settings {
   int no_main_iter;
   int no_flow_iter;
   bool temp_solve;
+  bool flag_write {true};
   double conv_crit_flow {1.E-10};
 } // namespace settings
 
@@ -104,6 +105,7 @@ void read_settings_xml(pugi::xml_node root)
   no_main_iter = stod(get_node_value(root, "no_main_iter"));
   no_flow_iter = stod(get_node_value(root, "no_flow_iter"));
   // conv_crit_flow = stod(get_node_value(root, "conv_crit_flow"));
+  flag_write = get_node_value_bool(root, "flag_write");
 
   bool trans_sim = settings::run_mode == RunMode::TRANSIENT;
   if (trans_sim) {

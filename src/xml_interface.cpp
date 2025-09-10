@@ -1,6 +1,6 @@
 #include "opensd/xml_interface.h"
 
-// #include <fmt/core.h>
+#include <fmt/core.h>
 
 #include "opensd/error.h"
 #include "opensd/string_utils.h"
@@ -35,7 +35,7 @@ std::string get_node_value(
   return value;
 }
 
-/* bool get_node_value_bool(pugi::xml_node node, const char* name)
+bool get_node_value_bool(pugi::xml_node node, const char* name)
 {
   if (node.attribute(name)) {
     return node.attribute(name).as_bool();
@@ -48,7 +48,7 @@ std::string get_node_value(
   return false;
 }
 
-Position get_node_position(
+/* Position get_node_position(
   pugi::xml_node node, const char* name, bool lowercase)
 {
   vector<double> arr = get_node_array<double>(node, name, lowercase);

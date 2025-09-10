@@ -30,6 +30,7 @@ extern int no_main_iter;
 extern int no_flow_iter;
 extern double conv_crit_flow;
 extern bool temp_solve;
+extern bool flag_write;
 } // namespace settings
 
 //==============================================================================

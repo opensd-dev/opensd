@@ -50,6 +50,7 @@ class Settings:
         self._p_ambient = 1.E5
 
         self._temp_solve = True
+        self._flag_write = True
         self._conv_crit_temp_SS = 1.E-10
         self._conv_crit_temp_trans = self._conv_crit_temp_SS
 
@@ -112,6 +113,7 @@ class Settings:
         self._create_main_iter_subelement(element)
         self._create_flow_iter_subelement(element)
         self._create_temp_solve_subelement(element)
+        self._create_flag_write_subelement(element)
         
         # Clean the indentation in the file to be user-readable
         clean_indentation(element)
@@ -153,6 +155,10 @@ class Settings:
         elem = ET.SubElement(root, "temp_solve")
         elem.text = str(self._temp_solve)
 
+    def _create_flag_write_subelement(self, root):
+        elem = ET.SubElement(root, "flag_write")
+        elem.text = str(self._flag_write)
+
     def _no_main_iter_from_xml_element(self, root):
         text = get_text(root, 'no_main_iter')
         if text is not None:
@@ -176,6 +182,15 @@ class Settings:
     def temp_solve(self, temp_solve: bool):
         cv.check_type('temperature solver', temp_solve, bool)
         self._temp_solve = temp_solve
+
+    @property
+    def flag_write(self) -> bool:
+        return self._flag_write
+
+    @flag_write.setter
+    def flag_write(self, flag_write: bool):
+        cv.check_type('write outputs', flag_write, bool)
+        self._flag_write = flag_write
 
     @property
     def run_mode(self) -> str:
