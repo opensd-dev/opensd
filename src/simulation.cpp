@@ -298,6 +298,7 @@ VecDestroy(&circuit->aplus_local);
 VecDestroy(&circuit->bplus_local);
 VecDestroy(&circuit->bminus_local);
 VecDestroy(&circuit->velocity_local);
+VecDestroy(&circuit->rhomass_local);
 
 }
 
