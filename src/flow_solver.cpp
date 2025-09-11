@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include "opensd/vector.h"
 #include "opensd/message_passing.h"
+#include "opensd/settings.h"
 #include "opensd/timer.h"
 
 #include "opensd/circuit.h"
@@ -95,7 +96,9 @@ Eigen::VectorXd insertZerosAtIndices(const Eigen::VectorXd& vec, const std::vect
 //==============================================================================
 
 void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int main_iter, std::shared_ptr<Circuit> circuit) {
-  std::ofstream fout("vflow_rank" + std::to_string(mpi::rank) + ".txt");
+  std::ofstream fout;
+  if (settings::verbosity >= 6)
+    std::ofstream fout("vflow_rank" + std::to_string(mpi::rank) + ".txt");
   // for (auto& branch : circuit->branches) { // Guess flow rate calculation
   for (auto& face : circuit->faces_owned) {
     // branch.choked = false;
@@ -156,12 +159,14 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
         // }
       // }
       face->update_abcoef(time, delt, trans_sim, alpha_mom);
-      fout << "face " << face->faceno << " " << std::setprecision(12) << std::fixed
+      if (settings::verbosity >= 6)
+        fout << "face " << face->faceno << " " << std::setprecision(12) << std::fixed
        << " vflow_gues " << face->vflow_gues << " vflow_old " << face->vflow_old << "\n";
 
       // std::cout << face->vflow_gues << std::endl;
   }
-  fout.close();
+  if (settings::verbosity >= 6)
+    fout.close();
 PetscInt n_faces_owned = circuit->face_indices_owned.size();
 PetscInt n_faces_ghost = circuit->ghost_face_indices_owned.size();
 
@@ -418,7 +423,9 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
 
     // Prepare file for writing (one file per rank)
-    std::ofstream fout("vflow_rank_" + std::to_string(mpi::rank) + ".txt");
+    std::ofstream fout;
+    if (settings::verbosity >= 6)
+      std::ofstream fout("vflow_rank_" + std::to_string(mpi::rank) + ".txt");
     
     // Create ghost vector
     PetscInt n_local = circuit->indices_owned.size();
@@ -569,15 +576,16 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
     // fout.close();
 
-
-    std::ofstream fout1("tpres_rank_" + std::to_string(mpi::rank) + ".txt");
-    for (auto& node : circuit->nodes_owned) {
-      fout1 << node->identifier << " " << std::setprecision(8) << std::fixed << node->tpres_gues << " " << node->tpres_old << "\n";
+    if (settings::verbosity >= 6) {
+      std::ofstream fout1("tpres_rank_" + std::to_string(mpi::rank) + ".txt");
+      for (auto& node : circuit->nodes_owned) {
+        fout1 << node->identifier << " " << std::setprecision(8) << std::fixed << node->tpres_gues << " " << node->tpres_old << "\n";
+      }
+      for (auto& node : circuit->ghost_nodes_owned1) {
+        fout1 << "(ghost) " << node->identifier << " " << node->tpres_gues << " " << node->tpres_old << "\n";
+      }
+      fout1.close();
     }
-    for (auto& node : circuit->ghost_nodes_owned1) {
-      fout1 << "(ghost) " << node->identifier << " " << node->tpres_gues << " " << node->tpres_old << "\n";
-    }
-    fout1.close();
     
     VecRestoreArrayRead(pc_local, &pc_array);
 
@@ -626,13 +634,14 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
     }
     
-    for (auto& face : circuit->faces_owned) {
-      fout << "face " << face->faceno << " " << std::setprecision(12) << std::fixed << face->velocity << std::endl;
+    if (settings::verbosity >= 6) {
+      for (auto& face : circuit->faces_owned) {
+        fout << "face " << face->faceno << " " << std::setprecision(12) << std::fixed << face->velocity << std::endl;
+      }
+      fout.close();
     }
 
     VecRestoreArrayRead(rhomass_local, &rhomass_array_read);
-
-    fout.close();
 
   }
   simulation::time_massmom.stop();

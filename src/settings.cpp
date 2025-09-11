@@ -16,7 +16,7 @@ namespace settings {
 
   std::string path_input;
   RunMode run_mode {RunMode::UNSET};
-  int verbosity {0};
+  int verbosity {2};
   double alpha_mom;
   double alpha_ener;
   vector<double> tim_slot;
