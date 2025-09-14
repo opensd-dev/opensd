@@ -16,6 +16,10 @@ namespace simulation {
 extern Timer time_finalize;
 extern Timer time_massmom;
 extern Timer time_total;
+extern Timer time_pressure_correction;
+extern Timer time_guess_flow;
+extern Timer time_convergence;
+extern Timer time_update_old;
 
 } // namespace simulation
 

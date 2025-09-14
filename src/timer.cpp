@@ -11,6 +11,10 @@ namespace simulation {
 Timer time_finalize;
 Timer time_total;
 Timer time_massmom;
+Timer time_convergence;
+Timer time_pressure_correction;
+Timer time_guess_flow;
+Timer time_update_old;
 
 } // namespace simulation
 
@@ -55,6 +59,10 @@ void reset_timers()
   simulation::time_finalize.reset();
   simulation::time_massmom.reset();
   simulation::time_total.reset();
+  simulation::time_guess_flow.reset();
+  simulation::time_pressure_correction.reset();
+  simulation::time_convergence.reset();
+  simulation::time_update_old.reset();
 }
 
 } // namespace opensd

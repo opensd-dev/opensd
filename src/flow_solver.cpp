@@ -286,9 +286,12 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
   for (auto& circuit : model::circuits_owned) {
     // if (!trans_sim && !circuit->solveSS) continue;
     // std::cout << circuit->identifier << std::endl;
+	simulation::time_guess_flow.start();
     guess_flow(time, delt, trans_sim, alpha_mom, main_iter, circuit);
+	simulation::time_guess_flow.stop();
     // std::ofstream fout("abcoef_rank_" + std::to_string(mpi::rank) + ".txt");
 
+	simulation::time_pressure_correction.start();
     // Pressure corrections
     auto &A = circuit->A; 
     auto &b = circuit->b; 
@@ -639,6 +642,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     VecRestoreArrayRead(rhomass_local, &rhomass_array_read);
 
   }
+  simulation::time_pressure_correction.stop();
   simulation::time_massmom.stop();
 }
 

@@ -65,15 +65,18 @@ int opensd_run()
       
       for (int flow_iter = 0; flow_iter < settings::no_flow_iter; ++flow_iter) {
         exec_massmom(simulation::current_time, simulation::delt, trans_sim, alpha_mom, main_iter, flow_iter);
+		simulation::time_convergence.start();
         // if (mpi::rank == 0) {
           std::tuple<bool, std::tuple<double, double>> result = check_conv(simulation::current_time, simulation::delt, trans_sim, alpha_mom, "massmom");
           bool converged_local = std::get<0>(result);
           std::tie(eps_m, eps_p) = std::get<1>(result);
 		// }
 
-        std::ofstream fout("convergence_rank_" + std::to_string(mpi::rank) + ".txt");
-        fout << "massmom iteration " << flow_iter + 1 << " eps_m=" << eps_m << " eps_p=" << eps_p << std::endl;
-        fout.close();
+		if (settings::verbosity >= 6) {
+          std::ofstream fout("convergence_rank_" + std::to_string(mpi::rank) + ".txt");
+          fout << "massmom iteration " << flow_iter + 1 << " eps_m=" << eps_m << " eps_p=" << eps_p << std::endl;
+          fout.close();
+		}
 
         PetscReal eps_m_local = eps_m;
         PetscReal eps_p_local = eps_p;
@@ -90,10 +93,13 @@ int opensd_run()
         MPI_Allreduce(&conv_local, &conv_global, 1, MPI_INT, MPI_LAND, mpi::intracomm);
 
         converged = (conv_global != 0);
+		simulation::time_convergence.stop();
 		
+		simulation::time_update_old.start();
 		if (converged) {
 			update_old();
 		}
+		simulation::time_update_old.stop();
 
         // if (flow_iter == 0) {
           // MPI_Abort(mpi::intracomm, 0);
