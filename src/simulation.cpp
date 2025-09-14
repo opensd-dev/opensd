@@ -50,11 +50,11 @@ int opensd_run()
     simulation::current_time = settings::tim_slot[i];
     
     bool trans_sim = settings::run_mode == RunMode::TRANSIENT;
-	double alpha_mom = settings::alpha_mom;
     if (trans_sim) {
       simulation::delt = settings::tim_slot[i] - settings::tim_slot[i-1];
-	  alpha_mom = 0.6;
+	  settings::alpha_mom = 0.6;
     }
+	double alpha_mom = settings::alpha_mom;
     if (mpi::rank == 0) {
     if (settings::verbosity >= 1) std::cout << "time=" << std::setprecision(5) << simulation::current_time << " ";
     }
@@ -305,6 +305,14 @@ VecDestroy(&circuit->bplus_local);
 VecDestroy(&circuit->bminus_local);
 VecDestroy(&circuit->velocity_local);
 VecDestroy(&circuit->rhomass_local);
+
+// Clean up SNES
+// MatDestroy(&J);
+SNESDestroy(&circuit->snes);
+// Use defaults (later override with -snes_fd or -snes_mf_operator from CLI)
+SNESSetFromOptions(&circuit->snes);
+VecDestroy(&circuit->x);
+VecDestroy(&circuit->r);
 
 }
 
@@ -833,6 +841,15 @@ PetscInt n_faces_ghost = circuit->ghost_face_global_indices.size();
 
     VecCreateGhost(circuit_comm, n_local, PETSC_DECIDE, nghost,
                circuit->ghost_indices_owned.data(), &circuit->velocity_local);
+   
+    auto &snes = circuit->snes; 
+    auto &x = circuit->x;
+    auto &r = circuit->r;
+    SNESCreate(circuit->comm, &snes);
+
+  // Create solution vector (owned + ghosts)
+  VecDuplicate(circuit->vflow_gues_local, &x);
+  VecDuplicate(circuit->vflow_gues_local, &r);
 
   }
 
