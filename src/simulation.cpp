@@ -790,6 +790,11 @@ PetscInt global_nrows = vertex_count; // same as nvtxs
     VecSetSizes(pc, local_nrows, global_nrows);
     VecSetFromOptions(pc);
     
+    auto &ksp = circuit->ksp; 
+    
+    KSPCreate(circuit->comm, &ksp);
+    KSPSetOperators(ksp, A, A);
+    KSPSetFromOptions(ksp);
 
     PetscInt n_faces_owned = circuit->face_indices_owned.size();
 // ghost indices in PETSc global numbering

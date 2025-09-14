@@ -402,12 +402,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     // PetscViewerDestroy(&viewerB);
 
 
-    auto &ksp = circuit->ksp; 
-    
-    KSPCreate(circuit->comm, &ksp);
-    KSPSetOperators(ksp, A, A);
-    KSPSetFromOptions(ksp);
-    KSPSolve(ksp, b, pc);
+    KSPSolve(circuit->ksp, b, pc);
     
     // PetscViewer viewer;
     // PetscViewerASCIIOpen(PETSC_COMM_WORLD, "pc_output.txt", &viewer);
