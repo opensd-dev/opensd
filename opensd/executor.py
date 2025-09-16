@@ -1,6 +1,6 @@
 import subprocess
 
-def _process_CLI_arguments(opensd_exec='opensd', mpi_args=None):
+def _process_CLI_arguments(opensd_exec='opensd', mpi_args=None, petsc_args = None):
     """Converts user-readable flags in to command-line arguments to be run with
     the OpenSD executable via subprocess.
 
@@ -23,6 +23,9 @@ def _process_CLI_arguments(opensd_exec='opensd', mpi_args=None):
 
     if mpi_args is not None:
         args = mpi_args + args
+
+    if petsc_args is not None:
+        args += petsc_args
 
     return args
 
@@ -58,7 +61,7 @@ def _run(args, output, cwd):
 
         # raise RuntimeError(error_msg)
 
-def run(output=True, cwd='.', opensd_exec='opensd', mpi_args=None):
+def run(output=True, cwd='.', opensd_exec='opensd', mpi_args=None, petsc_args=None):
     """Run an OpenSD simulation.
 
     Parameters
@@ -80,6 +83,6 @@ def run(output=True, cwd='.', opensd_exec='opensd', mpi_args=None):
         If the `opensd` executable returns a non-zero status
 
     """
-    args = _process_CLI_arguments(opensd_exec=opensd_exec, mpi_args=mpi_args)
+    args = _process_CLI_arguments(opensd_exec=opensd_exec, mpi_args=mpi_args, petsc_args=petsc_args)
 
     _run(args, output, cwd)

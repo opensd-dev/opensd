@@ -119,13 +119,8 @@ void guess_flow1(double time, double delt, bool trans_sim,
   }
   VecRestoreArray(x, &x_array);
 
-  // Create SNES solver
-  SNESSetFunction(snes, r, FormFunction, circuit.get());
 
-  // Optional: use matrix-free Jacobian
-  // Mat J;
-  // MatCreateSNESMF(snes, &J);
-  // SNESSetJacobian(snes, J, J, SNESComputeJacobianDefault, nullptr);
+  SNESSetFunction(snes, r, FormFunction, circuit.get());
 
   // Solve F(x)=0
   SNESSolve(snes, NULL, x);
