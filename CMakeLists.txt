@@ -29,6 +29,7 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(PETSC REQUIRED IMPORTED_TARGET petsc)
 
 find_package(fmt REQUIRED)
+find_package(GSL REQUIRED)
 
 set(COOLPROP_STATIC_LIBRARY ON CACHE BOOL "Build static CoolProp library" FORCE)
 SET(EXENAME opensd)
@@ -105,6 +106,8 @@ target_link_libraries(${EXENAME}
     PkgConfig::PETSC
     fmt::fmt-header-only
 	${METIS_LIBRARY}
+	GSL::gsl
+	GSL::gslcblas
 )
 
 # if (OPENSD_USE_MPI)

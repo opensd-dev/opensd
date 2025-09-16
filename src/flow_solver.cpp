@@ -19,6 +19,8 @@
 // #include <petscksp.h>
 // #include <petscsnes.h>
 #include <fstream>
+#include <gsl/gsl_errno.h>
+#include <gsl/gsl_roots.h>
 
 namespace opensd {
 
@@ -29,6 +31,86 @@ namespace opensd {
 //==============================================================================
 // Non-member functions
 //==============================================================================
+
+// Wrapper for a single face equation
+struct FaceWrapper {
+  std::shared_ptr<Face> face;
+  double time;
+  double delt;
+  bool trans_sim;
+  double alpha_mom;
+};
+
+// Define the residual f(x) for one face
+double face_residual(double x, void* params) {
+  auto* fw = static_cast<FaceWrapper*>(params);
+
+  // Example: call your existing residual calculation here
+  return fw->face->eqn_mom(x, fw->time, fw->delt,
+                                    fw->trans_sim, fw->alpha_mom);
+}
+
+// Solve nonlinear equation for one face using GSL
+double solve_face(FaceWrapper& fw, double x_guess) {
+  const gsl_root_fsolver_type* T;
+  gsl_root_fsolver* s;
+
+  gsl_function F;
+  F.function = &face_residual;
+  F.params = &fw;
+
+  // Choose solver type
+  T = gsl_root_fsolver_brent;
+  s = gsl_root_fsolver_alloc(T);
+
+  // Initial bracket: you must provide [x_lo, x_hi] that contains the root
+  double x_lo = -1.E5;
+  double x_hi = 1.E5;
+  gsl_root_fsolver_set(s, &F, x_lo, x_hi);
+
+  int status;
+  int iter = 0, max_iter = 100;
+  double r = x_guess;
+
+  do {
+    iter++;
+    status = gsl_root_fsolver_iterate(s);
+    r = gsl_root_fsolver_root(s);
+    x_lo = gsl_root_fsolver_x_lower(s);
+    x_hi = gsl_root_fsolver_x_upper(s);
+
+    status = gsl_root_test_interval(x_lo, x_hi, 1e-8, 0.0);
+  } while (status == GSL_CONTINUE && iter < max_iter);
+
+  gsl_root_fsolver_free(s);
+  return r;
+}
+
+
+// Rewritten guess_flow1
+void guess_flow1(double time, double delt, bool trans_sim,
+                 double alpha_mom, int main_iter, std::shared_ptr<Circuit> circuit) {
+
+  PetscInt n_faces_owned = circuit->face_indices_owned.size();
+
+  for (PetscInt i = 0; i < n_faces_owned; ++i) {
+    FaceWrapper fw {circuit->faces_owned[i], time, delt, trans_sim, alpha_mom};
+
+    double guess = circuit->faces_owned[i]->vflow_gues;
+    double root = solve_face(fw, guess);
+
+    circuit->faces_owned[i]->vflow_gues = root;
+
+    // Apply small-value correction
+    if (std::abs(root) < 1.E-8 && main_iter == 0) {
+      auto& g = circuit->faces_owned[i]->vflow_gues;
+      g = 1.E-8 * std::copysign(1.0, g);
+      if (g == 0.0) g = 1.E-8;
+    }
+
+    circuit->faces_owned[i]->update_abcoef(time, delt, trans_sim, alpha_mom);
+  }
+}
 
 // Residual function for SNES (momentum equations on all owned faces)
 PetscErrorCode FormFunction(SNES snes, Vec x, Vec f, void* ctx) {
@@ -276,7 +358,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     // if (!trans_sim && !circuit->solveSS) continue;
     // std::cout << circuit->identifier << std::endl;
 	simulation::time_guess_flow.start();
-    guess_flow(time, delt, trans_sim, alpha_mom, main_iter, circuit);
+    guess_flow1(time, delt, trans_sim, alpha_mom, main_iter, circuit);
     update_ghost_face(circuit);
 	simulation::time_guess_flow.stop();
     // std::ofstream fout("abcoef_rank_" + std::to_string(mpi::rank) + ".txt");
