@@ -25,48 +25,10 @@ namespace opensd {
 //==============================================================================
 // Global variables
 //==============================================================================
-using MatrixR = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
-// Define the nonlinear function for the face's momentum equation
-struct FaceFunctor {
-  using Scalar = double;
-  using InputType = Eigen::VectorXd;
-  using ValueType = Eigen::VectorXd;
-  using JacobianType = Eigen::MatrixXd;
-  enum { InputsAtCompileTime = 1, ValuesAtCompileTime = 1 };  
-  
-  // Constructor to initialize with parameters
-  FaceFunctor(double time, double delt, bool trans_sim, double alpha_mom, std::shared_ptr<Face> face)
-    : time(time), delt(delt), trans_sim(trans_sim), alpha_mom(alpha_mom), face(face) {}
-
-  // Function to be solved: returns f(x)
-  int operator()(const Eigen::VectorXd &x, Eigen::VectorXd &fvec) const {
-    // Replace with the actual momentum equation
-    double vflow_gues = x(0);
-    fvec(0) = face->eqn_mom(vflow_gues,time,delt,trans_sim,alpha_mom);/* momentum equation involving vflow_gues and other parameters */;
-    return 0;
-  }
-
-/* 
-  // Optionally provide the Jacobian
-  int df(const Eigen::VectorXd &x, Eigen::MatrixXd &fjac) const {
-    // Derivative of the momentum equation with respect to vflow_gues
-    fjac(0, 0) = // derivative of momentum equation ;
-    return 0;
-  }
-
- */
-  int inputs() const { return 1; }
-  int values() const { return 1; }
-
-private:
-  double time;
-  double delt;
-  bool trans_sim;
-  double alpha_mom;
-  std::shared_ptr<Face> face;
-};
-
+//==============================================================================
+// Non-member functions
+//==============================================================================
 
 // Residual function for SNES (momentum equations on all owned faces)
 PetscErrorCode FormFunction(SNES snes, Vec x, Vec f, void* ctx) {
@@ -99,14 +61,43 @@ PetscErrorCode FormFunction(SNES snes, Vec x, Vec f, void* ctx) {
   return 0;
 }
 
-// ---------------------------------------------------------------------------
-// Replacement for guess_flow using PETSc SNES
-// ---------------------------------------------------------------------------
-void guess_flow1(double time, double delt, bool trans_sim,
-                double alpha_mom, int main_iter, std::shared_ptr<Circuit> circuit) {
+void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int main_iter, std::shared_ptr<Circuit> circuit) {
+  std::ofstream fout;
+  if (settings::verbosity >= 6)
+    std::ofstream fout("vflow_rank" + std::to_string(mpi::rank) + ".txt");
+  // for (auto& branch : circuit->branches) { // Guess flow rate calculation
+  // for (auto& face : circuit->faces_owned) {
+    // branch.choked = false;
+    // for (auto face = branch.faces.rbegin(); face != branch.faces.rend(); ++face) { // Reverse iteration
+      // face.choked = false;
+      // if (circuit->fllib == "CoolProp" && circuit->flname != "Air" && circuit->flname != "Nitrogen") {
+        // face.update_Gcr();
+      // }
+      // if (!branch.choked && face.dnode->spres_gues < face.pcr && dynamic_cast<turbo_comp::Turbine*>(&face) == nullptr) {
+        // branch.choked = true;
+        // face.choked = true;
+        // face.spres_gues = face.pcr;
+        // face.stemp_gues = face.ther_cr.T();
+        // face.ther_gues.update(face.ther_cr);
+        // face.velocity = face.Gcr / face.ther_gues.rhomass();
+        // face.tpres_gues = face.spres_gues + 0.5 * face.ther_gues.rhomass() * std::pow(face.velocity, 2);
+        // face.ttemp_gues = face.stemp_gues + 0.5 * std::pow(face.velocity, 2) / face.ther_gues.cpmass();
+        // for (int i = 0; i < 100; ++i) {
+          // face.unode->update_staticvar();
+          // face.unode->ther_gues.update(CoolProp::HmassP_INPUTS, face.unode->senth_gues, face.unode->spres_gues);
+          // face.dnode->update_staticvar();
+          // face.dnode->ther_gues.update(CoolProp::HmassP_INPUTS, face.dnode->senth_gues, face.dnode->spres_gues);
+        // }
+        // face.G = face.Gcr;
+        // face.vflow_gues = face.G * face.cfarea * face.opening / face.ther_gues.rhomass();
+      // }
+  // }
+// }
+// }
+  
 
   PetscInt n_faces_owned = circuit->face_indices_owned.size();
-  
+
   auto &x = circuit->x;
   auto &r = circuit->r;
   auto &snes = circuit->snes;
@@ -131,67 +122,6 @@ void guess_flow1(double time, double delt, bool trans_sim,
   for (PetscInt i = 0; i < n_faces_owned; ++i) {
     circuit->faces_owned[i]->vflow_gues = sol_array[i];
 
-    // Apply your small-value correction
-    if (std::abs(circuit->faces_owned[i]->vflow_gues) < 1.E-8 && main_iter == 0) {
-      auto& g = circuit->faces_owned[i]->vflow_gues;
-      g = 1.E-8 * std::copysign(1.0, g);
-      if (g == 0.0) g = 1.E-8;
-    }
-
-    circuit->faces_owned[i]->update_abcoef(time, delt, trans_sim, alpha_mom);
-  }
-  VecRestoreArrayRead(x, &sol_array);
-
-}
-
-//==============================================================================
-// Non-member functions
-//==============================================================================
-
-void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int main_iter, std::shared_ptr<Circuit> circuit) {
-  std::ofstream fout;
-  if (settings::verbosity >= 6)
-    std::ofstream fout("vflow_rank" + std::to_string(mpi::rank) + ".txt");
-  // for (auto& branch : circuit->branches) { // Guess flow rate calculation
-  for (auto& face : circuit->faces_owned) {
-    // branch.choked = false;
-    // for (auto face = branch.faces.rbegin(); face != branch.faces.rend(); ++face) { // Reverse iteration
-      // face.choked = false;
-      // if (circuit->fllib == "CoolProp" && circuit->flname != "Air" && circuit->flname != "Nitrogen") {
-        // face.update_Gcr();
-      // }
-      // if (!branch.choked && face.dnode->spres_gues < face.pcr && dynamic_cast<turbo_comp::Turbine*>(&face) == nullptr) {
-        // branch.choked = true;
-        // face.choked = true;
-        // face.spres_gues = face.pcr;
-        // face.stemp_gues = face.ther_cr.T();
-        // face.ther_gues.update(face.ther_cr);
-        // face.velocity = face.Gcr / face.ther_gues.rhomass();
-        // face.tpres_gues = face.spres_gues + 0.5 * face.ther_gues.rhomass() * std::pow(face.velocity, 2);
-        // face.ttemp_gues = face.stemp_gues + 0.5 * std::pow(face.velocity, 2) / face.ther_gues.cpmass();
-        // for (int i = 0; i < 100; ++i) {
-          // face.unode->update_staticvar();
-          // face.unode->ther_gues.update(CoolProp::HmassP_INPUTS, face.unode->senth_gues, face.unode->spres_gues);
-          // face.dnode->update_staticvar();
-          // face.dnode->ther_gues.update(CoolProp::HmassP_INPUTS, face.dnode->senth_gues, face.dnode->spres_gues);
-        // }
-        // face.G = face.Gcr;
-        // face.vflow_gues = face.G * face.cfarea * face.opening / face.ther_gues.rhomass();
-      // } else {
-  
-        Eigen::VectorXd x(1);
-        x(0) = face->vflow_gues;
-  
-        FaceFunctor functor(time, delt, trans_sim, alpha_mom, face);
-        Eigen::NumericalDiff<FaceFunctor> numDiff(functor);
-        Eigen::LevenbergMarquardt<Eigen::NumericalDiff<FaceFunctor>> lm(numDiff);
-  
-        int info = lm.minimize(x);
-        if (info <= 0) {
-          std::cerr << "LM failed to converge: info = " << info << std::endl;
-        }
-        
-        face->vflow_gues = x(0);
 //        auto pface = std::static_pointer_cast<PFace>(face);
 //        std::cout << std::defaultfloat << std::setprecision(10) << "pdnode = "   << pface->dnode->tpres_gues << std::endl;
   
@@ -200,24 +130,26 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
           // face.vflow_gues = 0.0;
           // continue;
         // }
-        if (std::abs(face->vflow_gues) < 1.E-8 && main_iter == 0) { // Tune the value 1.E-8 as needed
-          face->vflow_gues = 1.E-8 * std::copysign(1.0, face->vflow_gues);
-          if (face->vflow_gues == 0.0) {
-            face->vflow_gues = 1.E-8;
-          }
-        }
+
+    // Apply your small-value correction. Tune the value 1.E-8 as needed
+    if (std::abs(circuit->faces_owned[i]->vflow_gues) < 1.E-8 && main_iter == 0) {
+      auto& g = circuit->faces_owned[i]->vflow_gues;
+      g = 1.E-8 * std::copysign(1.0, g);
+      if (g == 0.0) g = 1.E-8;
+    }
         // std::cout << face.vflow_gues << std::endl;
         // if (dynamic_cast<PFace*>(&face) != nullptr || dynamic_cast<or_comp::Orifice*>(&face) != nullptr) {
           // face.G = face.vflow_gues * face.ther_gues.rhomass() / (face.cfarea * face.opening);
         // }
       // }
-      face->update_abcoef(time, delt, trans_sim, alpha_mom);
+      circuit->faces_owned[i]->update_abcoef(time, delt, trans_sim, alpha_mom);
       if (settings::verbosity >= 6)
-        fout << "face " << face->faceno << " " << std::setprecision(12) << std::fixed
-       << " vflow_gues " << face->vflow_gues << " vflow_old " << face->vflow_old << "\n";
+        fout << "face " << circuit->faces_owned[i]->faceno << " " << std::setprecision(12) << std::fixed
+       << " vflow_gues " << circuit->faces_owned[i]->vflow_gues << " vflow_old " << circuit->faces_owned[i]->vflow_old << "\n";
 
       // std::cout << face->vflow_gues << std::endl;
-  }
+}
+VecRestoreArrayRead(x, &sol_array);
   if (settings::verbosity >= 6)
     fout.close();
 
@@ -344,7 +276,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     // if (!trans_sim && !circuit->solveSS) continue;
     // std::cout << circuit->identifier << std::endl;
 	simulation::time_guess_flow.start();
-    guess_flow1(time, delt, trans_sim, alpha_mom, main_iter, circuit);
+    guess_flow(time, delt, trans_sim, alpha_mom, main_iter, circuit);
     update_ghost_face(circuit);
 	simulation::time_guess_flow.stop();
     // std::ofstream fout("abcoef_rank_" + std::to_string(mpi::rank) + ".txt");
