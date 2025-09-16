@@ -87,62 +87,6 @@ double solve_face(FaceWrapper& fw, double x_guess) {
 }
 
 
-// Rewritten guess_flow1
-void guess_flow1(double time, double delt, bool trans_sim,
-                 double alpha_mom, int main_iter, std::shared_ptr<Circuit> circuit) {
-
-  PetscInt n_faces_owned = circuit->face_indices_owned.size();
-
-  for (PetscInt i = 0; i < n_faces_owned; ++i) {
-    FaceWrapper fw {circuit->faces_owned[i], time, delt, trans_sim, alpha_mom};
-
-    double guess = circuit->faces_owned[i]->vflow_gues;
-    double root = solve_face(fw, guess);
-
-    circuit->faces_owned[i]->vflow_gues = root;
-
-    // Apply small-value correction
-    if (std::abs(root) < 1.E-8 && main_iter == 0) {
-      auto& g = circuit->faces_owned[i]->vflow_gues;
-      g = 1.E-8 * std::copysign(1.0, g);
-      if (g == 0.0) g = 1.E-8;
-    }
-
-    circuit->faces_owned[i]->update_abcoef(time, delt, trans_sim, alpha_mom);
-  }
-}
-
-// Residual function for SNES (momentum equations on all owned faces)
-PetscErrorCode FormFunction(SNES snes, Vec x, Vec f, void* ctx) {
-  auto* circuit = static_cast<Circuit*>(ctx);
-  const PetscScalar* x_array;
-  PetscScalar* f_array;
-
-  PetscInt n_faces_owned = circuit->face_indices_owned.size();
-
-  VecGetArrayRead(x, &x_array);
-  VecGetArray(f, &f_array);
-
-  for (PetscInt i = 0; i < n_faces_owned; ++i) {
-    auto& face = circuit->faces_owned[i];
-    double vflow_gues = x_array[i];
-
-	bool trans_sim = settings::run_mode == RunMode::TRANSIENT;
-
-    // Residual = momentum equation for this face
-    f_array[i] = face->eqn_mom(vflow_gues,
-                               simulation::current_time,
-                               simulation::delt,
-                               trans_sim,
-                               settings::alpha_mom);
-  }
-
-  VecRestoreArrayRead(x, &x_array);
-  VecRestoreArray(f, &f_array);
-
-  return 0;
-}
-
 void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int main_iter, std::shared_ptr<Circuit> circuit) {
   std::ofstream fout;
   if (settings::verbosity >= 6)
@@ -180,29 +124,15 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
 
   PetscInt n_faces_owned = circuit->face_indices_owned.size();
 
-  auto &x = circuit->x;
-  auto &r = circuit->r;
-  auto &snes = circuit->snes;
 
-  // Load initial guesses from Face objects
-  PetscScalar* x_array;
-  VecGetArray(x, &x_array);
+
   for (PetscInt i = 0; i < n_faces_owned; ++i) {
-    x_array[i] = circuit->faces_owned[i]->vflow_gues;
-  }
-  VecRestoreArray(x, &x_array);
+    FaceWrapper fw {circuit->faces_owned[i], time, delt, trans_sim, alpha_mom};
 
+    double guess = circuit->faces_owned[i]->vflow_gues;
+    double root = solve_face(fw, guess);
 
-  SNESSetFunction(snes, r, FormFunction, circuit.get());
-
-  // Solve F(x)=0
-  SNESSolve(snes, NULL, x);
-
-  // Copy solution back into face objects
-  const PetscScalar* sol_array;
-  VecGetArrayRead(x, &sol_array);
-  for (PetscInt i = 0; i < n_faces_owned; ++i) {
-    circuit->faces_owned[i]->vflow_gues = sol_array[i];
+    circuit->faces_owned[i]->vflow_gues = root;
 
 //        auto pface = std::static_pointer_cast<PFace>(face);
 //        std::cout << std::defaultfloat << std::setprecision(10) << "pdnode = "   << pface->dnode->tpres_gues << std::endl;
@@ -231,7 +161,6 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
 
       // std::cout << face->vflow_gues << std::endl;
 }
-VecRestoreArrayRead(x, &sol_array);
   if (settings::verbosity >= 6)
     fout.close();
 
@@ -358,7 +287,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     // if (!trans_sim && !circuit->solveSS) continue;
     // std::cout << circuit->identifier << std::endl;
 	simulation::time_guess_flow.start();
-    guess_flow1(time, delt, trans_sim, alpha_mom, main_iter, circuit);
+    guess_flow(time, delt, trans_sim, alpha_mom, main_iter, circuit);
     update_ghost_face(circuit);
 	simulation::time_guess_flow.stop();
     // std::ofstream fout("abcoef_rank_" + std::to_string(mpi::rank) + ".txt");

@@ -68,9 +68,6 @@ public:
   Vec pc_local;
   Vec velocity_local;
   MPI_Comm comm;
-  SNES snes;
-  Vec x, r;
-  Mat J;
   int rank_in_comm, comm_size;
 
   void save_to_hdf5(hid_t group_id) const;

@@ -306,13 +306,6 @@ VecDestroy(&circuit->bminus_local);
 VecDestroy(&circuit->velocity_local);
 VecDestroy(&circuit->rhomass_local);
 
-// Clean up SNES
-MatDestroy(&circuit->J);
-SNESDestroy(&circuit->snes);
-// Use defaults (later override with -snes_fd or -snes_mf_operator from CLI)
-VecDestroy(&circuit->x);
-VecDestroy(&circuit->r);
-
 }
 
 // #ifdef OPENMC_MPI
@@ -841,25 +834,6 @@ PetscInt n_faces_ghost = circuit->ghost_face_global_indices.size();
     VecCreateGhost(circuit_comm, n_local, PETSC_DECIDE, nghost,
                circuit->ghost_indices_owned.data(), &circuit->velocity_local);
    
-    auto &snes = circuit->snes; 
-    auto &x = circuit->x;
-    auto &r = circuit->r;
-
-    // Create SNES solver
-    SNESCreate(circuit->comm, &snes);
-  // Use defaults (later override with -snes_fd or -snes_mf_operator from CLI)
-   SNESSetFromOptions(snes);
-    // Optional: use matrix-free Jacobian
-    auto &J = circuit->J;
-    MatCreateAIJ(circuit->comm,
-                 n_faces_owned, n_faces_owned, PETSC_DECIDE, PETSC_DECIDE,
-                 1, NULL, 0, NULL, &circuit->J); // one nonzero per row (diagonal)
-    SNESSetJacobian(snes, J, J, SNESComputeJacobianDefault, nullptr);
-
-    // Create solution vector (owned + ghosts)
-    VecDuplicate(circuit->vflow_gues_local, &x);
-    VecDuplicate(circuit->vflow_gues_local, &r);
-
   }
 
 }
