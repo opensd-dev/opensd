@@ -83,6 +83,15 @@ double solve_face(FaceWrapper& fw, double x_guess) {
   } while (status == GSL_CONTINUE && iter < max_iter);
 
   gsl_root_fsolver_free(s);
+
+  // Throw exception if not converged
+  if (status != GSL_SUCCESS) {
+    throw std::runtime_error(
+      "Face root solver did not converge within " + std::to_string(max_iter) +
+      " iterations. Last approximate root: " + std::to_string(r)
+    );
+  }
+
   return r;
 }
 
@@ -130,7 +139,14 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
     FaceWrapper fw {circuit->faces_owned[i], time, delt, trans_sim, alpha_mom};
 
     double guess = circuit->faces_owned[i]->vflow_gues;
-    double root = solve_face(fw, guess);
+    double root;
+    try {
+      root = solve_face(fw, guess);
+    } catch (const std::runtime_error& e) {
+      std::cerr << "Solver error at face " << fw.face->faceno << ": " << e.what() << "\n";
+      // handle error: reduce timestep, skip this face, etc.
+    }
+
 
     circuit->faces_owned[i]->vflow_gues = root;
 
