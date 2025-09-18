@@ -15,6 +15,9 @@ Timer time_convergence;
 Timer time_pressure_correction;
 Timer time_guess_flow;
 Timer time_update_old;
+Timer time_pc_assembly;
+Timer time_pc_solve;
+Timer time_pc_update;
 
 } // namespace simulation
 
@@ -63,6 +66,9 @@ void reset_timers()
   simulation::time_pressure_correction.reset();
   simulation::time_convergence.reset();
   simulation::time_update_old.reset();
+  simulation::time_pc_assembly.reset();
+  simulation::time_pc_solve.reset();
+  simulation::time_pc_update.reset();
 }
 
 } // namespace opensd

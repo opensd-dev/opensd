@@ -309,6 +309,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     // std::ofstream fout("abcoef_rank_" + std::to_string(mpi::rank) + ".txt");
 
 	simulation::time_pressure_correction.start();
+    simulation::time_pc_assembly.start();
     // Pressure corrections
     auto &A = circuit->A; 
     auto &b = circuit->b; 
@@ -404,6 +405,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     
     VecAssemblyBegin(b);
     VecAssemblyEnd(b);
+    simulation::time_pc_assembly.stop();
 
 
 
@@ -421,9 +423,10 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     // VecView(b, viewerB);
     // PetscViewerDestroy(&viewerB);
 
-
+    simulation::time_pc_solve.start();
     KSPSolve(circuit->ksp, b, pc);
-    
+    simulation::time_pc_solve.stop();
+
     // PetscViewer viewer;
     // PetscViewerASCIIOpen(PETSC_COMM_WORLD, "pc_output.txt", &viewer);
     // VecView(pc, viewer);
@@ -436,7 +439,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
        //   std::exit(0);
        // }
 
-
+    simulation::time_pc_update.start();
     // Prepare file for writing (one file per rank)
     std::ofstream fout;
     if (settings::verbosity >= 6)
@@ -658,8 +661,11 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
     VecRestoreArrayRead(rhomass_local, &rhomass_array_read);
 
+    simulation::time_pc_update.stop();
+
+    simulation::time_pressure_correction.stop();
   }
-  simulation::time_pressure_correction.stop();
+
   simulation::time_massmom.stop();
 }
 
