@@ -101,6 +101,124 @@ double Node::eqn_cont(double time, double delt, bool trans_sim, double alpha_mom
   return y;
 }
 
+double Node::eqn_ener(double time, double delt, bool trans_sim, double alpha_ener) {
+  // initialize heat input terms
+  _heat_input_esource = 0.0;
+  _heat_input_msource = msource * tenth_gues;
+
+  // handle fixed_var logic (assumes fixed_var is std::string)
+  if (fixed_var.count("T") || fixed_var.count("H")) {
+    _heat_input_esource = esource;
+  } 
+/*  else if (fixed_var.find("msource") != std::string::npos || fixed_var.find('P') != std::string::npos) {
+     if (this->msource > 1.e-6) {
+      // assume there is a boolean flag has_tenth_msrc; if not, replace with an appropriate check
+      if (this->has_tenth_msrc) {
+        this->_heat_input_msource = this->msource * this->tenth_msrc;
+      } else {
+        this->_heat_input_msource = this->msource * this->tenth_old;
+      }
+    }
+   }
+*/
+
+  double isum_gues = 0.0;
+  double isum_old  = 0.0;
+  double isum_gues2 = 0.0;
+  double isum_old2  = 0.0;
+  for (const auto& iface : ifaces) {
+
+    double up_contrib_gues = iface->upstream->tenth_gues * std::max(iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
+    double down_contrib_gues = iface->downstream->tenth_gues * std::max(-iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
+    isum_gues += (up_contrib_gues - down_contrib_gues);
+
+    double up_contrib_old = iface->upstream->tenth_old * std::max(iface->ther_old->rhomass() * iface->vflow_old, 0.0);
+    double down_contrib_old = iface->downstream->tenth_old * std::max(-iface->ther_old->rhomass() * iface->vflow_old, 0.0);
+    isum_old += (up_contrib_old - down_contrib_old);
+
+    isum_gues2 += iface->ther_gues->rhomass() * iface->vflow_gues;
+    isum_old2  += iface->ther_old->rhomass() * iface->vflow_old;
+
+  }
+
+
+  double osum_gues = 0.0;
+  double osum_old  = 0.0;
+  double osum_gues2 = 0.0;
+  double osum_old2  = 0.0;
+
+  for (const auto& oface : ofaces) {
+    double up_contrib_gues = oface->upstream->tenth_gues * std::max(oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
+    double down_contrib_gues = oface->downstream->tenth_gues * std::max(-oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
+    osum_gues += (up_contrib_gues - down_contrib_gues);
+
+    double up_contrib_old = oface->upstream->tenth_old * std::max(oface->ther_old->rhomass() * oface->vflow_old, 0.0);
+    double down_contrib_old = oface->downstream->tenth_old * std::max(-oface->ther_old->rhomass() * oface->vflow_old, 0.0);
+    osum_old += (up_contrib_old - down_contrib_old);
+
+    osum_gues2 += oface->ther_gues->rhomass() * oface->vflow_gues;
+    osum_old2  += oface->ther_old->rhomass() * oface->vflow_old;
+  }
+
+  // weighted face convective heat input (alpha_ener weighting)
+  _heat_input_faceconv  = alpha_ener * (isum_gues - osum_gues) + (1.0 - alpha_ener) * (isum_old - osum_old);
+  _heat_input_faceconv2 = alpha_ener * (osum_gues2 - isum_gues2) + (1.0 - alpha_ener) * (osum_old2 - isum_old2) - msource;
+
+
+  // -------- face heat generation / slab heat contributions ----------
+  isum_gues = 0.0;
+  isum_old  = 0.0;
+
+  for (const auto& iface : ifaces) {
+    // (iface.heat_input + sum(iface.heat_hslab)) * max(sign(iface.vflow_gues),0)
+    double sum_hslab_gues = std::accumulate(iface->heat_hslab.begin(), iface->heat_hslab.end(), 0.0);
+    double sum_hslab_old  = std::accumulate(iface->heat_hslab_old.begin(), iface->heat_hslab_old.end(), 0.0);
+
+    double pos_gues = (iface->vflow_gues > 0.0 ? 1.0 : 0.0);
+    double pos_old  = (iface->vflow_old  > 0.0 ? 1.0 : 0.0);
+
+    isum_gues += (iface->heat_input + sum_hslab_gues) * pos_gues;
+    isum_old  += (iface->heat_input_old + sum_hslab_old) * pos_old;
+  }
+  osum_gues = 0.0;
+  osum_old  = 0.0;
+  for (const auto& oface : ofaces) {
+
+    double sum_hslab_gues = std::accumulate(oface->heat_hslab.begin(), oface->heat_hslab.end(), 0.0);
+    double sum_hslab_old  = std::accumulate(oface->heat_hslab_old.begin(), oface->heat_hslab_old.end(), 0.0);
+
+    // uses max(np.sign(-oface.vflow_gues),0) <-- this is 1 when oface.vflow_gues < 0
+    double negpos_gues = (oface->vflow_gues < 0.0 ? 1.0 : 0.0);
+    double negpos_old  = (oface->vflow_old  < 0.0 ? 1.0 : 0.0);
+
+    osum_gues += (oface->heat_input + sum_hslab_gues) * negpos_gues;
+    osum_old  += (oface->heat_input_old + sum_hslab_old) * negpos_old;
+  }
+  _heat_input_facegen = alpha_ener * (isum_gues + osum_gues) + (1.0 - alpha_ener) * (isum_old + osum_old);
+
+  // -------- transient and storage terms ----------
+  double C = volume * ther_old->rhomass();
+  double E = volume;
+
+  double trans1 = trans_sim * C * (tenth_gues - tenth_old) / delt;
+  double trans2 = trans_sim * E * (spres_gues - spres_old) / delt;
+
+  double y = trans1
+           - trans2
+           - _heat_input_faceconv
+           - _heat_input_faceconv2 * tenth_old * (trans_sim ? 1.0 : 0.0)
+           - _heat_input_msource
+           - heat_input
+           - std::accumulate(heat_hslab.begin(), heat_hslab.end(), 0.0)
+           - _heat_input_facegen
+           - _heat_input_esource;
+		   
+  std::cout<<"flag1 "<<identifier << " " << y << std::endl;
+
+  return y;
+
+}
+
 void Node::update_gues() {
   tpres_gues = tpres_old;
   ttemp_gues = ttemp_old;

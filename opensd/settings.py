@@ -63,6 +63,7 @@ class Settings:
         self._alpha_mom = 1.0
         self._alpha_heat = np.array(0.6)
         self._alpha_ener = np.array(1.0)
+        self._alpha_heat = np.array(1.0)
 
         
         for key, value in kwargs.items():
@@ -110,6 +111,7 @@ class Settings:
         self._create_verbosity_subelement(element)
         self._create_alpha_mom_subelement(element)
         self._create_alpha_ener_subelement(element)
+        self._create_alpha_heat_subelement(element)
         self._create_main_iter_subelement(element)
         self._create_flow_iter_subelement(element)
         self._create_temp_solve_subelement(element)
@@ -142,6 +144,10 @@ class Settings:
     def _create_alpha_ener_subelement(self, root):
         elem = ET.SubElement(root, "alpha_ener")
         elem.text = str(self._alpha_ener)
+
+    def _create_alpha_heat_subelement(self, root):
+        elem = ET.SubElement(root, "alpha_heat")
+        elem.text = str(self._alpha_heat)
 
     def _create_main_iter_subelement(self, root):
         elem = ET.SubElement(root, "no_main_iter")

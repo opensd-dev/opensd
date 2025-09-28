@@ -25,10 +25,14 @@ extern RunMode run_mode;       //!< Run mode ('steady', 'design', 'sensitivity',
 extern "C" int verbosity;          //!< How verbose to make output
 extern double alpha_mom; //!< relaxation factor
 extern double alpha_ener; //!< relaxation factor
+extern double alpha_heat; //!< relaxation factor
 extern vector<double> tim_slot;
 extern int no_main_iter;
 extern int no_flow_iter;
 extern double conv_crit_flow;
+extern double conv_crit_temp_SS;
+extern double conv_crit_temp_trans;
+extern double conv_crit_ht;
 extern bool temp_solve;
 extern bool flag_write;
 } // namespace settings

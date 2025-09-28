@@ -12,7 +12,7 @@
 
 namespace opensd {
     
-std::tuple<bool, std::tuple<double, double>> check_conv(double time, double delt, bool trans_sim, double alpha_mom, std::string opt) {
+std::tuple<bool, double, double, double, double> check_conv(double time, double delt, bool trans_sim, double alpha_mom, double alpha_ener, std::string opt, double alpha_heat) {
   double eps_mtot = 0.0, eps_ptot = 0.0, eps_htot = 0.0, eps_ttot = 0.0;
 
   for (auto& circuit : model::circuits_owned) {
@@ -59,6 +59,20 @@ std::tuple<bool, std::tuple<double, double>> check_conv(double time, double delt
       }
     }
 
+
+	if (opt == "all") {
+	  circuit->eps_h = 0.;
+	  for (auto& node : circuit->nodes_owned) {
+	    if (not e_mass.empty() != 0) { // node.flowreg == "Homogeneous" and
+          node->hresidue = node->eqn_ener(time,delt,trans_sim,alpha_ener);
+	      circuit->eps_h = std::max(circuit->eps_h,abs(node->hresidue)/(node->tenth_gues*circuit->mean_flow)); // node.tenth_gues*node.volume*node.ther_gues.rhomass()/delt)(or) node.tenth_gues*mean_flow
+		}
+	  }
+	}
+	if (circuit->mean_flow <= 1.E-1) {
+	  circuit->eps_h = 1.E-11;
+	}
+
     
     
     eps_mtot = std::max(eps_mtot, circuit->eps_m);
@@ -67,14 +81,30 @@ std::tuple<bool, std::tuple<double, double>> check_conv(double time, double delt
       eps_htot = std::max(eps_htot, circuit->eps_h);
     }
   }
+  
+  bool condition;
+  if (opt == "all") {
+    double conv_crit_temp;
+    if (trans_sim) {
+      conv_crit_temp = settings::conv_crit_temp_trans;
+    } else {
+      conv_crit_temp = settings::conv_crit_temp_SS;
+    }
+    condition = (eps_ptot < settings::conv_crit_flow) &&
+                     (eps_mtot < settings::conv_crit_flow) &&
+                     (eps_htot < conv_crit_temp) &&
+                     (eps_ttot < settings::conv_crit_ht);
+					 
+  } else if (opt == "massmom") {
+    condition = (eps_ptot < settings::conv_crit_flow) &&
+                     (eps_mtot < settings::conv_crit_flow);  
 
-  bool condition = (eps_ptot < settings::conv_crit_flow) && (eps_mtot < settings::conv_crit_flow);
-  std::tuple<double, double> ret_args = std::make_tuple(eps_mtot, eps_ptot);
+  }
 
   if (condition) {
-    return std::make_tuple(true, ret_args);
+    return {true, eps_mtot, eps_ptot, eps_htot, eps_ttot};
   } else {
-    return std::make_tuple(false, ret_args);
+    return {false, eps_mtot, eps_ptot, eps_htot, eps_ttot};
   }
 
 }

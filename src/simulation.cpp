@@ -67,9 +67,8 @@ int opensd_run()
         exec_massmom(simulation::current_time, simulation::delt, trans_sim, alpha_mom, main_iter, flow_iter);
 		simulation::time_convergence.start();
         // if (mpi::rank == 0) {
-          std::tuple<bool, std::tuple<double, double>> result = check_conv(simulation::current_time, simulation::delt, trans_sim, alpha_mom, "massmom");
-          bool converged_local = std::get<0>(result);
-          std::tie(eps_m, eps_p) = std::get<1>(result);
+		  bool converged_local;
+          std::tie(converged_local, eps_m, eps_p, std::ignore, std::ignore) = check_conv(simulation::current_time, simulation::delt, trans_sim, alpha_mom, 0.0, "massmom");
 		// }
 
 		if (settings::verbosity >= 6) {
@@ -134,12 +133,11 @@ int opensd_run()
       if (settings::temp_solve) {
         // HT_solver.exec_energy(time, delt, trans_sim, alpha_heat, main_iter);
         exec_energy(simulation::current_time, simulation::delt, trans_sim, settings::alpha_ener, main_iter);
-        std::exit(1);
+        // std::exit(1);
 
         // bool converged;
-        // double eps_h, eps_t, eps_hvof;
-        // std::tie(converged, std::tie(eps_m, eps_p, eps_h, eps_t, eps_hvof)) = convergence.check_conv(
-            // time, delt, trans_sim, alpha_mom, alpha_ener, "all", alpha_heat);
+        double eps_h, eps_t;
+        std::tie(converged, eps_m, eps_p, eps_h, eps_t) = check_conv(simulation::current_time, simulation::delt, trans_sim, settings::alpha_mom, settings::alpha_ener, "all", settings::alpha_heat);
       }
 
       if (converged) {

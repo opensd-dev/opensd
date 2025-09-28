@@ -62,6 +62,13 @@ public:
   shared_ptr<CoolProp::AbstractState> ther_old;
   double velocity;
   double B1;
+  
+  double _heat_input_esource;
+  double _heat_input_msource;
+  double _heat_input_faceconv;
+  double _heat_input_faceconv2;
+  double _heat_input_facegen;
+  std::vector<double> heat_hslab;
 
   explicit Node(pugi::xml_node flnode_node);
   Node(std::string identifier, double volume, double heat_input, double elevation, double tpres_old = 0.0, double ttemp_old = 0.0, double tenth_old = 0.0); //Circuit* circuit, 
@@ -73,6 +80,7 @@ public:
   // }
 
   double eqn_cont(double time, double delt, bool trans_sim, double alpha_mom);
+  double eqn_ener(double time, double delt, bool trans_sim, double alpha_ener);
   void update_gues();
   void assign_staticvar();
   void update_staticvar(std::optional<double> velocity_in = std::nullopt);

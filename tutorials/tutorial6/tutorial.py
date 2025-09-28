@@ -29,7 +29,7 @@ circuit2.assign_fluid(flname="LiqNa",fltype="incompressible")
 node3 = circuit2.add_node("node3")
 node4 = circuit2.add_node("node4")
 
-pipe2=circuit2.add_pipe("pipe2",0.0174,7.5,"node3","node4",'DW',30.,20,npar=3600)
+pipe2=circuit2.add_pipe("pipe2",0.0174,7.5,"node3","node4",'DW',30.,20,npar=3600,heat_input=308.E6)
 
 circuit2.add_BC("bc4","node3",'P',5.E5)
 circuit2.add_BC("bc5","node3",'T',628.)
@@ -42,9 +42,9 @@ geometry.export_to_xml()
 
 settings = opensd.Settings()
 settings.verbosity = 3
-settings.temp_solve = False
+settings.temp_solve = True
 settings.run_mode = "steady"
 settings.export_to_xml()
 
-opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/home/vikram/Codes/opensd/build/opensd')
+opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/c/codes/opensd/build/opensd')
 

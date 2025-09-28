@@ -19,12 +19,16 @@ namespace settings {
   int verbosity {2};
   double alpha_mom;
   double alpha_ener;
+  double alpha_heat;
   vector<double> tim_slot;
   int no_main_iter;
   int no_flow_iter;
-  bool temp_solve;
+  bool temp_solve {true};
   bool flag_write {true};
   double conv_crit_flow {1.E-10};
+  double conv_crit_temp_SS {1.E-10};
+  double conv_crit_temp_trans {conv_crit_temp_SS};
+  double conv_crit_ht {1.E-10};
 } // namespace settings
 
 //==============================================================================
@@ -101,11 +105,13 @@ void read_settings_xml(pugi::xml_node root)
   
   alpha_mom = stod(get_node_value(root, "alpha_mom"));
   alpha_ener = stod(get_node_value(root, "alpha_ener"));
+  alpha_heat = stod(get_node_value(root, "alpha_heat"));
   tim_slot = get_node_array<double>(root, "tim_slot");
   no_main_iter = stod(get_node_value(root, "no_main_iter"));
   no_flow_iter = stod(get_node_value(root, "no_flow_iter"));
   // conv_crit_flow = stod(get_node_value(root, "conv_crit_flow"));
   flag_write = get_node_value_bool(root, "flag_write");
+  temp_solve = get_node_value_bool(root, "temp_solve");
 
   bool trans_sim = settings::run_mode == RunMode::TRANSIENT;
   if (trans_sim) {
