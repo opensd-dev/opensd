@@ -120,7 +120,7 @@ void Face::update_old() {
     // }
 
     // heat_hslab_old = heat_hslab;
-    // heat_input_old = heat_input;
+    heat_input_old = heat_input;
     //
     // if (upstream) upstream->update_old();
     // if (downstream) downstream->update_old();
@@ -319,6 +319,9 @@ void PFace::update_fricfact() {
   // }
 }
 
+void PFace::update_heat_input() {
+  heat_input = pipe->heat_input/pipe->ncell;
+}
 
 void PFace::save_to_hdf5(hid_t group_id) const {
   write_scalar(group_id, "faceno", faceno);

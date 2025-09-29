@@ -377,12 +377,12 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 		b_local = 0.0;
         
       } else if (node->fixed_var.count("msource")) {
-        if (time <= 20) {
-            node->msource = -753.6*(20.-time)/20.;
-		}
-        else {
-            node->msource = 0.;
-		}
+  //       if (time <= 20) {
+  //           node->msource = -753.6*(20.-time)/20.;
+		// }
+  //       else {
+  //           node->msource = 0.;
+		// }
         b_local += node->msource;
       }
 

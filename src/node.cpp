@@ -28,6 +28,7 @@ Node::Node(pugi::xml_node flnode_node)
     tenth_old  = stod(get_node_value(flnode_node, "tenth_old"));
     volume     = stod(get_node_value(flnode_node, "volume"));
     msource    = stod(get_node_value(flnode_node, "msource"));
+    heat_input = stod(get_node_value(flnode_node, "heat_input"));
 
     pugi::xml_attribute fixed_var_attr = flnode_node.attribute("fixed_var");
     if (fixed_var_attr) {
@@ -128,12 +129,12 @@ double Node::eqn_ener(double time, double delt, bool trans_sim, double alpha_ene
   double isum_old2  = 0.0;
   for (const auto& iface : ifaces) {
 
-    double up_contrib_gues = iface->upstream->tenth_gues * std::max(iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
-    double down_contrib_gues = iface->downstream->tenth_gues * std::max(-iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
+    double up_contrib_gues = iface->unode->tenth_gues * std::max(iface->ther_gues->rhomass() * iface->vflow_gues, 0.0); //iface->upstream->tenth_gues
+    double down_contrib_gues = iface->dnode->tenth_gues * std::max(-iface->ther_gues->rhomass() * iface->vflow_gues, 0.0); //iface->downstream->tenth_gues
     isum_gues += (up_contrib_gues - down_contrib_gues);
 
-    double up_contrib_old = iface->upstream->tenth_old * std::max(iface->ther_old->rhomass() * iface->vflow_old, 0.0);
-    double down_contrib_old = iface->downstream->tenth_old * std::max(-iface->ther_old->rhomass() * iface->vflow_old, 0.0);
+    double up_contrib_old = iface->unode->tenth_old * std::max(iface->ther_old->rhomass() * iface->vflow_old, 0.0); //iface->upstream->tenth_old
+    double down_contrib_old = iface->dnode->tenth_old * std::max(-iface->ther_old->rhomass() * iface->vflow_old, 0.0); //iface->downstream->tenth_old
     isum_old += (up_contrib_old - down_contrib_old);
 
     isum_gues2 += iface->ther_gues->rhomass() * iface->vflow_gues;
@@ -148,12 +149,12 @@ double Node::eqn_ener(double time, double delt, bool trans_sim, double alpha_ene
   double osum_old2  = 0.0;
 
   for (const auto& oface : ofaces) {
-    double up_contrib_gues = oface->upstream->tenth_gues * std::max(oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
-    double down_contrib_gues = oface->downstream->tenth_gues * std::max(-oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
+    double up_contrib_gues = oface->unode->tenth_gues * std::max(oface->ther_gues->rhomass() * oface->vflow_gues, 0.0); //oface->upstream->tenth_gues
+    double down_contrib_gues = oface->dnode->tenth_gues * std::max(-oface->ther_gues->rhomass() * oface->vflow_gues, 0.0); //oface->downstream->tenth_gues
     osum_gues += (up_contrib_gues - down_contrib_gues);
 
-    double up_contrib_old = oface->upstream->tenth_old * std::max(oface->ther_old->rhomass() * oface->vflow_old, 0.0);
-    double down_contrib_old = oface->downstream->tenth_old * std::max(-oface->ther_old->rhomass() * oface->vflow_old, 0.0);
+    double up_contrib_old = oface->unode->tenth_old * std::max(oface->ther_old->rhomass() * oface->vflow_old, 0.0); //oface->upstream->tenth_old
+    double down_contrib_old = oface->dnode->tenth_old * std::max(-oface->ther_old->rhomass() * oface->vflow_old, 0.0); //oface->downstream->tenth_old
     osum_old += (up_contrib_old - down_contrib_old);
 
     osum_gues2 += oface->ther_gues->rhomass() * oface->vflow_gues;
@@ -213,7 +214,7 @@ double Node::eqn_ener(double time, double delt, bool trans_sim, double alpha_ene
            - _heat_input_facegen
            - _heat_input_esource;
 		   
-  std::cout<<"flag1 "<<identifier << " " << y << std::endl;
+  // std::cout<<"flag1 "<<identifier << " " << _heat_input_msource << " " << _heat_input_esource << " " << _heat_input_facegen << " " << y << std::endl;
 
   return y;
 

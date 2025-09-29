@@ -135,16 +135,12 @@ int opensd_run()
         exec_energy(simulation::current_time, simulation::delt, trans_sim, settings::alpha_ener, main_iter);
         // std::exit(1);
 
-        // bool converged;
-        double eps_h, eps_t;
         std::tie(converged, eps_m, eps_p, eps_h, eps_t) = check_conv(simulation::current_time, simulation::delt, trans_sim, settings::alpha_mom, settings::alpha_ener, "all", settings::alpha_heat);
       }
 
       if (converged) {
         if (settings::temp_solve) {
           if (settings::verbosity >= 1 || (settings::verbosity >= 0 && !trans_sim)) {
-              eps_h = 0.;
-              eps_t = 0.;
             std::cout << "main converged in " << main_iter + 1 << " iter. " << eps_m << " " << eps_p << " " << eps_h << " " << eps_t << std::endl;
           }
         } else {

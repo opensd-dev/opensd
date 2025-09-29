@@ -76,6 +76,7 @@ public:
 
   virtual void update_velocity() {}
   virtual void update_fricfact() {}
+  virtual void update_heat_input() {}
 
   virtual double eqn_mom(double x, double time, double delt, bool trans_sim, double alpha_mom) {return 0;}
   virtual void update_abcoef(double time, double delt, double trans_sim, double alpha_mom) {}
@@ -121,6 +122,7 @@ public:
   void update_velocity() override;
   
   void update_fricfact() override;
+  void update_heat_input() override;
 
   void save_to_hdf5(hid_t group_id) const override;
   void load_from_hdf5(hid_t group_id) override;
