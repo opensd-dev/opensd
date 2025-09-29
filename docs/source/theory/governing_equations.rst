@@ -122,3 +122,4 @@ The general energy equation for solids is given by Equation :eq:`energy_solid`.
 
 .. bibliography::
    :style: unsrt
+   :filter: docname in docnames
