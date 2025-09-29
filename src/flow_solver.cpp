@@ -613,7 +613,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         face->update_statevar();
         face->ther_gues->update();
         // if (circuit.flag_tp) face->ther_gues->update_sat();
-        // face->update_heat_input(time, delt);
+        face->update_heat_input(); //(time, delt)
         face->update_fricfact();
       // } else {
         // face->update_Gcr();

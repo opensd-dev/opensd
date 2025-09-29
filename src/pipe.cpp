@@ -47,6 +47,7 @@ Pipe::Pipe(pugi::xml_node pipe_node)
   this->unode_str = get_node_value(pipe_node, "unode");
   this->ncell     = stod(get_node_value(pipe_node, "ncell"));
   this->cfarea    = stod(get_node_value(pipe_node, "cfarea"));
+  this->heat_input= stod(get_node_value(pipe_node, "heat_input"));
   this->unode = nullptr;
   this->dnode = nullptr;
   double ufrac;

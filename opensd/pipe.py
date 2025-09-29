@@ -82,6 +82,7 @@ class Pipe(object):
         subelement.set("dnode",      str(self.dnode.identifier))
         subelement.set("roughness",  str(self.roughness))
         subelement.set("cfarea",     str(self.cfarea))
+        subelement.set("heat_input", str(self.heat_input))
 
 class Wall(object):
     def __init__(self,thk,solname,sollib,restraint):

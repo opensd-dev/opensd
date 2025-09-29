@@ -10,4 +10,5 @@ Theory Guide
 
     governing_equations
     discretized_equations
+    parallelization
     
