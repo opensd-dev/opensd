@@ -62,7 +62,11 @@ public:
   Mat A;
   Vec b;
   Vec pc;
+  Mat Ah;
+  Vec bh;
+  Vec enth;
   KSP ksp;
+  KSP ksph;
   Vec vflow_gues_local, aminus_local, aplus_local, bplus_local, bminus_local;
   Vec rhomass_local;
   Vec pc_local;

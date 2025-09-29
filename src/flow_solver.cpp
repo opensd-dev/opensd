@@ -675,21 +675,29 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
     // if (!trans_sim && !circuit.solveSS) continue;
 
     int n = circuit->nodes.size();
-    Eigen::MatrixXd A = Eigen::MatrixXd::Zero(n, n);
-    Eigen::VectorXd b = Eigen::VectorXd::Zero(n);
-    vector<int> nocal_ind;
 
+    // vector<int> nocal_ind;
+    simulation::time_fluid_energy.start();
+    auto &Ah = circuit->Ah;
+    auto &bh = circuit->bh;
+    auto &enth = circuit->enth;
 
-    for (int i = 0; i < n; ++i) {
-      auto& node = circuit->nodes[i];
+    MatZeroEntries(Ah);
+    VecZeroEntries(bh);
+    VecZeroEntries(enth);
+    for (auto& node : circuit->nodes_owned) {
+      int i = circuit->old2new[node->node_ind];  // global row index
+	  // bool pbound = node->fixed_var.count("P");
+      double A_local_node = 0, A_local_iface, A_local_oface;
+      double b_local;
 
       double C = node->volume * node->ther_old->rhomass();
       double E = node->volume;
-      A(i, i) = trans_sim * C / delt;
-      b(i) = node->tenth_old * (trans_sim * C / delt) 
-             + trans_sim * E * (node->spres_gues - node->spres_old) / delt
-             + node->heat_input; // + std::accumulate(node.heat_hslab.begin(), node.heat_hslab.end(), 0.0);
-      b(i) = b(i) - node->tenth_old * node->msource * trans_sim;
+      A_local_node = trans_sim * C / delt;
+      b_local = node->tenth_old * (trans_sim * C / delt)
+                + trans_sim * E * (node->spres_gues - node->spres_old) / delt
+                + node->heat_input; // + std::accumulate(node.heat_hslab.begin(), node.heat_hslab.end(), 0.0);
+      b_local = b_local - node->tenth_old * node->msource * trans_sim;
 
       for (auto& iface : node->ifaces) {
         // if (dynamic_cast<cont::Reservoir*>(iface.dnode) && iface.dfrac != nullptr 
@@ -870,6 +878,7 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
     }
 */
     }
+    simulation::time_fluid_energy.stop();
 }
 
 }

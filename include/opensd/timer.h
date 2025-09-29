@@ -23,6 +23,7 @@ extern Timer time_update_old;
 extern Timer time_pc_assembly;
 extern Timer time_pc_solve;
 extern Timer time_pc_update;
+extern Timer time_fluid_energy;
 
 } // namespace simulation
 

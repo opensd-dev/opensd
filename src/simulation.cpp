@@ -284,12 +284,20 @@ for (auto& circuit : model::circuits_owned) {
 auto &A = circuit->A;  // alias
 auto &b = circuit->b;  // alias
 auto &pc = circuit->pc;  // alias
+auto &Ah = circuit->Ah;  // alias
+auto &bh = circuit->bh;  // alias
+auto &enth = circuit->enth;  // alias
 auto &ksp = circuit->ksp;  // alias
+auto &ksph = circuit->ksph;  // alias
 
 KSPDestroy(&ksp);
+KSPDestroy(&ksph);
 MatDestroy(&A);
 VecDestroy(&b);
 VecDestroy(&pc);
+MatDestroy(&Ah);
+VecDestroy(&bh);
+VecDestroy(&enth);
 VecDestroy(&circuit->pc_local);
 
 VecDestroy(&circuit->vflow_gues_local);
@@ -780,21 +788,41 @@ PetscInt global_nrows = vertex_count; // same as nvtxs
     MatSetFromOptions(A);
     MatSetUp(A);
     
-    auto &b = circuit->b; 
+    auto &Ah = circuit->Ah;
+    MatCreate(circuit_comm, &Ah);
+    MatSetSizes(Ah, local_nrows, local_nrows, global_nrows, global_nrows);
+    MatSetFromOptions(Ah);
+    MatSetUp(Ah);
+
+    auto &b = circuit->b;
     VecCreate(circuit_comm, &b);
     VecSetSizes(b, local_nrows, global_nrows);
     VecSetFromOptions(b);
     
+    auto &bh = circuit->bh;
+    VecCreate(circuit_comm, &bh);
+    VecSetSizes(bh, local_nrows, global_nrows);
+    VecSetFromOptions(bh);
+
     auto &pc = circuit->pc; 
     VecCreate(circuit_comm, &pc);
     VecSetSizes(pc, local_nrows, global_nrows);
     VecSetFromOptions(pc);
     
-    auto &ksp = circuit->ksp; 
-    
+    auto &enth = circuit->enth;
+    VecCreate(circuit_comm, &enth);
+    VecSetSizes(enth, local_nrows, global_nrows);
+    VecSetFromOptions(enth);
+
+    auto &ksp = circuit->ksp;
     KSPCreate(circuit->comm, &ksp);
     KSPSetOperators(ksp, A, A);
     KSPSetFromOptions(ksp);
+
+    auto &ksph = circuit->ksph;
+    KSPCreate(circuit->comm, &ksph);
+    KSPSetOperators(ksph, A, A);
+    KSPSetFromOptions(ksph);
 
     PetscInt n_faces_owned = circuit->face_indices_owned.size();
 // ghost indices in PETSc global numbering
