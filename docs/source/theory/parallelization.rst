@@ -73,8 +73,13 @@ Given a project with nodes and elements, partition them using METIS, and assign 
 
   **If converged:**
 
-  * *Step 8.* Compute temperature :math:`T` in all solid nodes using Equation (18).
-  * *Step 9.* Compute enthalpy :math:`h` in all fluid nodes using Equation (20).
+  * *Step 8.* Compute temperature :math:`T` in all solid nodes using Equation :eq:`eqn-solid-energy-disc`.
+  * *Step 9.* Compute enthalpy :math:`h_0` in all fluid nodes using Equation :eq:`eqn-energy-disc`.
+  
+    a. Compute global matrix and vector elements for the owned nodes and assemble.
+    b. Solve the assembled system.
+    c. Communicate :math:`h_0` for all ghost nodes.
+  
   * *Step 10.* Check convergence of mass, momentum, and energy equations (fluid and solid).
 
     - **If converged:** **Stop.**
