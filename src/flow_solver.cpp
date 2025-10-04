@@ -704,29 +704,31 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
             // && iface.dnode->ther_gues.phase() == 6) {
           // b(i) -= alpha_ener * iface.downstream->tenth_gues * std::max(-iface.ther_gues.rhomass() * iface.vflow_gues, 0.0);
         // } else {
-          A(i, i) += alpha_ener * std::max(-iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
+          A_local_node = A_local_node + alpha_ener * std::max(-iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
         // }
 
         // if (dynamic_cast<cont::Reservoir*>(iface.unode) && iface.ufrac != nullptr 
             // && iface.unode->ther_gues.phase() == 6) {
           // b(i) += alpha_ener * iface.upstream->tenth_gues * std::max(iface.ther_gues.rhomass() * iface.vflow_gues, 0.0);
         // } else {
-          A(i, iface->unode->node_ind) = -alpha_ener * std::max(iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
+          A_local_iface = -alpha_ener * std::max(iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
+		  int j = circuit->old2new[iface->unode->node_ind];
+		  MatSetValue(Ah, i, j, A_local_iface, INSERT_VALUES);
         // }
-
-        b[i] = (b[i] 
+		
+        b_local = (b_local 
                   - iface->downstream->tenth_old * (1.0 - alpha_ener) 
                     * std::max(-iface->ther_old->rhomass() * iface->vflow_old, 0.0)
                   + iface->upstream->tenth_old * (1.0 - alpha_ener) 
                     * std::max(iface->ther_old->rhomass() * iface->vflow_old, 0.0));
         
-        b[i] = (b[i] 
+        b_local = (b_local
                   + alpha_ener * (iface->heat_input) // + sum(iface->heat_hslab)) 
                     * std::max(static_cast<double>(!std::signbit(iface->vflow_gues)), 0.0)
                   + (1.0 - alpha_ener) * (iface->heat_input_old ) //+ sum(iface->heat_hslab_old)) 
                     * std::max(static_cast<double>(!std::signbit(iface->vflow_old)), 0.0));
         
-        b[i] = (b[i] 
+        b_local = (b_local 
                   - node->tenth_old * alpha_ener * iface->ther_gues->rhomass() 
                     * iface->vflow_gues * trans_sim
                   - node->tenth_old * (1.0 - alpha_ener) 
@@ -739,36 +741,43 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
             // && oface.unode->ther_gues.phase() == 6) {
           // b(i) -= alpha_ener * oface.upstream->tenth_gues * std::max(oface.ther_gues.rhomass() * oface.vflow_gues, 0.0);
         // } else {
-          A(i, i) += alpha_ener * std::max(oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
+          A_local_node = A_local_node + alpha_ener * std::max(oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
         // }
 
         // if (dynamic_cast<cont::Reservoir*>(oface.dnode) && oface.dfrac != nullptr 
             // && oface.dnode->ther_gues.phase() == 6) {
           // b(i) += alpha_ener * oface.downstream->tenth_gues * std::max(-oface.ther_gues.rhomass() * oface.vflow_gues, 0.0);
         // } else {
-          A(i, oface->dnode->node_ind) = -alpha_ener * std::max(-oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
+          A_local_oface = -alpha_ener * std::max(-oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
+		  int j = circuit->old2new[oface->dnode->node_ind];
+		  MatSetValue(Ah, i, j, A_local_oface, INSERT_VALUES);
+
         // }
 
         
-        b[i] = (b[i] 
+        b_local = (b_local 
                   - oface->upstream->tenth_old * (1.0 - alpha_ener) 
                     * std::max(oface->ther_old->rhomass() * oface->vflow_old, 0.0)
                   + oface->downstream->tenth_old * (1.0 - alpha_ener) 
                     * std::max(-oface->ther_old->rhomass() * oface->vflow_old, 0.0));
         
-        b[i] = (b[i] 
+        b_local = (b_local 
                   + alpha_ener * (oface->heat_input) // + std::accumulate(oface->heat_hslab.begin(), oface->heat_hslab.end(), 0.0)) 
                     * std::max(static_cast<double>(!std::signbit(-oface->vflow_gues)), 0.0)
                   + (1.0 - alpha_ener) * (oface->heat_input_old) // + std::accumulate(oface->heat_hslab_old.begin(), oface->heat_hslab_old.end(), 0.0)) 
                     * std::max(static_cast<double>(!std::signbit(-oface->vflow_old)), 0.0));
         
-        b[i] = (b[i] 
+        b_local = (b_local 
                   + node->tenth_old * alpha_ener * oface->ther_gues->rhomass() 
                     * oface->vflow_gues * trans_sim
                   + node->tenth_old * (1.0 - alpha_ener) 
                     * oface->ther_old->rhomass() * oface->vflow_old * trans_sim);
         
       }
+	  
+	  MatSetValue(Ah, i, i, A_local_node, INSERT_VALUES);
+      VecSetValue(bh, i, b_local, INSERT_VALUES);
+	  
     }
 
     
@@ -837,6 +846,31 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
       }
     }
  */    
+
+
+    MatAssemblyBegin(Ah, MAT_FINAL_ASSEMBLY);
+    MatAssemblyEnd(Ah, MAT_FINAL_ASSEMBLY);
+    
+    VecAssemblyBegin(bh);
+    VecAssemblyEnd(bh);
+
+    // Print matrix Ah
+    PetscViewer viewerAh;
+    PetscViewerASCIIOpen(PETSC_COMM_WORLD, "matrix_Ah.txt", &viewerAh);
+    PetscViewerPushFormat(viewerAh, PETSC_VIEWER_ASCII_DENSE); // optional: DENSE format
+    MatView(Ah, viewerAh);
+    PetscViewerPopFormat(viewerAh);
+    PetscViewerDestroy(&viewerAh);
+    
+    // Print vector bh
+    PetscViewer viewerbh;
+    PetscViewerASCIIOpen(PETSC_COMM_WORLD, "vector_bh.txt", &viewerbh);
+    VecView(bh, viewerbh);
+    PetscViewerDestroy(&viewerbh);
+
+    MPI_Abort(mpi::intracomm, 0);
+    std::exit(0);
+	
 /*     std::vector<int> nocal_ind;
     for (int i = 0; i < A.cols(); ++i) {
       if (A.col(i).sum() == 0.0) {
