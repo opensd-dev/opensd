@@ -780,41 +780,102 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
 	  
     }
 
+    MatAssemblyBegin(Ah, MAT_FINAL_ASSEMBLY);
+    MatAssemblyEnd(Ah, MAT_FINAL_ASSEMBLY);
     
-    // using Eigen::MatrixXd;
-    // using Eigen::VectorXd;
+    VecAssemblyBegin(bh);
+    VecAssemblyEnd(bh);
     
-    for (size_t i = 0; i < circuit->nodes.size(); ++i) {
-      auto node = circuit->nodes[i];
+    for (auto& node : circuit->nodes_owned) {
+      int i = circuit->old2new[node->node_ind];
     
-       if (node->fixed_var.find("T") != node->fixed_var.end()) {
-        // node->update_statictemp();
-        // node->ther_gues->update(CoolProp::PT_INPUTS, node->spres_gues, node->stemp_gues);
-        // node->senth_gues = node->ther_gues->hmass();
-        // node->ther_gues->update(CoolProp::HmassP_INPUTS, node->senth_gues, node->spres_gues);
-        // if (circuit->flag_tp || dynamic_cast<TPTank*>(node)) node->ther_gues->update_sat();
-        // node->update_totalenth();
-        // node->Arow = A.row(i);
-        // node->brow = b(i);
-        // b(i) = node->tenth_gues;
-        // A.row(i).setZero();
-        // A(i, i) = 1.0;
-      } 
-      else if (node->fixed_var.find("H") != node->fixed_var.end()) {
-        // node->update_staticenth();
-        // node->ther_gues->update(CoolProp::HmassP_INPUTS, node->senth_gues, node->spres_gues);
-        // node->stemp_gues = node->ther_gues->T();
-        // if (circuit->flag_tp || dynamic_cast<TPTank*>(node)) node->ther_gues->update_sat();
-        // node->update_totaltemp();
-        // node->update_staticpres();
-        // node->Arow = A.row(i);
-        // node->brow = b(i);
-        // b(i) = node->tenth_gues;
-        // A.row(i).setZero();
-        // A(i, i) = 1.0;
-      } 
-      else if (node->fixed_var.find("msource") != node->fixed_var.end() || node->fixed_var.find("P") != node->fixed_var.end()) {
-        // if (node->msource > 0.0) {
+      // --- Case 1: Temperature fixed ---
+      if (node->fixed_var.count("T")) {
+        // Update thermodynamic state based on T
+        node->update_statictemp();
+        node->ther_gues->update(CoolProp::PT_INPUTS,
+                               node->spres_gues,
+                               node->stemp_gues);
+        node->senth_gues = node->ther_gues->hmass();
+        node->ther_gues->update(CoolProp::HmassP_INPUTS,
+                               node->senth_gues,
+                               node->spres_gues);
+    
+        // if (circuit->flag_tp || node->isTPTank()) {
+          // node->ther_gues->update_sat();
+        // }
+    
+        node->update_totalenth();
+    
+        // Save row info (optional, for debugging or post-processing)
+        node->Arow.clear();
+        node->brow = 0.0;
+        {
+          PetscInt row = i;
+          PetscInt ncols;
+          const PetscInt *cols;
+          const PetscScalar *vals;
+          MatGetRow(Ah, row, &ncols, &cols, &vals);
+          for (int k = 0; k < ncols; ++k) {
+            node->Arow.push_back(vals[k]);
+          }
+          MatRestoreRow(Ah, row, &ncols, &cols, &vals);
+    
+          PetscScalar bi;
+          VecGetValues(bh, 1, &row, &bi);
+          node->brow = bi;
+        }
+    
+        // Apply Dirichlet BC
+        PetscInt row = i;
+        PetscScalar diag = 1.0;
+        MatZeroRows(Ah, 1, &row, diag, bh, nullptr);
+        VecSetValue(bh, row, node->tenth_gues, INSERT_VALUES);
+      }
+    
+      // --- Case 2: Enthalpy fixed ---
+      else if (node->fixed_var.count("H")) {
+        // Update thermodynamic state based on H
+        node->update_staticenth();
+        node->ther_gues->update(CoolProp::HmassP_INPUTS,
+                               node->senth_gues,
+                               node->spres_gues);
+        node->stemp_gues = node->ther_gues->T();
+    
+        // if (circuit->flag_tp || node->isTPTank()) {
+          // node->ther_gues->update_sat();
+        // }
+    
+        node->update_totaltemp();
+        node->update_staticpres();
+    
+        // Save row info (optional)
+        node->Arow.clear();
+        node->brow = 0.0;
+        {
+          PetscInt row = i;
+          PetscInt ncols;
+          const PetscInt *cols;
+          const PetscScalar *vals;
+          MatGetRow(Ah, row, &ncols, &cols, &vals);
+          for (int k = 0; k < ncols; ++k) {
+            node->Arow.push_back(vals[k]);
+          }
+          MatRestoreRow(Ah, row, &ncols, &cols, &vals);
+    
+          PetscScalar bi;
+          VecGetValues(bh, 1, &row, &bi);
+          node->brow = bi;
+        }
+    
+        // Apply Dirichlet BC
+        PetscInt row = i;
+        PetscScalar diag = 1.0;
+        MatZeroRows(Ah, 1, &row, diag, bh, nullptr);
+        VecSetValue(bh, row, node->tenth_gues, INSERT_VALUES);
+      }
+	  else if (node->fixed_var.count("msource") || node->fixed_var.count("P")) {
+		if (node->msource > 0.0) {
           // if (node->tenth_msrc.has_value()) {
             // b(i) += node->tenth_msrc.value() * node->msource;
           // } else {
@@ -824,15 +885,25 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
             // }
             // b(i) += node->tenth_old * node->msource;
           // }
-        // } else {
-          // A(i, i) -= node->msource;
-          // if (A(i, i) < 0.0) {
-            // std::cerr << "negative coef. in energy solver. stopping" << std::endl;
-            // exit(EXIT_FAILURE);
-          // }
-        // }
-      }
+        } else {
+	      PetscScalar Aii;
+		  PetscInt row = i, col = i;
+          MatGetValues(Ah, 1, &row, 1, &col, &Aii);
+          Aii = Aii - node->msource;
+		  MatSetValue(Ah, row, col, Aii, INSERT_VALUES);
+          if (Aii < 0.0) {
+            std::cerr << "negative coef. in energy solver. stopping" << std::endl;
+            exit(EXIT_FAILURE);
+          }
+        }
+	  }
     }
+
+    MatAssemblyBegin(Ah, MAT_FINAL_ASSEMBLY);
+    MatAssemblyEnd(Ah, MAT_FINAL_ASSEMBLY);
+
+
+
     
 /*     for (size_t i = 0; i < circuit->nodes.size(); ++i) {
       auto node = circuit->nodes[i];
@@ -848,11 +919,6 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
  */    
 
 
-    MatAssemblyBegin(Ah, MAT_FINAL_ASSEMBLY);
-    MatAssemblyEnd(Ah, MAT_FINAL_ASSEMBLY);
-    
-    VecAssemblyBegin(bh);
-    VecAssemblyEnd(bh);
 
     // Print matrix Ah
     PetscViewer viewerAh;

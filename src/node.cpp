@@ -267,6 +267,26 @@ void Node::assign_staticvar() {
   velocity = 0.;
 }
 
+void Node::update_statictemp() {
+  stemp_gues = ttemp_gues - 0.5*velocity*velocity/ther_gues->cpmass();
+}
+
+void Node::update_totalenth() {
+  tenth_gues = senth_gues + 0.5*velocity*velocity;
+}
+
+void Node::update_totaltemp() {
+  ttemp_gues = stemp_gues + 0.5*velocity*velocity/ther_gues->cpmass();
+}
+
+void Node::update_staticenth() {
+  senth_gues = tenth_gues - 0.5*velocity*velocity;
+}
+
+void Node::update_staticpres() {
+  spres_gues = tpres_gues - 0.5*ther_gues->rhomass()*velocity*velocity; //slug pending
+}
+
 void Node::assign_prop() {
 	if (circuit->fltype != FluidType::INCOMPRESSIBLE) {
   ther_gues = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("BICUBIC&HEOS", circuit->flname));

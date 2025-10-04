@@ -12,6 +12,7 @@
 #include "AbstractState.h"
 #include "crossplatform_shared_ptr.h"
 #include "hdf5_interface.h"
+#include <petscksp.h>
 
 namespace opensd {
 
@@ -69,6 +70,8 @@ public:
   double _heat_input_faceconv2;
   double _heat_input_facegen;
   std::vector<double> heat_hslab;
+  std::vector<PetscScalar> Arow;
+  PetscScalar brow;
 
   explicit Node(pugi::xml_node flnode_node);
   Node(std::string identifier, double volume, double heat_input, double elevation, double tpres_old = 0.0, double ttemp_old = 0.0, double tenth_old = 0.0); //Circuit* circuit, 
@@ -83,9 +86,14 @@ public:
   double eqn_ener(double time, double delt, bool trans_sim, double alpha_ener);
   void update_gues();
   void assign_staticvar();
+  void update_statictemp();
+  void update_totalenth();
   void update_staticvar(std::optional<double> velocity_in = std::nullopt);
   void assign_prop();
   void update_old();
+  void update_staticpres();
+  void update_totaltemp(); 
+  void update_staticenth();
 
   void save_to_hdf5(hid_t group_id) const;
   void load_from_hdf5(hid_t group_id);
