@@ -41,7 +41,7 @@ geometry = opensd.Geometry([circuit2])
 geometry.export_to_xml()
 
 settings = opensd.Settings()
-settings.verbosity = 3
+settings.verbosity = 6
 settings.temp_solve = True
 settings.run_mode = "steady"
 settings.no_main_iter = 200

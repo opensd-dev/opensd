@@ -671,13 +671,13 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
 void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, int main_iter) {
   
+  simulation::time_fluid_energy.start();
   for (auto& circuit : model::circuits_owned) {
     // if (!trans_sim && !circuit.solveSS) continue;
 
     int n = circuit->nodes.size();
 
     // vector<int> nocal_ind;
-    simulation::time_fluid_energy.start();
     auto &Ah = circuit->Ah;
     auto &bh = circuit->bh;
     auto &enth = circuit->enth;
@@ -921,18 +921,18 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
 
 
     // Print matrix Ah
-    PetscViewer viewerAh;
-    PetscViewerASCIIOpen(PETSC_COMM_WORLD, "matrix_Ah.txt", &viewerAh);
-    PetscViewerPushFormat(viewerAh, PETSC_VIEWER_ASCII_DENSE); // optional: DENSE format
-    MatView(Ah, viewerAh);
-    PetscViewerPopFormat(viewerAh);
-    PetscViewerDestroy(&viewerAh);
+    // PetscViewer viewerAh;
+    // PetscViewerASCIIOpen(PETSC_COMM_WORLD, "matrix_Ah.txt", &viewerAh);
+    // PetscViewerPushFormat(viewerAh, PETSC_VIEWER_ASCII_DENSE); // optional: DENSE format
+    // MatView(Ah, viewerAh);
+    // PetscViewerPopFormat(viewerAh);
+    // PetscViewerDestroy(&viewerAh);
     
     // Print vector bh
-    PetscViewer viewerbh;
-    PetscViewerASCIIOpen(PETSC_COMM_WORLD, "vector_bh.txt", &viewerbh);
-    VecView(bh, viewerbh);
-    PetscViewerDestroy(&viewerbh);
+    // PetscViewer viewerbh;
+    // PetscViewerASCIIOpen(PETSC_COMM_WORLD, "vector_bh.txt", &viewerbh);
+    // VecView(bh, viewerbh);
+    // PetscViewerDestroy(&viewerbh);
 
 
 	
@@ -1015,22 +1015,65 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
     VecView(enth, viewer);
     PetscViewerDestroy(&viewer);
 	
+
+
+    std::ofstream fout;
+    if (settings::verbosity >= 6)
+      std::ofstream fout2("tenth_rank_" + std::to_string(mpi::rank) + ".txt");
+    
+    // Create ghost vector
+    // PetscInt n_local = circuit->indices_owned.size();
+    // PetscInt nghost  = circuit->ghost_indices_owned.size();
+    
+    // std::vector<PetscScalar> vals_owned(n_local);
+    // VecGetValues(enth, n_local, circuit->indices_owned.data(), vals_owned.data());
+	
+    double relax = 1.;
+    // if (!HT_comp::HSlab::_registry.empty()) {
+  	// if (!trans_sim) {
+  	  // relax = 0.25;
+  	// }
+    // }
+	PetscScalar enth_i;
+    for (auto& node : circuit->nodes_owned) {
+      int i = circuit->old2new[node->node_ind];
+	  
+	  if (node->fixed_var.count("T") ||
+          node->fixed_var.count("H") ) {
+        continue;
+      }
+	  
+      VecGetValues(enth, 1, (PetscInt*)&i, &enth_i);
+	  node->tenth_gues = (1.0 - relax) * node->tenth_gues + relax * enth_i;
+	  // if (settings::verbosity >= 6)
+	  // fout2 << "node " << node->identifier << " " << std::setprecision(8) << std::fixed << node->tenth_gues << "\n";
+    }
+	
+	
+	for (auto& node : circuit->nodes_owned) {
+      int i = circuit->old2new[node->node_ind];
+	
+	  if (node->fixed_var.count("T") ||
+          node->fixed_var.count("H") ) {
+        double sum_A_tenth = 0.0;
+        for (size_t j = 0; j < circuit->nodes.size(); ++j) {
+          sum_A_tenth += node->Arow[j] * circuit->nodes[j]->tenth_gues;
+        }
+      
+        node->esource = sum_A_tenth - node->brow - node->tenth_gues * node->msource;
+        std::cout << "node " << node->identifier << " " << std::setprecision(8) << std::fixed << node->esource << "\n";
+      }
+
+	}
+	// if (settings::verbosity >= 6)
+	  // fout2.close();
+	
 	MPI_Abort(mpi::intracomm, 0);
     std::exit(0);
-/*
-    // Remaining logic to handle matrix operations, boundary conditions, nocal_ind, energy update, etc.
-
-    // Solving the system and post-processing the results here...
-    if (A.determinant() != 0 && A.fullPivLu().isInvertible()) {
-      Eigen::VectorXd enth = A.fullPivLu().solve(b);
-      // Further updates and checks for enth values...
-    } else {
-      std::cerr << "Matrix is singular or ill-conditioned, please check boundary conditions.\n";
-      std::exit(EXIT_FAILURE);
-    }
-*/
-    }
-    simulation::time_fluid_energy.stop();
+  }
+  
+  simulation::time_fluid_energy.stop();
+  
 }
 
 }
