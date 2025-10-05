@@ -821,7 +821,7 @@ PetscInt global_nrows = vertex_count; // same as nvtxs
 
     auto &ksph = circuit->ksph;
     KSPCreate(circuit->comm, &ksph);
-    KSPSetOperators(ksph, A, A);
+    KSPSetOperators(ksph, Ah, Ah);
     KSPSetFromOptions(ksph);
 
     PetscInt n_faces_owned = circuit->face_indices_owned.size();

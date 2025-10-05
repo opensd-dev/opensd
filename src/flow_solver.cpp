@@ -934,8 +934,7 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
     VecView(bh, viewerbh);
     PetscViewerDestroy(&viewerbh);
 
-    MPI_Abort(mpi::intracomm, 0);
-    std::exit(0);
+
 	
 /*     std::vector<int> nocal_ind;
     for (int i = 0; i < A.cols(); ++i) {
@@ -950,21 +949,74 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
       b = removeElement(b, *it); // removeElement is a custom function to remove elements from b
     }
  */    
-    // double cond = A.fullPivLu().rcond();
-    // if (cond < 1.E8) {
-      // VectorXd enth = A.colPivHouseholderQr().solve(b);
-    // } else if (std::isinf(cond)) {
-      // std::cerr << "infinite condition number. check boundary conditions" << std::endl;
-      // exit(EXIT_FAILURE);
-    // } else {
-      // VectorXd enth_old = VectorXd::Zero(circuit->nodes.size());
-      // for (size_t i = 0; i < circuit->nodes.size(); ++i) {
-        // enth_old[i] = circuit->nodes[i]->tenth_gues;
-      // }
-      // removeElements(enth_old, nocal_ind);
-      // VectorXd enth = sor_solver(A, b, 0.8, enth_old, 1.E-8, 25);  // sor_solver is assumed to be defined
-    // }
+// Assume A (Mat), b (Vec), and circuit->nodes already filled.
+// enth (Vec) will store the solution.
 
+  // PC pc;
+  // PetscReal emin, emax, cond;
+  
+  // Create KSP solver
+  // KSPSetOperators(circuit->ksph, A, A);
+  
+  // (1) Estimate condition number
+  // KSPSetUp(ksp);  // must set up before computing eigenvalues
+  // KSPComputeExtremeSingularValues(ksp, &emin, &emax);
+  
+  // if (emin > 0.0 && emax > 0.0) {
+    // cond = emax / emin;
+  // } else {
+    // std::cerr << "Infinite condition number. Check boundary conditions." << std::endl;
+    // PetscFinalize();
+    // exit(EXIT_FAILURE);
+  // }
+  
+  // (2) If condition number is reasonable -> direct LU solve
+  // if (cond < 1.0e8) {
+    // KSPSetType(ksp, KSPPREONLY);
+    // KSPGetPC(ksp, &pc);
+    // PCSetType(pc, PCLU);  // direct LU
+    // KSPSetFromOptions(ksp);
+  
+    // VecDuplicate(b, &enth);
+    KSPSolve(circuit->ksph, bh, enth);
+  
+  // } else {
+    // (3) Else -> fallback to SOR iteration
+    // KSPSetType(ksp, KSPRICHARDSON);   // basic iterative solver
+    // KSPGetPC(ksp, &pc);
+    // PCSetType(pc, PCSOR);
+  
+    // KSPSetTolerances(ksp, 1.e-8, PETSC_DEFAULT, PETSC_DEFAULT, 25);
+  
+    // Build initial guess enth_old from nodes
+    // Vec enth_old;
+    // VecDuplicate(b, &enth_old);
+    // for (size_t i = 0; i < circuit->nodes.size(); ++i) {
+      // double val = circuit->nodes[i]->tenth_gues;      
+      // if (std::find(nocal_ind.begin(), nocal_ind.end(), i) != nocal_ind.end()) { // removeElements(enth_old, nocal_ind) equivalent:
+        // continue; // skip removed indices
+      // }
+      // VecSetValue(enth_old, i, val, INSERT_VALUES);
+    // }
+    // VecAssemblyBegin(enth_old);
+    // VecAssemblyEnd(enth_old);
+  
+    // VecDuplicate(b, &enth);
+    // VecCopy(enth_old, enth); // use old guess as initial guess
+  
+    // KSPSolve(ksp, b, enth);
+  
+    // VecDestroy(&enth_old);
+  // }
+  
+
+    PetscViewer viewer;
+    PetscViewerASCIIOpen(PETSC_COMM_WORLD, "enth_output.txt", &viewer);
+    VecView(enth, viewer);
+    PetscViewerDestroy(&viewer);
+	
+	MPI_Abort(mpi::intracomm, 0);
+    std::exit(0);
 /*
     // Remaining logic to handle matrix operations, boundary conditions, nocal_ind, energy update, etc.
 
