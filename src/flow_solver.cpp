@@ -902,6 +902,8 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
     MatAssemblyBegin(Ah, MAT_FINAL_ASSEMBLY);
     MatAssemblyEnd(Ah, MAT_FINAL_ASSEMBLY);
 
+    // VecAssemblyBegin(bh);
+    // VecAssemblyEnd(bh);
 
 
     
@@ -1061,13 +1063,55 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
         }
       
         node->esource = sum_A_tenth - node->brow - node->tenth_gues * node->msource;
-        std::cout << "node " << node->identifier << " " << std::setprecision(8) << std::fixed << node->esource << "\n";
+        // std::cout << "node " << node->identifier << " " << std::setprecision(8) << std::fixed << node->esource << "\n";
       }
 
 	}
 	// if (settings::verbosity >= 6)
 	  // fout2.close();
-	
+
+	for (auto& node : circuit->nodes_owned) {
+      int i = circuit->old2new[node->node_ind];
+
+      // Skip T/H fixed nodes for static enthalpy update
+      bool fixedT = node->fixed_var.count("T");
+      bool fixedH = node->fixed_var.count("H");
+
+      if (!fixedT && !fixedH) {
+        node->update_staticenth();
+        node->ther_gues->update(CoolProp::HmassP_INPUTS,
+                                node->senth_gues,
+                                node->spres_gues);
+
+        // if (circuit->flag_tp || dynamic_cast<TPTank*>(node.get()))
+        //   node->ther_gues.update_sat();
+      }
+
+      // if (trans_sim && (node->pc_flag ||
+      //                   node->ther_gues.phase() != node->ther_old.phase())) {
+      //   node->pc_flag = true;
+
+          // optional phase-change relaxation (commented as in Python)
+          /*
+          if (!fixedT && !fixedH) {
+            double relax = 0.5;
+            node->ther_gues.update(CoolProp::HmassP_INPUTS,
+                                  (1.0 - relax) * node->senth_old + relax * node->senth_gues,
+                                  (1.0 - relax) * node->spres_old + relax * node->spres_gues);
+            node->update_Qth();
+          }
+          */
+      // }
+
+      if (!fixedT && !fixedH) {
+        double relax = 1.0;
+        node->stemp_gues = relax * node->ther_gues->T() + (1.0 - relax) * node->stemp_gues;
+        node->update_totaltemp();
+      }
+      std::cout << "node " << node->identifier << " " << std::setprecision(8) << std::fixed << node->stemp_gues << "\n";
+    }
+
+
 	MPI_Abort(mpi::intracomm, 0);
     std::exit(0);
   }
