@@ -1,8 +1,41 @@
 # SFR IHX
 
 import opensd
-
 import math
+
+# Define sodium (shell side)
+Na6 = opensd.Fluid(name="Na6")
+Na6.rhomass = 860.0
+Na6.molarmass = 23E-3
+Na6.viscosity = 3.75E-4
+Na6.cpmass = 1260.0
+Na6.cvmass = 1270.0
+Na6.conductivity = 70.0
+Na6.adiabatic_compressibility = 1.86E-10
+Na6.isothermal_compressibility = 1.86E-10
+Na6.boiling_point = 883.0 + 273.0
+Na6.enthalpy_vaporization = 2.23E6
+
+# Define sodium (tube side)
+Na7 = opensd.Fluid(name="Na7")
+Na7.rhomass = 860.0
+Na7.molarmass = 23E-3
+Na7.viscosity = 3.75E-4
+Na7.cpmass = 1260.0
+Na7.cvmass = 1270.0
+Na7.conductivity = 70.0
+Na7.adiabatic_compressibility = 1.86E-10
+Na7.isothermal_compressibility = 1.86E-10
+Na7.boiling_point = 883.0 + 273.0
+Na7.enthalpy_vaporization = 2.23E6
+
+# Fluids collection
+fluids = opensd.Fluids()
+fluids.append(Na6)
+fluids += [Na7]
+
+# Export all fluids to a single XML
+fluids.export_to_xml()
 
 #primary circuit (IHX shell)
 # circuit1 = opensd.Circuit(identifier="circuit1")
@@ -24,7 +57,7 @@ import math
 
 #secondary circuit (IHX tube)
 circuit2 = opensd.Circuit(identifier="circuit2")
-circuit2.assign_fluid(flname="LiqNa",fltype="incompressible")
+circuit2.assign_fluid(flname="LiqNa",fltype="incompressible",fllib="User")
 
 node3 = circuit2.add_node("node3")
 node4 = circuit2.add_node("node4")
@@ -47,5 +80,5 @@ settings.run_mode = "steady"
 settings.no_main_iter = 200
 settings.export_to_xml()
 
-opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/d/codes/opensd/build/opensd')
+opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/home/vikram/Codes/opensd/build/opensd')
 

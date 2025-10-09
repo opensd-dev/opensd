@@ -53,9 +53,10 @@ class Circuit:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-    def assign_fluid(self,flname,fltype="compressible"):
+    def assign_fluid(self,flname,fltype="compressible",fllib="CoolProp"):
         self._flname = flname
         self._fltype = FluidType(fltype)
+        self._fllib = fllib
         
         # if fllib=="CoolProp":
         if self._fltype == FluidType.INCOMPRESSIBLE:
@@ -323,6 +324,9 @@ class Circuit:
             
         subelement = ET.SubElement(element, "fltype")
         subelement.text = self._fltype.value
+
+        subelement = ET.SubElement(element, "fllib")
+        subelement.text = self._fllib
 
         if self.nodes:
             for node in self.nodes:
