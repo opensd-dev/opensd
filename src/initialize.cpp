@@ -5,6 +5,7 @@
 
 // #include "opensd/capi.h"
 // #include "opensd/constants.h"
+#include "opensd/fluid.h"
 #include "opensd/settings.h"
 #include "opensd/geometry.h"
 #include "opensd/message_passing.h"
@@ -174,6 +175,13 @@ void initialize_mpi(MPI_Comm intracomm)
 void read_separate_xml_files()
 {
   read_settings_xml();
+  read_fluids_xml();
+  for (auto& fptr : opensd::model::fluids) {
+    std::cout << "Fluid ID: " << fptr->id()
+              << ", Name: " << fptr->name()
+              << ", Name: " << fptr->cpmass()
+              << ", Density: " << fptr->rhomass() << " kg/m3" << std::endl;
+  }
   read_geometry_xml();
 
 }

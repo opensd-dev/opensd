@@ -36,6 +36,7 @@ public:
   std::string identifier; //!< User-defined identifier
   std::string flname;
   FluidType fltype;       //!< Fluid Type ('compressible', 'incompressible', 'two_phase')
+  std::string fllib;
   explicit Circuit(pugi::xml_node cir_node);
   Circuit() = default;
   double eps_m;

@@ -8,8 +8,8 @@ Na6 = opensd.Fluid(name="Na6")
 Na6.rhomass = 860.0
 Na6.molarmass = 23E-3
 Na6.viscosity = 3.75E-4
-Na6.cpmass = 1260.0
-Na6.cvmass = 1270.0
+Na6.cpmass = 1267.0
+Na6.cvmass = 1266.9
 Na6.conductivity = 70.0
 Na6.adiabatic_compressibility = 1.86E-10
 Na6.isothermal_compressibility = 1.86E-10
@@ -21,8 +21,8 @@ Na7 = opensd.Fluid(name="Na7")
 Na7.rhomass = 860.0
 Na7.molarmass = 23E-3
 Na7.viscosity = 3.75E-4
-Na7.cpmass = 1260.0
-Na7.cvmass = 1270.0
+Na7.cpmass = 1267.0
+Na7.cvmass = 1266.9
 Na7.conductivity = 70.0
 Na7.adiabatic_compressibility = 1.86E-10
 Na7.isothermal_compressibility = 1.86E-10
@@ -57,7 +57,7 @@ fluids.export_to_xml()
 
 #secondary circuit (IHX tube)
 circuit2 = opensd.Circuit(identifier="circuit2")
-circuit2.assign_fluid(flname="LiqNa",fltype="incompressible",fllib="User")
+circuit2.assign_fluid(flname="Na6",fltype="incompressible",fllib="User")
 
 node3 = circuit2.add_node("node3")
 node4 = circuit2.add_node("node4")

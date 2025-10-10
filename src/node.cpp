@@ -8,6 +8,8 @@
 #include "opensd/xml_interface.h"
 #include "opensd/circuit.h"
 #include "opensd/face.h"
+#include "opensd/fluid.h"
+#include "opensd/coolprop_adapter.h"
 
 namespace opensd {
 
@@ -289,13 +291,32 @@ void Node::update_staticpres() {
 
 void Node::assign_prop() {
 	if (circuit->fltype != FluidType::INCOMPRESSIBLE) {
-  ther_gues = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("BICUBIC&HEOS", circuit->flname));
-  ther_old = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("BICUBIC&HEOS", circuit->flname));
+  ther_gues = std::make_shared<opensd::CoolPropAdapter>("BICUBIC&HEOS", circuit->flname);
+  ther_old  = std::make_shared<opensd::CoolPropAdapter>("BICUBIC&HEOS", circuit->flname);
 	}
 	else {
-  ther_gues = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("INCOMP",circuit->flname));
-  ther_old = shared_ptr<CoolProp::AbstractState>(CoolProp::AbstractState::factory("INCOMP",circuit->flname));
-	}
+      if (circuit->fllib=="CoolProp") {
+  ther_gues = std::make_shared<opensd::CoolPropAdapter>("INCOMP", circuit->flname);
+  ther_old = std::make_shared<opensd::CoolPropAdapter>("INCOMP", circuit->flname);
+  // ther_old  = node->ther_gues->clone();
+      } else { //circuit->fllib=="User"
+
+  bool found = false;
+  for (auto& fptr : model::fluids) {
+    if (fptr->name() == circuit->flname) {
+      ther_gues = fptr->clone(); // deep copy
+      ther_old  = fptr->clone();
+      found = true;
+      break;
+    }
+  }
+  if (!found) fatal_error(fmt::format("Could not find fluid '{}'", circuit->flname));
+
+
+      }
+
+
+    }
   ther_old->update(CoolProp::HmassP_INPUTS,senth_old,spres_old);
 }
 

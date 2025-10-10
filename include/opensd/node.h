@@ -9,6 +9,7 @@
 // #include "opensd/circuit.h"
 #include "opensd/vector.h"
 #include "CoolProp.h"
+#include "fluidframe.h"
 #include "AbstractState.h"
 #include "crossplatform_shared_ptr.h"
 #include "hdf5_interface.h"
@@ -59,8 +60,8 @@ public:
   double esource;
   double hresidue;
   double volume;
-  shared_ptr<CoolProp::AbstractState> ther_gues;
-  shared_ptr<CoolProp::AbstractState> ther_old;
+  shared_ptr<FluidFrame> ther_gues;
+  shared_ptr<FluidFrame> ther_old;
   double velocity;
   double B1;
   

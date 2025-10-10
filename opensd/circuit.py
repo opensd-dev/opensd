@@ -8,6 +8,7 @@ from opensd.bc import BC
 from opensd.project import get_comp
 from opensd.settings import Settings
 from opensd.branch import Branch
+import sys,os
 
 class FluidType(Enum):
     COMPRESSIBLE = 'compressible'
@@ -58,22 +59,23 @@ class Circuit:
         self._fltype = FluidType(fltype)
         self._fllib = fllib
         
-        # if fllib=="CoolProp":
-        if self._fltype == FluidType.INCOMPRESSIBLE:
-            self.flstate = CoolProp.AbstractState("INCOMP",self._flname)
-        else:
-            self.flstate = CoolProp.AbstractState("BICUBIC&HEOS",self._flname)
+        if fllib=="CoolProp":
+            if self._fltype == FluidType.INCOMPRESSIBLE:
+                self.flstate = CoolProp.AbstractState("INCOMP",self._flname)
+            else:
+                self.flstate = CoolProp.AbstractState("BICUBIC&HEOS",self._flname)
         
         # elif fllib=="thiravam":
             # self.flstate=thiravam.state(self.flname)
-        # elif fllib=="User":
+        elif fllib=="User":
             # sys.path.insert(0,os.getcwd() + "/")
             # mod = __import__(flname)
-            # clas = getattr(mod,'fluid')
-            # self.flstate=clas()
-        # else:
-            # print ("fluid library unknown. stopping")
-            # sys.exit()
+            mod = __import__(f"opensd.{flname}", fromlist=[''])
+            clas = getattr(mod,'fluid')
+            self.flstate=clas()
+        else:
+            print ("fluid library unknown. stopping")
+            sys.exit()
 
     def add_node(self,identifier,volume=0.,heat_input=0.,elevation=0.,tpres_old=None,ttemp_old=None,tenth_old=None,geom=None):
         node = Node(identifier,self,volume,heat_input,elevation,tpres_old,ttemp_old,tenth_old,geom)
