@@ -1108,14 +1108,54 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
         node->stemp_gues = relax * node->ther_gues->T() + (1.0 - relax) * node->stemp_gues;
         node->update_totaltemp();
       }
-      std::cout << "node " << node->identifier << " " << std::setprecision(8) << std::fixed << node->stemp_gues << "\n";
     }
 
 
-	MPI_Abort(mpi::intracomm, 0);
+    for (auto& face : circuit->faces_owned) {
+      if (!face->choked) {
+        face->update_statevar();
+        face->ther_gues->update();
+        // if (circuit->flag_tp) face->ther_gues->update_sat();
+        face->update_heat_input();
+        face->update_fricfact();
+        face->update_velocity(); //may not be required for incomp solver. check pending
+      }
+    }
+
+
+	for (auto& node : circuit->nodes_owned) {
+      int i = circuit->old2new[node->node_ind];
+
+      bool fixedT = node->fixed_var.count("T");
+      bool fixedH = node->fixed_var.count("H");
+
+      if (!fixedT && !fixedH) {
+        node->update_staticpres();
+      }
+
+      // if (!trans_sim && dynamic_cast<Reservoir*>(node.get())) {
+      //     node->update_level();
+      // }
+    }
+
+
+    for (auto& face : circuit->faces_owned) {
+      // if (!face->choked) {
+        face->update_staticpres();
+      // } else {
+      //   face->update_Gcr();
+      //   face->G = std::copysign(face->Gcr, face->vflow_gues);
+      //   face->vflow_gues = face->G * face->cfarea / face->ther_gues.rhomass();
+      // }
+      std::cout << "face " << face->faceno << " " << std::setprecision(8) << std::fixed << face->stemp_gues << "\n";
+    }
+
+
+    MPI_Abort(mpi::intracomm, 0);
     std::exit(0);
   }
-  
+
+
   simulation::time_fluid_energy.stop();
   
 }

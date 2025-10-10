@@ -40,6 +40,10 @@ void Face::update_statevar(){
   stemp_gues = 0.5 * (unode->stemp_gues + dnode->stemp_gues);
 }
 
+void Face::update_staticpres() {
+  spres_gues = 0.5 * (unode->spres_gues + dnode->spres_gues);
+}
+
 void Face::assign_statevar() {
   tpres_old = 0.5 * (unode->tpres_old + dnode->tpres_old);
   spres_old = 0.5 * (unode->spres_old + dnode->spres_old);

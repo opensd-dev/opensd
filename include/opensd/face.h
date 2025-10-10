@@ -70,6 +70,7 @@ public:
   virtual ~Face() = default;
   void assign_statevar();
   void update_statevar();
+  void update_staticpres();
   virtual void update_gues();
   void assign_prop();
   virtual void update_old();
