@@ -133,8 +133,7 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
 
   PetscInt n_faces_owned = circuit->face_indices_owned.size();
 
-
-
+  #pragma omp parallel for
   for (PetscInt i = 0; i < n_faces_owned; ++i) {
     FaceWrapper fw {circuit->faces_owned[i], time, delt, trans_sim, alpha_mom};
 
@@ -318,7 +317,20 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     MatZeroEntries(A);
     VecZeroEntries(b);
     VecZeroEntries(pc);
-    for (auto& node : circuit->nodes_owned) {
+
+// #pragma omp parallel
+// {
+//   if (omp_get_thread_num() == 0)
+//     std::cout << "Threads used: " << omp_get_num_threads() << std::endl;
+// }
+// #pragma omp parallel for
+// for (int i = 0; i < 8; ++i) {
+//   printf("Thread %d processing %d\n", omp_get_thread_num(), i);
+// }
+
+    // #pragma omp parallel for
+    for (size_t n = 0; n < circuit->nodes_owned.size(); ++n) {
+      auto& node = circuit->nodes_owned[n];
       int i = circuit->old2new[node->node_ind];  // global row index
 	  bool pbound = node->fixed_var.count("P");
       double A_local_node = 0, A_local_iface, A_local_oface;
@@ -327,7 +339,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       double B, D;
       if (circuit->fltype != FluidType::INCOMPRESSIBLE && node->ther_old->phase() == 6) {
         B = node->B1 + node->volume * node->ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iP, CoolProp::iHmass) / node->ther_old->rhomass();
-        if (!pbound) 
+        if (!pbound)
           A_local_node = trans_sim * B * node->ther_old->rhomass() / delt;
         D = trans_sim * node->volume * node->ther_old->first_two_phase_deriv(CoolProp::iDmass, CoolProp::iHmass, CoolProp::iP);
       } else {
@@ -377,12 +389,12 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 		b_local = 0.0;
         
       } else if (node->fixed_var.count("msource")) {
-  //       if (time <= 20) {
-  //           node->msource = -753.6*(20.-time)/20.;
-		// }
-  //       else {
-  //           node->msource = 0.;
-		// }
+        if (time <= 20) {
+            node->msource = -753.6*(20.-time)/20.;
+		}
+        else {
+            node->msource = 0.;
+		}
         b_local += node->msource;
       }
 
@@ -440,6 +452,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
        // }
 
     simulation::time_pc_update.start();
+    simulation::time_pc_update_a.start();
     // Prepare file for writing (one file per rank)
     std::ofstream fout;
     if (settings::verbosity >= 6)
@@ -491,6 +504,9 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       }
       face->update_velocity();
     }
+    simulation::time_pc_update_a.stop();
+
+    simulation::time_pc_update_b.start();
 
     PetscInt n_faces_owned = circuit->face_indices_owned.size();
     PetscInt n_faces_ghost = circuit->ghost_face_indices_owned.size();
@@ -518,13 +534,16 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     }
 
     VecRestoreArrayRead(vflow_gues_local, &vflow_array_read);
+    simulation::time_pc_update_b.stop();
 
+    simulation::time_pc_update_cd.start();
 
     // Pressure and density corrections
-    int k = 0;
-    for (auto& node : circuit->nodes_owned) {
+    #pragma omp parallel for
+    for (size_t n = 0; n < circuit->nodes_owned.size(); ++n) {
+      auto& node = circuit->nodes_owned[n];
       double relax = 0.6;
-      node->tpres_gues += relax * pc_array[k++];
+      node->tpres_gues += relax * pc_array[n];
       // if (node->identifier == "node2") {
       //  std::cout << "rank " << mpi::rank << " tpres " << node->tpres_gues << std::endl;
       // }
@@ -558,8 +577,9 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     // if (trans_sim) {
       // std::exit(1);
     // }
+    simulation::time_pc_update_cd.stop();
 
-
+    simulation::time_pc_update_ef.start();
     auto &velocity_local = circuit->velocity_local;
 
     PetscScalar* velocity_arr = nullptr;
@@ -583,9 +603,11 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     VecRestoreArrayRead(velocity_local, &velocity_arr_read);
 
 
-    for (auto& node : circuit->ghost_nodes_owned1) {
+    // #pragma omp parallel for
+    for (size_t i = 0; i < circuit->ghost_nodes_owned1.size(); ++i) {
+      auto& node = circuit->ghost_nodes_owned1[i];
       double relax = 0.6;
-      node->tpres_gues = node->tpres_gues + relax * pc_array[k++];
+      node->tpres_gues = node->tpres_gues + relax * pc_array[circuit->nodes_owned.size()+i];
       // std::cout << std::defaultfloat << std::setprecision(15) << "flag2 rank " << mpi::rank << " tpres_gues " << node->tpres_gues << " tpres_old " << node->tpres_old << std::endl;
       node->update_staticvar(node->velocity);
       node->ther_gues->update(CoolProp::HmassP_INPUTS, node->senth_gues, node->spres_gues);
@@ -604,11 +626,14 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       }
       fout1.close();
     }
-    
+
     VecRestoreArrayRead(pc_local, &pc_array);
+    simulation::time_pc_update_ef.stop();
 
-
-    for (auto& face : circuit->faces_owned) {
+    simulation::time_pc_update_g.start();
+    #pragma omp parallel for
+    for (size_t i = 0; i < circuit->faces_owned.size(); ++i) {
+      auto& face = circuit->faces_owned[i];
       // if (!face->choked) {
         face->update_statevar();
         face->ther_gues->update();
@@ -621,8 +646,9 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         // face->vflow_gues = face->G * face->cfarea / face->ther_gues.rhomass();
       // }
     }
+    simulation::time_pc_update_g.stop();
 
-
+    simulation::time_pc_update_h.start();
     
     auto &rhomass_local = circuit->rhomass_local;
     
@@ -660,6 +686,8 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     }
 
     VecRestoreArrayRead(rhomass_local, &rhomass_array_read);
+
+    simulation::time_pc_update_h.stop();
 
     simulation::time_pc_update.stop();
 

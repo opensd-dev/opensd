@@ -1,6 +1,8 @@
 #ifndef MASSMOM_H
 #define MASSMOM_H
 
+#include <omp.h>
+
 #include "opensd/circuit.h"
 // #include <Eigen/Dense>
 // #include <Eigen/Core>

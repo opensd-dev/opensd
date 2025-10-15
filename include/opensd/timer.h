@@ -19,10 +19,18 @@ extern Timer time_total;
 extern Timer time_pressure_correction;
 extern Timer time_guess_flow;
 extern Timer time_convergence;
+extern Timer time_conv_mass;
+extern Timer time_conv_mom;
 extern Timer time_update_old;
 extern Timer time_pc_assembly;
 extern Timer time_pc_solve;
 extern Timer time_pc_update;
+extern Timer time_pc_update_a;
+extern Timer time_pc_update_b;
+extern Timer time_pc_update_cd;
+extern Timer time_pc_update_ef;
+extern Timer time_pc_update_g;
+extern Timer time_pc_update_h;
 extern Timer time_fluid_energy;
 
 } // namespace simulation

@@ -16,6 +16,7 @@ message(STATUS "OPENSD_USE_MPI ${OPENSD_USE_MPI}")
 if(OPENSD_USE_MPI)
   find_package(MPI REQUIRED)
 endif()
+find_package(OpenMP REQUIRED)
 
 find_package(HDF5 REQUIRED COMPONENTS C HL)
 
@@ -108,6 +109,7 @@ target_link_libraries(${EXENAME}
 	${METIS_LIBRARY}
 	GSL::gsl
 	GSL::gslcblas
+	OpenMP::OpenMP_CXX
 )
 
 # if (OPENSD_USE_MPI)

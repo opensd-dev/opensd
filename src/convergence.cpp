@@ -9,6 +9,8 @@
 #include "opensd/initialize.h"
 #include "opensd/message_passing.h"
 #include "opensd/settings.h"
+#include "opensd/simulation.h"
+#include "opensd/timer.h"
 
 namespace opensd {
     
@@ -16,29 +18,43 @@ std::tuple<bool, double, double, double, double> check_conv(double time, double 
   double eps_mtot = 0.0, eps_ptot = 0.0, eps_htot = 0.0, eps_ttot = 0.0;
 
   for (auto& circuit : model::circuits_owned) {
-    
+    simulation::time_conv_mass.start();
     vector<double> eps_mlist;
-    for (auto& node : circuit->nodes_owned) {
+    #pragma omp parallel for
+    for (size_t n = 0; n < circuit->nodes_owned.size(); ++n) {
+      auto& node = circuit->nodes_owned[n];
       node->mresidue = node->eqn_cont(time,delt,trans_sim,alpha_mom);
       // std::cout << "rank " << mpi::rank << " " << node->identifier << " " << node->mresidue << std::endl;
       // if (dynamic_cast<comp::Reservoir*>(&node)) node.mresidue = 0;
+    }
+    for (size_t n = 0; n < circuit->nodes_owned.size(); ++n) {
+      auto& node = circuit->nodes_owned[n];
       if (std::abs(node->mflow_in) > 1.E-5 || std::abs(node->mflow_out) > 1.E-5) {
         eps_mlist.push_back(std::abs(node->mresidue));
       }
     }
+    simulation::time_conv_mass.stop();
 
+    simulation::time_conv_mom.start();
     circuit->eps_p = 0.0;
     std::vector<double> e_mass;
-    for (auto& face : circuit->faces_owned) {
+
+    #pragma omp parallel for
+    for (size_t i = 0; i < circuit->faces_owned.size(); ++i) {
+      auto& face = circuit->faces_owned[i];
       face->presidue = face->eqn_mom(face->vflow_gues, time, delt, trans_sim, alpha_mom);
       // std::cout << "rank " << mpi::rank << " " << std::setprecision(12) << std::fixed << " face " << face->faceno << " " << face->presidue << std::endl;
       circuit->eps_p += std::abs(face->presidue) / face->tpres_gues;
       face->mflow = face->vflow_gues * face->ther_gues->rhomass();
+    }
+
+    for (auto& face : circuit->faces_owned) {
       if (std::abs(face->mflow) > 1.0E-5) {
         e_mass.push_back(std::abs(face->mflow));
       }
-      face->mflow = face->vflow_gues * face->ther_gues->rhomass();
     }
+    simulation::time_conv_mom.stop();
+
     for (auto& pipe : circuit->pipes) {
       // pipe.update_mflow();
     }

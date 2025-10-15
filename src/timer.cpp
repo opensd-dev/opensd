@@ -12,12 +12,20 @@ Timer time_finalize;
 Timer time_total;
 Timer time_massmom;
 Timer time_convergence;
+Timer time_conv_mass;
+Timer time_conv_mom;
 Timer time_pressure_correction;
 Timer time_guess_flow;
 Timer time_update_old;
 Timer time_pc_assembly;
 Timer time_pc_solve;
 Timer time_pc_update;
+Timer time_pc_update_a;
+Timer time_pc_update_b;
+Timer time_pc_update_cd;
+Timer time_pc_update_ef;
+Timer time_pc_update_g;
+Timer time_pc_update_h;
 Timer time_fluid_energy;
 
 } // namespace simulation
@@ -66,10 +74,18 @@ void reset_timers()
   simulation::time_guess_flow.reset();
   simulation::time_pressure_correction.reset();
   simulation::time_convergence.reset();
+  simulation::time_conv_mass.reset();
+  simulation::time_conv_mom.reset();
   simulation::time_update_old.reset();
   simulation::time_pc_assembly.reset();
   simulation::time_pc_solve.reset();
   simulation::time_pc_update.reset();
+  simulation::time_pc_update_a.reset();
+  simulation::time_pc_update_b.reset();
+  simulation::time_pc_update_cd.reset();
+  simulation::time_pc_update_ef.reset();
+  simulation::time_pc_update_g.reset();
+  simulation::time_pc_update_h.reset();
   simulation::time_fluid_energy.reset();
 }
 

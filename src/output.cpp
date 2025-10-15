@@ -226,8 +226,16 @@ void print_runtime()
   show_time("Total time for pc assembly", time_pc_assembly.elapsed());
   show_time("Total time for pc solve", time_pc_solve.elapsed());
   show_time("Total time for pc update", time_pc_update.elapsed());
+  show_time("Total time for pc update a", time_pc_update_a.elapsed());
+  show_time("Total time for pc update b", time_pc_update_b.elapsed());
+  show_time("Total time for pc update cd", time_pc_update_cd.elapsed());
+  show_time("Total time for pc update ef", time_pc_update_ef.elapsed());
+  show_time("Total time for pc update g", time_pc_update_g.elapsed());
+  show_time("Total time for pc update h", time_pc_update_h.elapsed());
   show_time("Total time for guess flow", time_guess_flow.elapsed());
   show_time("Total time for convergence", time_convergence.elapsed());
+  show_time("Total time for convergence mass", time_conv_mass.elapsed());
+  show_time("Total time for convergence momentum", time_conv_mom.elapsed());
   show_time("Total time for update old", time_update_old.elapsed());
 
 }
