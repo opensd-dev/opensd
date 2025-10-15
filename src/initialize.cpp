@@ -5,6 +5,7 @@
 
 // #include "opensd/capi.h"
 // #include "opensd/constants.h"
+#include "opensd/file_utils.h"
 #include "opensd/fluid.h"
 #include "opensd/settings.h"
 #include "opensd/geometry.h"

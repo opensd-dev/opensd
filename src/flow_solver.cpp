@@ -1147,12 +1147,12 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
       //   face->G = std::copysign(face->Gcr, face->vflow_gues);
       //   face->vflow_gues = face->G * face->cfarea / face->ther_gues.rhomass();
       // }
-      std::cout << "face " << face->faceno << " " << std::setprecision(8) << std::fixed << face->stemp_gues << "\n";
+      // std::cout << "face " << face->faceno << " " << std::setprecision(8) << std::fixed << face->stemp_gues << "\n";
     }
 
 
-    MPI_Abort(mpi::intracomm, 0);
-    std::exit(0);
+    // MPI_Abort(mpi::intracomm, 0);
+    // std::exit(0);
   }
 
 
