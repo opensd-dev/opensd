@@ -40,6 +40,7 @@ Circuit::Circuit(pugi::xml_node cir_node) : fltype(FluidType::UNSET)
         
   // Read the circuit fluid
   this->flname = get_node_value(cir_node, "flname");
+  this->fllib = get_node_value(cir_node, "fllib");
 
 
   if (fltype == FluidType::UNSET) {
