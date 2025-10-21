@@ -126,7 +126,7 @@ double Fluid::first_two_phase_deriv(int var1, int var2, int var3) const {
 void read_fluids_xml()
 {
   // Check if fluids.xml exists. If not, just return since it is optional
-  std::string filename = settings::path_input + "tallies.xml";
+  std::string filename = settings::path_input + "fluids.xml";
   if (!file_exists(filename))
     return;
 
