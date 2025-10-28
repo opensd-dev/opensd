@@ -5,6 +5,7 @@
 
 // #include "opensd/capi.h"
 // #include "opensd/constants.h"
+#include "opensd/action.h"
 #include "opensd/fluid.h"
 #include "opensd/settings.h"
 #include "opensd/geometry.h"
@@ -179,11 +180,19 @@ void read_separate_xml_files()
   for (auto& fptr : opensd::model::fluids) {
     std::cout << "Fluid ID: " << fptr->id()
               << ", Name: " << fptr->name()
-              << ", Name: " << fptr->cpmass()
+              << ", Cp: " << fptr->cpmass()
               << ", Density: " << fptr->rhomass() << " kg/m3" << std::endl;
   }
   read_geometry_xml();
 
+  read_actions_xml();  // <— Add here
+
+  for (const auto& a : opensd::model::actions) {
+    std::cout << "Action: " << a->identifier()
+              << ", Target: " << a->target()
+              << ", Variable: " << a->variable()
+              << ", Interp: " << a->interp() << std::endl;
+  }
 }
 
 } // namespace opensd

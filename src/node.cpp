@@ -215,8 +215,21 @@ double Node::eqn_ener(double time, double delt, bool trans_sim, double alpha_ene
            - std::accumulate(heat_hslab.begin(), heat_hslab.end(), 0.0)
            - _heat_input_facegen
            - _heat_input_esource;
-		   
-  // std::cout<<"flag1 "<<identifier << " " << _heat_input_msource << " " << _heat_input_esource << " " << _heat_input_facegen << " " << y << std::endl;
+
+// if (identifier == "node3") {
+//   std::cout << "flag1 " << identifier << std::endl
+//             << "  trans1 = " << trans1 << std::endl
+//             << "  trans2 = " << trans2 << std::endl
+//             << "  _heat_input_faceconv = " << _heat_input_faceconv << std::endl
+//             << "  _heat_input_faceconv2_term = "
+//             << (_heat_input_faceconv2 * tenth_old * (trans_sim ? 1.0 : 0.0)) << std::endl
+//             << "  _heat_input_msource = " << _heat_input_msource << std::endl
+//             << "  heat_input = " << heat_input << std::endl
+//             << "  heat_hslab_sum = " << std::accumulate(heat_hslab.begin(), heat_hslab.end(), 0.0) << std::endl
+//             << "  _heat_input_facegen = " << _heat_input_facegen << std::endl
+//             << "  _heat_input_esource = " << _heat_input_esource << std::endl
+//             << "  y = " << y << std::endl;
+// }
 
   return y;
 
