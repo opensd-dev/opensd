@@ -325,5 +325,12 @@ void Circuit::load_from_hdf5(hid_t group_id) {
 
 }
   
+Node* Circuit::get_node_by_identifier(const std::string& id) const
+{
+    for (auto& n : nodes) {
+        if (n->identifier == id) return n.get();
+    }
+    return nullptr; // not found
+}
 
 } // namespace opensd

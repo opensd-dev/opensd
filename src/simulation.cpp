@@ -8,6 +8,7 @@
 #include <iomanip> // for setting precision in output
 
 #include "opensd/capi.h"
+#include "opensd/action.h"
 #include "opensd/convergence.h"
 #include "opensd/error.h"
 #include "opensd/flow_solver.h"
@@ -58,7 +59,10 @@ int opensd_run()
     if (mpi::rank == 0) {
     if (settings::verbosity >= 1) std::cout << "time=" << std::setprecision(5) << simulation::current_time << " ";
     }
-    // action_setup.update(time, delt);
+    for (auto& action : opensd::model::actions) {
+      action->update(simulation::current_time, simulation::delt);
+    }
+
     bool converged;
     double eps_m, eps_p, eps_h, eps_t;
     for (int main_iter = 0; main_iter < settings::no_main_iter; ++main_iter) {

@@ -4,7 +4,11 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <functional>
 #include <pugixml.hpp>
+#include "opensd/circuit.h"
+#include "opensd/bc.h"
+#include "opensd/node.h"
 
 namespace opensd {
 
@@ -36,9 +40,8 @@ public:
   // Constructor
   explicit Action(pugi::xml_node node);
 
-  // Methods
-  double value_at(double t) const;
-  void update(double t) const;
+  // Update function called each timestep
+  void update(double t, double dt) const;
 
   // Accessors
   const std::string& identifier() const { return identifier_; }
@@ -53,6 +56,14 @@ private:
   std::string variable_;
   std::string interp_;
   std::vector<Point> points_;
+
+  // Resolved target object
+  Node* obj_ {nullptr};
+  std::function<void(Node*, double)> setter_;
+
+  // Internal helpers
+  double value_at(double t) const;
+  void link_target();  // resolves target_ → obj_ + setter_
 };
 
 //==============================================================================
