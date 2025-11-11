@@ -3,6 +3,7 @@ import lxml.etree as ET
 from ._xml import clean_indentation, reorder_attributes
 from opensd.checkvalue import PathLike
 from opensd.circuit import Circuit
+from opensd.hslab import HSlab
 
 class Geometry(list):
     """Geometry representing a collection of circuits and heat slabs.

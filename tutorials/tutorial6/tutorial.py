@@ -68,9 +68,12 @@ circuit2.add_BC("bc4","node3",'P',5.E5)
 circuit2.add_BC("bc5","node3",'T',628.)
 circuit2.add_BC("bc6","node4",'msource',-1461.)
 
+Au = math.pi*0.019*7.5*3600
+Ad = math.pi*0.0174*7.5*3600
+hslab1 = opensd.HSlab("hslab1",ucomp="pipe1",uvar="pipe",uval=[10000.],dcomp="pipe2",dvar="pipe",dval=[10000.],uarea=Au,config="counter",nlayers=1)
+hslab1.add_layer(thk_elem=0.0016,thk_cros=7.5,nnodes=3,darea=Ad,solname="SS6",sollib="User")
 
-
-geometry = opensd.Geometry([circuit1,circuit2])
+geometry = opensd.Geometry([circuit1,circuit2,hslab1])
 geometry.export_to_xml()
 
 settings = opensd.Settings()
