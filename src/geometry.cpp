@@ -5,6 +5,7 @@
 
 #include "opensd/error.h"
 #include "opensd/circuit.h"
+#include "opensd/hslab.h"
 
 namespace opensd {
 
@@ -36,7 +37,7 @@ void read_geometry_xml(pugi::xml_node root)
 {
   // Read circuits, heatslabs
   read_circuits(root);
-  // read_heatslabs(root);
+  read_hslabs(root);
 
 }
 
