@@ -345,6 +345,36 @@ class HSlab:
         #self.dind_pd_spv_old = self.dind_pd_spv
         #self.dind_spl_nb_old = self.dind_spl_nb
 
+    def to_xml_element(self):
+        """Create a 'hslab' element to be written to an XML file.
+
+        """
+
+        # Reset xml element tree
+        element = ET.Element("hslab")
+        element.set("identifier", str(self.identifier))
+        element.set("ucomp", str(self.ucompid))
+        element.set("uvar",  str(self.uvar))
+        element.set("uval",  str(self.uval))
+        element.set("dcomp", str(self.dcompid))
+        element.set("dvar",  str(self.dvar))
+        element.set("dval",  str(self.dval))
+        element.set("uarea", str(self.uarea))
+
+        # if self.solveSS:
+        #     element.set("solveSS", "true")
+
+        if self.layers:
+            for layer in self.layers:
+                layer.to_xml_element(element)
+
+        # if self.bcs:
+        #     for bc in self.bcs:
+        #         bc.to_xml_element(element)
+
+        return element
+
+
 class Layer(object):
     def __init__(self,layerno,hslab,thk_elem,thk_cros,nnodes,uarea,darea,solname,sollib,ninc,heat_input,AFF,gap,cyl,eps1,eps2):
         self.layerno = layerno
@@ -367,6 +397,8 @@ class Layer(object):
         # self.mat = mat
         self.gap = gap
         self.cyl = cyl
+        self._solname = solname
+        self._sollib = sollib
         if self.gap:
             if cyl:
                 self.epsbar = 1./(1./eps1+min(self.uarea,self.darea)/max(self.uarea,self.darea)*(1./eps2-1.))
@@ -479,6 +511,26 @@ class Layer(object):
                 else: #centrol nodes
                     self.nodes[j+ninc*i].nface=self.jfaces[j+(ninc-1)*i]
                     self.nodes[j+ninc*i].sface=self.jfaces[j+(ninc-1)*i-1]
+
+    def to_xml_element(self,element):
+        """Create a 'layer' element to be written to an XML file.
+
+        """
+
+        # Reset xml element tree
+        subelement = ET.SubElement(element, "layer")
+        subelement.set("layerno", str(self.layerno))
+
+        if self._solname is not None:
+            subelement.set("solname", self._solname)
+        else:
+            raise ValueError(f'Solid has not been assigned for heat slab {self.hslab.identifier} layer  {self.layerno}!')
+
+        subelement.set("sollib", self._sollib)
+        subelement.set("thk_elem", str(self.thk_elem))
+        # subelement.set("thk_cros", str(self.thk_cros))
+        subelement.set("nnodes", str(self.nnodes))
+        subelement.set("darea", str(self.darea))
 
 class Face(object):
     def __init__(self,identifier,unode,dnode,A):

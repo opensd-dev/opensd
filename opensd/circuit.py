@@ -140,7 +140,7 @@ class Circuit:
         
     def add_BC(self,identifier,bnode,bvar,val,msrc_cond=None,trans=True,enabled=True):
         bnode = get_comp(bnode)
-        bc = BC(identifier,bnode,bvar,val,msrc_cond,trans,enabled)
+        bc = BC(identifier,bnode,bvar,val,msrc_cond,trans,enabled,self)
         self.bcs.append(bc)
         return bc
 

@@ -5,5 +5,7 @@ from opensd.result import *
 from opensd.fluid import *
 from opensd.actions import *
 from opensd.tabular import *
+from opensd.conditions import *
+from opensd.initial_guess import *
 
 __version__ = '0.1.0'

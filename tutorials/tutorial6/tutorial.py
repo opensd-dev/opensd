@@ -50,9 +50,9 @@ dh = 4.*Af/(Pw)
 
 pipe1 = circuit1.add_pipe("pipe1",dh,7.5,"node1","node2",'DW',30.,20,cfarea=Af,heat_input=-308.E6) #npar=1
 
-circuit1.add_BC("bc1","node1",'P',5.E5)
-circuit1.add_BC("bc2","node1",'T',817.)
-circuit1.add_BC("bc3","node2",'msource',-1644.)
+bc1 = circuit1.add_BC("bc1","node1",'P',5.E5)
+bc2 = circuit1.add_BC("bc2","node1",'T',817.)
+bc3 = circuit1.add_BC("bc3","node2",'msource',-1644.)
 
 
 #secondary circuit (IHX tube)
@@ -64,9 +64,9 @@ node4 = circuit2.add_node("node4")
 
 pipe2=circuit2.add_pipe("pipe2",0.0174,7.5,"node3","node4",'DW',30.,10,npar=3600,heat_input=308.E6)
 
-circuit2.add_BC("bc4","node3",'P',5.E5)
-circuit2.add_BC("bc5","node3",'T',628.)
-circuit2.add_BC("bc6","node4",'msource',-1461.)
+bc4 = circuit2.add_BC("bc4","node3",'P',5.E5)
+bc5 = circuit2.add_BC("bc5","node3",'T',628.)
+bc6 = circuit2.add_BC("bc6","node4",'msource',-1461.)
 
 Au = math.pi*0.019*7.5*3600
 Ad = math.pi*0.0174*7.5*3600
@@ -75,6 +75,12 @@ hslab1.add_layer(thk_elem=0.0016,thk_cros=7.5,nnodes=3,darea=Ad,solname="SS6",so
 
 geometry = opensd.Geometry([circuit1,circuit2,hslab1])
 geometry.export_to_xml()
+
+conditions = opensd.Conditions([bc1,bc2,bc3,bc4,bc5,bc6])
+conditions.export_to_xml('conditions.xml')
+
+initial_guess = opensd.InitialGuess(geometry,conditions)
+initial_guess.export_to_xml('initial_guess.xml')
 
 settings = opensd.Settings()
 settings.verbosity = 6
