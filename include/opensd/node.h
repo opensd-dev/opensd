@@ -71,7 +71,8 @@ public:
   double _heat_input_faceconv2;
   double _heat_input_facegen;
   std::vector<double> heat_hslab;
-  std::vector<PetscScalar> Arow;
+  std::vector<PetscScalar> Acols;
+  std::vector<PetscScalar> Avals;
   PetscScalar brow;
 
   explicit Node(pugi::xml_node flnode_node);

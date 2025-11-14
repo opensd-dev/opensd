@@ -836,7 +836,6 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
         node->update_totalenth();
     
         // Save row info (optional, for debugging or post-processing)
-        node->Arow.clear();
         node->brow = 0.0;
         {
           PetscInt row = i;
@@ -844,8 +843,15 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
           const PetscInt *cols;
           const PetscScalar *vals;
           MatGetRow(Ah, row, &ncols, &cols, &vals);
+
+          node->Acols.clear();
+          node->Avals.clear();
+          node->Acols.reserve(ncols);
+          node->Avals.reserve(ncols);
+
           for (int k = 0; k < ncols; ++k) {
-            node->Arow.push_back(vals[k]);
+            node->Acols.push_back(cols[k]);
+            node->Avals.push_back(vals[k]);
           }
           MatRestoreRow(Ah, row, &ncols, &cols, &vals);
     
@@ -878,7 +884,7 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
         node->update_staticpres();
     
         // Save row info (optional)
-        node->Arow.clear();
+
         node->brow = 0.0;
         {
           PetscInt row = i;
@@ -886,8 +892,15 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
           const PetscInt *cols;
           const PetscScalar *vals;
           MatGetRow(Ah, row, &ncols, &cols, &vals);
+
+          node->Acols.clear();
+          node->Avals.clear();
+          node->Acols.reserve(ncols);
+          node->Avals.reserve(ncols);
+
           for (int k = 0; k < ncols; ++k) {
-            node->Arow.push_back(vals[k]);
+            node->Acols.push_back(cols[k]);
+            node->Avals.push_back(vals[k]);
           }
           MatRestoreRow(Ah, row, &ncols, &cols, &vals);
     
@@ -1086,8 +1099,10 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
 	  if (node->fixed_var.count("T") ||
           node->fixed_var.count("H") ) {
         double sum_A_tenth = 0.0;
-        for (size_t j = 0; j < circuit->nodes.size(); ++j) {
-          sum_A_tenth += node->Arow[j] * circuit->nodes[j]->tenth_gues;
+        for (size_t k = 0; k < node->Avals.size(); ++k) {
+          int col = node->Acols[k];
+          sum_A_tenth += node->Avals[k] * circuit->nodes[col]->tenth_gues;
+//          std::cout << "flag4 " << node->identifier << " " << sum_A_tenth << std::endl;
         }
       
         node->esource = sum_A_tenth - node->brow - node->tenth_gues * node->msource;

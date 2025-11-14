@@ -32,12 +32,12 @@ vector<std::shared_ptr<HSlab>> hslabs_owned;
 
 HSlab::HSlab(pugi::xml_node hslab_node)
 {
-  // if (check_for_node(hslab_node, "identifier")) {
-  //   this->identifier = get_node_value(hslab_node, "identifier");
-  // } else {
-  //   fatal_error("Must specify identifier of hslab in geometry XML file.");
-  // }
-  //
+  if (check_for_node(hslab_node, "identifier")) {
+    this->identifier = get_node_value(hslab_node, "identifier");
+  } else {
+    fatal_error("Must specify identifier of hslab in geometry XML file.");
+  }
+
   // // Read the circuit fluid
   // this->solname = get_node_value(hslab_node, "solname");
   // this->sollib = get_node_value(hslab_node, "sollib");
@@ -81,7 +81,7 @@ void read_hslabs(pugi::xml_node node)
 {
   // Count the number of nodes
   for (pugi::xml_node hslab_node : node.children("hslab")) {
-    // model::hslabs.push_back(std::make_shared<HSlab>(hslab_node));
+    model::hslabs.push_back(std::make_unique<HSlab>(hslab_node));
   }
 
 }
