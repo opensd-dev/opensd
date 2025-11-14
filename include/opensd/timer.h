@@ -32,7 +32,7 @@ extern Timer time_pc_update_ef;
 extern Timer time_pc_update_g;
 extern Timer time_pc_update_h;
 extern Timer time_fluid_energy;
-
+extern Timer time_solid_energy;
 } // namespace simulation
 
 //==============================================================================

@@ -27,7 +27,7 @@ Timer time_pc_update_ef;
 Timer time_pc_update_g;
 Timer time_pc_update_h;
 Timer time_fluid_energy;
-
+Timer time_solid_energy;
 } // namespace simulation
 
 //==============================================================================
@@ -87,6 +87,7 @@ void reset_timers()
   simulation::time_pc_update_g.reset();
   simulation::time_pc_update_h.reset();
   simulation::time_fluid_energy.reset();
+  simulation::time_solid_energy.reset();
 }
 
 } // namespace opensd

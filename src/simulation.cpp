@@ -12,6 +12,7 @@
 #include "opensd/convergence.h"
 #include "opensd/error.h"
 #include "opensd/flow_solver.h"
+#include "opensd/ht_solver.h"
 #include "opensd/hdf5_interface.h"
 #include "opensd/message_passing.h"
 #include "opensd/output.h"
@@ -135,7 +136,7 @@ int opensd_run()
       }
 
       if (settings::temp_solve) {
-        // HT_solver.exec_energy(time, delt, trans_sim, alpha_heat, main_iter);
+        solid::exec_energy(simulation::current_time, simulation::delt, trans_sim, settings::alpha_heat, main_iter);
         exec_energy(simulation::current_time, simulation::delt, trans_sim, settings::alpha_ener, main_iter);
         // std::exit(1);
 

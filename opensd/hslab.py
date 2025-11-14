@@ -360,6 +360,7 @@ class HSlab:
         element.set("dvar",  str(self.dvar))
         element.set("dval",  str(self.dval))
         element.set("uarea", str(self.uarea))
+        element.set("ninc", str(self.ninc))
 
         # if self.solveSS:
         #     element.set("solveSS", "true")

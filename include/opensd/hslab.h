@@ -5,7 +5,7 @@
 
 #include "pugixml.hpp"
 // #include "opensd/constants.h"
-// #include "opensd/node.h"
+#include "opensd/layer.h"
 // #include "opensd/pipe.h"
 // #include "opensd/bc.h"
 // #include "opensd/face.h"
@@ -35,15 +35,14 @@ extern vector<std::shared_ptr<HSlab>> hslabs_owned;
 class HSlab {
 public:
   std::string identifier; //!< User-defined identifier
-  std::string solname;
-  std::string sollib;
   explicit HSlab(pugi::xml_node hslab_node);
   HSlab() = default;
+  int ninc;
   // double eps_m;
   // double mean_flow;
   // double eps_h;
   // double eps_p;
-  // vector<std::shared_ptr<Node>> nodes;
+  vector<std::shared_ptr<Layer>> layers;
   // vector<std::shared_ptr<Node>> nodes_owned;
   // vector<std::shared_ptr<Node>> ghost_nodes_owned1;
   // std::map<int, std::vector<std::shared_ptr<Node>>> ghost_nodes_owned;

@@ -1,5 +1,7 @@
-#ifndef MASSMOM_H
-#define MASSMOM_H
+//! \file flow_solver.h
+
+#ifndef FLOW_SOLVER_H
+#define FLOW_SOLVER_H
 
 #include <omp.h>
 
@@ -18,4 +20,4 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
 
 } // namespace opensd
 
-#endif // MASSMOM_H
+#endif // FLOW_SOLVER_H

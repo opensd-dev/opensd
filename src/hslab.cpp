@@ -38,43 +38,17 @@ HSlab::HSlab(pugi::xml_node hslab_node)
     fatal_error("Must specify identifier of hslab in geometry XML file.");
   }
 
-  // // Read the circuit fluid
-  // this->solname = get_node_value(hslab_node, "solname");
-  // this->sollib = get_node_value(hslab_node, "sollib");
+  ninc = stod(get_node_value(hslab_node, "ninc"));
 
-//   // Read the fluid nodes, pipes and bcs
-//   for (pugi::xml_node flnode_node : cir_node.children("node")) {
-//     this->nodes.push_back(std::make_shared<Node>(flnode_node));
-//     this->nodes.back()->node_ind = this->nodes.size() - 1;
-// 	this->nodes.back()->circuit = this;
-//   }
-//
-//   for (pugi::xml_node pipe : cir_node.children("pipe")) {
-//     this->pipes.push_back(std::make_shared<Pipe>(pipe));
-//   }
-//
-//   // for (pugi::xml_node face : cir_node.children("face")) {
-//     // this->faces.push_back(std::make_shared<Face>(face));
-//   // }
-//
-//   for (pugi::xml_node bc : cir_node.children("bc")) {
-//     this->bcs.push_back(BC(bc));
-//   }
-//
-//
-//   std::string pbound_ind_str = cir_node.attribute("Pbound_ind").value();
-//   if (!pbound_ind_str.empty()) {
-//     std::istringstream iss(pbound_ind_str);
-//     std::string index_str;
-//     while (std::getline(iss, index_str, ',')) {
-//       int node_index = std::stoi(index_str);
-//       this->Pbound_ind.push_back(node_index);
-//     }
-//   }
-//
-//
+  // Read the solid layers
+  for (pugi::xml_node layer_node : hslab_node.children("layer")) {
+    this->layers.push_back(std::make_shared<Layer>(layer_node));
+ // this->layers.back()->layer_ind = this->layers.size() - 1;
+ // this->layers.back()->hslab = this;
+  }
+
 //   this->eps_m = this->mean_flow = this->eps_h = this->eps_p = 0;
-//
+
 }
 
 void read_hslabs(pugi::xml_node node)
