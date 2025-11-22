@@ -4,6 +4,7 @@
 #include <string>
 
 #include <opensd/circuit.h>
+// #include <opensd/hslab.h>
 
 #ifdef OPENSD_MPI
 #include <mpi.h>
@@ -24,6 +25,7 @@ void read_separate_xml_files();
 // void initial_output();
 
 void discretize_pipes();
+void discretize_layers();
 
 } // namespace opensd
 

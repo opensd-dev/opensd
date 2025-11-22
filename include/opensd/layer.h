@@ -4,9 +4,11 @@
 #define OPENSD_LAYER_H
 
 // #include <optional>
+#include <memory>
 #include "pugixml.hpp"
 
 // #include "opensd/hslab.h"
+#include "opensd/snode.h"
 #include "opensd/vector.h"
 // #include "hdf5_interface.h"
 // #include <petscksp.h>
@@ -34,6 +36,7 @@ public:
   // double mresidue;
   // vector<std::shared_ptr<Face>> ifaces;
   // vector<std::shared_ptr<Face>> ofaces;
+  vector<std::shared_ptr<SNode>> nodes;
   HSlab* hslab;
   // int node_ind;
   

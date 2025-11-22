@@ -113,10 +113,10 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
     Eigen::MatrixXd A = Eigen::MatrixXd::Zero(n, n);
     Eigen::VectorXd b = Eigen::VectorXd::Zero(n);
 
-  //   int i = -1;
-  //   for (auto &layer : HSlab->layers) {
-  //     for (auto *node : layer->nodes) {
-  //       ++i;
+    int i = -1;
+    for (auto &layer : hslab->layers) {
+      for (auto &node : layer->nodes) {
+        ++i;
   //       // East face
   //       if (node->eface != nullptr) {
   //         double aE  = alpha_heat * node->eface->A * node->eface->ther_gues.conductivity() / node->eface->delx;
@@ -183,8 +183,8 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
   //         b(i) += alpha_heat * binc - (1.0 - alpha_heat) * node->heat_transfer_old;
   //         A(i, i) += alpha_heat * Ainc;
   //       }
-  //     }
-  //   } // end building A, b
+      }
+    } // end building A, b
   //
   //   // Solve linear system A * temp = b
   //   Eigen::VectorXd tempVec(n);
@@ -205,7 +205,7 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
   //   i = -1;
   //   for (auto &layer : HSlab->layers) {
   //     double relax = 1.0;
-  //     // The original python toggles relax for some cases — kept simple here:
+   //     // The original python toggles relax for some cases — kept simple here:
   //     if (!trans_sim) relax = 1.0;
   //
   //     for (auto *node : layer->nodes) {

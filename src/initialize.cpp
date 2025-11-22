@@ -37,6 +37,7 @@ int opensd_init(int argc, char* argv[], const void* intracomm) {
   // if (!read_model_xml())
   read_separate_xml_files();
   discretize_pipes();
+  discretize_layers();
   
   if (settings::run_mode == RunMode::TRANSIENT) {
   try {

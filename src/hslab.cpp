@@ -7,8 +7,8 @@
 #include <cstdlib>
 
 #include "opensd/hslab.h"
-// #include "opensd/snode.h"
-// #include "opensd/pipe.h"
+#include "opensd/snode.h"
+// #include "opensd/layer.h"
 // #include "opensd/bc.h"
 #include "opensd/error.h"
 // #include "opensd/vector.h"
@@ -60,9 +60,8 @@ void read_hslabs(pugi::xml_node node)
 
 }
 
-// void discretize_pipes() {
-//   for (auto& circuit : model::circuits) {
-// 	for (auto& pipe : circuit->pipes) {
+void discretize_layers() {
+  for (auto& hslab : model::hslabs) {
 //       pipe->circuit = circuit;
 //
 // 	  for (auto& node : circuit->nodes) {
@@ -77,11 +76,12 @@ void read_hslabs(pugi::xml_node node)
 // 		  break;
 // 	    }
 //       }
+	for (auto& layer : hslab->layers) {
 //
 //       double delx = pipe->length/pipe->ncell;
 //
-//       for (int i = 0; i < pipe->ncell - 1; ++i) {
-//         auto node = std::make_shared<Node>();
+      for (int i = 0; i < layer->nnodes - 1; ++i) {
+        auto node = std::make_shared<SNode>();
 //         node->identifier = pipe->identifier + "_node" + std::to_string(i);
 //         node->tpres_old = pipe->unode->tpres_old+(pipe->dnode->tpres_old-pipe->unode->tpres_old)*(i+1)/pipe->ncell;
 //         node->ttemp_old = pipe->unode->ttemp_old+(pipe->dnode->ttemp_old-pipe->unode->ttemp_old)*(i+1)/pipe->ncell;
@@ -95,8 +95,8 @@ void read_hslabs(pugi::xml_node node)
 //         // node->height = pipe->unode->height + (pipe->dnode->height - pipe->unode->height) * (i + 1) / pipe->ncell;
 //         circuit->nodes.push_back(node);
 //         circuit->nodes.back()->node_ind = circuit->nodes.size() - 1;
-//         pipe->nodes.push_back(node);
-//       }
+        layer->nodes.push_back(node);
+      }
 //
 //       double ufrac;
 //       double dfrac;
@@ -125,9 +125,9 @@ void read_hslabs(pugi::xml_node node)
 //       pipe->unode->ofaces.push_back(pipe->faces[0]);
 //
 //       pipe->dnode->ifaces.push_back(pipe->faces[pipe->ncell-1]);
-// 	}
-//   }
-// }
+	}
+  }
+}
 //
 // void initialize_circuits() {
 //
