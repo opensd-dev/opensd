@@ -38,6 +38,8 @@ public:
   explicit HSlab(pugi::xml_node hslab_node);
   HSlab() = default;
   int ninc;
+  int nlayers;
+  double uarea;
   // double eps_m;
   // double mean_flow;
   // double eps_h;

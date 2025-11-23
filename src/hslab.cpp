@@ -39,12 +39,15 @@ HSlab::HSlab(pugi::xml_node hslab_node)
   }
 
   ninc = stod(get_node_value(hslab_node, "ninc"));
+  uarea = stod(get_node_value(hslab_node, "uarea"));
 
   // Read the solid layers
+  nlayers = 0;
   for (pugi::xml_node layer_node : hslab_node.children("layer")) {
     this->layers.push_back(std::make_shared<Layer>(layer_node));
  // this->layers.back()->layer_ind = this->layers.size() - 1;
  // this->layers.back()->hslab = this;
+    nlayers++;
   }
 
 //   this->eps_m = this->mean_flow = this->eps_h = this->eps_p = 0;
@@ -62,7 +65,6 @@ void read_hslabs(pugi::xml_node node)
 
 void discretize_layers() {
   for (auto& hslab : model::hslabs) {
-//       pipe->circuit = circuit;
 //
 // 	  for (auto& node : circuit->nodes) {
 // 	    if (pipe->unode_str == node->identifier) {
@@ -77,54 +79,88 @@ void discretize_layers() {
 // 	    }
 //       }
 	for (auto& layer : hslab->layers) {
-//
-//       double delx = pipe->length/pipe->ncell;
-//
-      for (int i = 0; i < layer->nnodes - 1; ++i) {
-        auto node = std::make_shared<SNode>();
-//         node->identifier = pipe->identifier + "_node" + std::to_string(i);
-//         node->tpres_old = pipe->unode->tpres_old+(pipe->dnode->tpres_old-pipe->unode->tpres_old)*(i+1)/pipe->ncell;
-//         node->ttemp_old = pipe->unode->ttemp_old+(pipe->dnode->ttemp_old-pipe->unode->ttemp_old)*(i+1)/pipe->ncell;
-//         node->tenth_old = std::max(pipe->unode->tenth_old,pipe->dnode->tenth_old);
-//         node->volume = delx*pipe->cfarea;
-//         node->msource = 0.;
-//         node->mresidue = 0.;
-//         node->mflow_in = 1.E-4;
-// 		node->circuit = circuit.get();
-//
-//         // node->height = pipe->unode->height + (pipe->dnode->height - pipe->unode->height) * (i + 1) / pipe->ncell;
-//         circuit->nodes.push_back(node);
-//         circuit->nodes.back()->node_ind = circuit->nodes.size() - 1;
-        layer->nodes.push_back(node);
+      // layer->hslab = hslab;
+      int nnodes = layer->nnodes;
+      int ninc   = hslab->ninc;
+      
+      double uarea = hslab->uarea;
+      double darea = layer->darea;
+      
+      for (int i = 0; i < nnodes; ++i) {
+        for (int j = 0; j < ninc; ++j) {
+      
+          double Ai;
+          if (hslab->nlayers == 1) {
+            Ai = (uarea - i * (uarea - darea) / (nnodes - 1)) / ninc;
+          }
+          else if (layer->layerno == 0) {
+            Ai = (uarea - i * (uarea - darea) / (nnodes - 1 + 0.5)) / ninc;
+          }
+          else if (layer->layerno < hslab->nlayers - 1) {
+            Ai = (uarea - (i + 0.5) * (uarea - darea) / nnodes) / ninc;
+          }
+          else {
+            Ai = (uarea - (i + 0.5) * (uarea - darea) / (nnodes - 1 + 0.5)) / ninc;
+          }
+      
+          // double delz = Ai / layer->dely;
+          // double Aj   = layer->delx * delz;
+          // double vol  = layer->delx * Ai;
+      
+          // std::string name =
+            // "layer" + std::to_string(layer->layerno) +
+            // "_node" + std::to_string(i) + std::to_string(j);
+      
+          // ---- Heat fraction and volume corrections ----
+          // double heat_frac = 0.0;
+      
+          // if (hslab->nlayers == 1) {
+            // if (i == 0 || i == nnodes - 1) {
+              // vol *= 0.5;
+              // heat_frac = 0.5 * hslab->AFF[j] / (nnodes - 1);
+            // } else {
+              // heat_frac = hslab->AFF[j] / (nnodes - 1);
+            // }
+          // }
+          // else if (layer->layerno == 0) {
+            // if (i == 0) {
+              // vol *= 0.5;
+              // heat_frac = 0.5 * hslab->AFF[j] / (nnodes - 1 + 0.5);
+            // } else {
+              // heat_frac = hslab->AFF[j] / (nnodes - 1 + 0.5);
+            // }
+          // }
+          // else if (layer->layerno < hslab->nlayers - 1) {
+            // heat_frac = hslab->AFF[j] / nnodes;
+          // }
+          // else {
+            // if (i == nnodes - 1) {
+              // vol *= 0.5;
+              // heat_frac = 0.5 * hslab->AFF[j] / (nnodes - 1 + 0.5);
+            // } else {
+              // heat_frac = hslab->AFF[j] / (nnodes - 1 + 0.5);
+            // }
+          // }
+      
+          // ---- Create node ----
+          // auto node = add_SNode(name, Ai, Aj, vol, layer->solname,
+                                // layer->sollib, heat_frac, layer);
+      
+          // layer->nodes.push_back(node);
+      
+          // ---- Upwind/downwind registration ----
+          // if (i == 0 && layer->layerno == 0) {
+            // hslab->uwnodes.push_back(node);
+            // node->AFF = hslab->AFF[j];
+          // }
+      
+          // if (i == nnodes - 1) {
+            // hslab->dwnodes.push_back(node);
+            // node->AFF = hslab->AFF[j];
+            // hslab->darea = darea;
+          // }
+        }
       }
-//
-//       double ufrac;
-//       double dfrac;
-//       double delz = 0.;
-//       double fricopt;
-//
-//       for (int i = 0; i < pipe->ncell; ++i) {
-//         if (i == 0 && pipe->ncell == 1) {
-//           pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->unode, ufrac, pipe->dnode, dfrac, pipe->diameter, pipe->cfarea, delx, delz, fricopt, pipe->roughness));
-//         } else if (i == 0) {
-//           pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->unode, ufrac, pipe->nodes[0], -1, pipe->diameter, pipe->cfarea, delx, delz, fricopt, pipe->roughness));
-//         } else if (i == pipe->ncell-1) {
-//           pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->nodes[pipe->ncell-2], -1, pipe->dnode, dfrac, pipe->diameter, pipe->cfarea, delx, delz, fricopt, pipe->roughness));
-//         } else {
-//           pipe->faces.push_back(std::make_shared<PFace>(i, pipe, pipe->nodes[i-1], -1, pipe->nodes[i], -1, pipe->diameter, pipe->cfarea, delx, delz, fricopt, pipe->roughness));
-//         }
-//         circuit->faces.push_back(pipe->faces.back());
-//       }
-//
-//       for (int i = 0; i < pipe->ncell-1; ++i) {
-//         pipe->nodes[i]->ifaces.push_back(pipe->faces[i]);
-//         pipe->nodes[i]->ofaces.push_back(pipe->faces[i+1]);
-//       }
-//
-//
-//       pipe->unode->ofaces.push_back(pipe->faces[0]);
-//
-//       pipe->dnode->ifaces.push_back(pipe->faces[pipe->ncell-1]);
 	}
   }
 }
