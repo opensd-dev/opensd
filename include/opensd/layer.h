@@ -31,6 +31,7 @@ public:
   std::string sollib;
   int nnodes;
   double thk_elem;
+  double thk_cros;
   double darea;
 
   // double mresidue;

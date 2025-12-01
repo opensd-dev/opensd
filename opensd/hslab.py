@@ -383,7 +383,7 @@ class Layer(object):
         self.nnodes = nnodes
         self.ninc = ninc
         self.thk_elem = thk_elem
-        # self.thk_cros = thk_cros
+        self.thk_cros = thk_cros
         if self.hslab.nlayers == 1:
             self.delx = thk_elem/(nnodes-1)
         elif self.layerno == 0: #first layer
@@ -529,7 +529,7 @@ class Layer(object):
 
         subelement.set("sollib", self._sollib)
         subelement.set("thk_elem", str(self.thk_elem))
-        # subelement.set("thk_cros", str(self.thk_cros))
+        subelement.set("thk_cros", str(self.thk_cros))
         subelement.set("nnodes", str(self.nnodes))
         subelement.set("darea", str(self.darea))
 

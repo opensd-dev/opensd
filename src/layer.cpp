@@ -25,6 +25,7 @@ Layer::Layer(pugi::xml_node layer_node)
     darea    = stod(get_node_value(layer_node, "darea"));
     nnodes   = stod(get_node_value(layer_node, "nnodes"));
     thk_elem = stod(get_node_value(layer_node, "thk_elem"));
+    thk_cros = stod(get_node_value(layer_node, "thk_cros"));
     solname  = get_node_value(layer_node, "solname");
     sollib   = get_node_value(layer_node, "sollib");
 

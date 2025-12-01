@@ -85,6 +85,25 @@ void discretize_layers() {
       
       double uarea = hslab->uarea;
       double darea = layer->darea;
+
+	  double thk_elem = layer->thk_elem;
+	  double thk_cros = layer->thk_cros;
+	  
+      double delx;
+      if (hslab->nlayers == 1) {
+        delx = thk_elem/(nnodes-1);
+      }
+      else if (layer->layerno == 0) { //first layer
+        delx = thk_elem/(nnodes-1+0.5);
+	  }
+	  else if (layer->layerno < hslab->nlayers-1) {
+        delx = thk_elem/nnodes;
+	  }
+      else { //last layer
+        delx = thk_elem/(nnodes-1+0.5);
+	  }
+	  	  
+	  double dely = thk_cros/ninc;
       
       for (int i = 0; i < nnodes; ++i) {
         for (int j = 0; j < ninc; ++j) {
@@ -103,16 +122,16 @@ void discretize_layers() {
             Ai = (uarea - (i + 0.5) * (uarea - darea) / (nnodes - 1 + 0.5)) / ninc;
           }
       
-          // double delz = Ai / layer->dely;
-          // double Aj   = layer->delx * delz;
-          // double vol  = layer->delx * Ai;
+          double delz = Ai / dely;
+          double Aj   = delx * delz;
+          double vol  = delx * Ai;
       
-          // std::string name =
-            // "layer" + std::to_string(layer->layerno) +
-            // "_node" + std::to_string(i) + std::to_string(j);
+          std::string name =
+            "layer" + std::to_string(layer->layerno) +
+            "_node" + std::to_string(i) + std::to_string(j);
       
           // ---- Heat fraction and volume corrections ----
-          // double heat_frac = 0.0;
+          double heat_frac = 0.0;
       
           // if (hslab->nlayers == 1) {
             // if (i == 0 || i == nnodes - 1) {
