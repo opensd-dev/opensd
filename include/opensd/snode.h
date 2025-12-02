@@ -7,7 +7,7 @@
 // #include "pugixml.hpp"
 
 // #include "opensd/circuit.h"
-// #include "opensd/vector.h"
+#include "opensd/vector.h"
 // #include "CoolProp.h"
 // #include "fluidframe.h"
 // #include "AbstractState.h"
@@ -38,7 +38,9 @@ public:
   // double mflow_out;
   // Circuit* circuit;
   // int node_ind;
-  
+  double Ai, Aj, vol, heat_frac;
+  double AFF;
+
   // double tpres_old;
   // double ttemp_old;
   // double tenth_old;
@@ -85,7 +87,7 @@ public:
   // }
 
   // double eqn_cont(double time, double delt, bool trans_sim, double alpha_mom);
-  // double eqn_ener(double time, double delt, bool trans_sim, double alpha_ener);
+  double eqn_ener(double time, double delt, bool trans_sim, double alpha_ener);
   // void update_gues();
   // void assign_staticvar();
   // void update_statictemp();

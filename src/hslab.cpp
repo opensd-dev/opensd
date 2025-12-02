@@ -104,7 +104,9 @@ void discretize_layers() {
 	  }
 	  	  
 	  double dely = thk_cros/ninc;
-      
+
+      std::vector<double> AFF(ninc, 1.0 / ninc);
+
       for (int i = 0; i < nnodes; ++i) {
         for (int j = 0; j < ninc; ++j) {
       
@@ -133,51 +135,56 @@ void discretize_layers() {
           // ---- Heat fraction and volume corrections ----
           double heat_frac = 0.0;
       
-          // if (hslab->nlayers == 1) {
-            // if (i == 0 || i == nnodes - 1) {
-              // vol *= 0.5;
-              // heat_frac = 0.5 * hslab->AFF[j] / (nnodes - 1);
-            // } else {
-              // heat_frac = hslab->AFF[j] / (nnodes - 1);
-            // }
-          // }
-          // else if (layer->layerno == 0) {
-            // if (i == 0) {
-              // vol *= 0.5;
-              // heat_frac = 0.5 * hslab->AFF[j] / (nnodes - 1 + 0.5);
-            // } else {
-              // heat_frac = hslab->AFF[j] / (nnodes - 1 + 0.5);
-            // }
-          // }
-          // else if (layer->layerno < hslab->nlayers - 1) {
-            // heat_frac = hslab->AFF[j] / nnodes;
-          // }
-          // else {
-            // if (i == nnodes - 1) {
-              // vol *= 0.5;
-              // heat_frac = 0.5 * hslab->AFF[j] / (nnodes - 1 + 0.5);
-            // } else {
-              // heat_frac = hslab->AFF[j] / (nnodes - 1 + 0.5);
-            // }
-          // }
+          if (hslab->nlayers == 1) {
+            if (i == 0 || i == nnodes - 1) {
+              vol *= 0.5;
+              heat_frac = 0.5 * AFF[j] / (nnodes - 1);
+            } else {
+              heat_frac = AFF[j] / (nnodes - 1);
+            }
+          }
+          else if (layer->layerno == 0) {
+            if (i == 0) {
+              vol *= 0.5;
+              heat_frac = 0.5 * AFF[j] / (nnodes - 1 + 0.5);
+            } else {
+              heat_frac = AFF[j] / (nnodes - 1 + 0.5);
+            }
+          }
+          else if (layer->layerno < hslab->nlayers - 1) {
+            heat_frac = AFF[j] / nnodes;
+          }
+          else {
+            if (i == nnodes - 1) {
+              vol *= 0.5;
+              heat_frac = 0.5 * AFF[j] / (nnodes - 1 + 0.5);
+            } else {
+              heat_frac = AFF[j] / (nnodes - 1 + 0.5);
+            }
+          }
       
           // ---- Create node ----
           // auto node = add_SNode(name, Ai, Aj, vol, layer->solname,
                                 // layer->sollib, heat_frac, layer);
-      
-          // layer->nodes.push_back(node);
-      
+          auto snode = std::make_shared<SNode>();
+          snode->Ai = Ai;
+          snode->Aj = Aj;
+          snode->vol = vol;
+          snode->heat_frac = heat_frac;
+
           // ---- Upwind/downwind registration ----
-          // if (i == 0 && layer->layerno == 0) {
-            // hslab->uwnodes.push_back(node);
-            // node->AFF = hslab->AFF[j];
-          // }
+          if (i == 0 && layer->layerno == 0) {
+            hslab->uwnodes.push_back(snode);
+            snode->AFF = AFF[j];
+          }
       
-          // if (i == nnodes - 1) {
-            // hslab->dwnodes.push_back(node);
-            // node->AFF = hslab->AFF[j];
-            // hslab->darea = darea;
-          // }
+          if (i == nnodes - 1) {
+            hslab->dwnodes.push_back(snode);
+            snode->AFF = AFF[j];
+            hslab->darea = darea;
+          }
+          layer->nodes.push_back(snode);
+
         }
       }
 	}

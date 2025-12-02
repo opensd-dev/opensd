@@ -40,11 +40,14 @@ public:
   int ninc;
   int nlayers;
   double uarea;
+  double darea;
   // double eps_m;
   // double mean_flow;
   // double eps_h;
   // double eps_p;
   vector<std::shared_ptr<Layer>> layers;
+  vector<std::shared_ptr<SNode>> uwnodes;
+  vector<std::shared_ptr<SNode>> dwnodes;
   // vector<std::shared_ptr<Node>> nodes_owned;
   // vector<std::shared_ptr<Node>> ghost_nodes_owned1;
   // std::map<int, std::vector<std::shared_ptr<Node>>> ghost_nodes_owned;

@@ -98,7 +98,67 @@ std::tuple<bool, double, double, double, double> check_conv(double time, double 
       eps_htot = std::max(eps_htot, circuit->eps_h);
     }
   }
-  
+
+
+
+
+  if (opt == "all") {
+
+    for (auto& hslab : model::hslabs) {
+
+      // if (!trans_sim && HSlab->solveSS == false)
+      //   continue;
+      //
+      // HSlab->eps_tlist.clear();
+      // HSlab->htlist.clear();
+      //
+      // double eps_t = 0.0;
+      //
+      // for (auto& layer : HSlab->layers) {
+      //   for (auto& node : layer->nodes) {
+      //
+      //     double eq = std::abs(node->eqn_ener(time, delt, trans_sim, alpha_heat));
+      //     HSlab->eps_tlist.push_back(eq);
+      //
+      //     if (node->heat_transfer != 0.0)
+      //       HSlab->htlist.push_back(std::abs(node->heat_transfer));
+      //   }
+      // }
+      //
+      // if (HSlab->htlist.empty()) {
+      //   eps_t = 0.0;
+      // }
+      // else {
+      //   double sum_ht = 0.0;
+      //   for (double h : HSlab->htlist)
+      //     sum_ht += h;
+      //
+      //   HSlab->mean_ht = sum_ht / HSlab->htlist.size();
+      //
+      //   if (HSlab->mean_ht < 1.0 &&
+      //       *std::max_element(HSlab->eps_tlist.begin(), HSlab->eps_tlist.end()) < 1.0)
+      //   {
+      //     eps_t = 0.0;
+      //   }
+      //   else {
+      //     eps_t =
+      //       *std::max_element(HSlab->eps_tlist.begin(), HSlab->eps_tlist.end())
+      //       / HSlab->mean_ht;
+      //   }
+      // }
+      //
+      // eps_ttot = std::max(eps_ttot, eps_t);
+    }
+  }
+
+
+
+
+
+
+
+
+
   bool condition;
   if (opt == "all") {
     double conv_crit_temp;

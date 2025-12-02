@@ -4,7 +4,7 @@
 #include <string>
 
 #include <opensd/circuit.h>
-// #include <opensd/hslab.h>
+#include <opensd/hslab.h>
 
 #ifdef OPENSD_MPI
 #include <mpi.h>
