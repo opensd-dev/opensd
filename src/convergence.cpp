@@ -109,45 +109,39 @@ std::tuple<bool, double, double, double, double> check_conv(double time, double 
       // if (!trans_sim && HSlab->solveSS == false)
       //   continue;
       //
-      // HSlab->eps_tlist.clear();
-      // HSlab->htlist.clear();
-      //
-      // double eps_t = 0.0;
-      //
-      // for (auto& layer : HSlab->layers) {
-      //   for (auto& node : layer->nodes) {
-      //
-      //     double eq = std::abs(node->eqn_ener(time, delt, trans_sim, alpha_heat));
-      //     HSlab->eps_tlist.push_back(eq);
-      //
-      //     if (node->heat_transfer != 0.0)
-      //       HSlab->htlist.push_back(std::abs(node->heat_transfer));
-      //   }
-      // }
-      //
-      // if (HSlab->htlist.empty()) {
-      //   eps_t = 0.0;
-      // }
-      // else {
-      //   double sum_ht = 0.0;
-      //   for (double h : HSlab->htlist)
-      //     sum_ht += h;
-      //
-      //   HSlab->mean_ht = sum_ht / HSlab->htlist.size();
-      //
-      //   if (HSlab->mean_ht < 1.0 &&
-      //       *std::max_element(HSlab->eps_tlist.begin(), HSlab->eps_tlist.end()) < 1.0)
-      //   {
-      //     eps_t = 0.0;
-      //   }
-      //   else {
-      //     eps_t =
-      //       *std::max_element(HSlab->eps_tlist.begin(), HSlab->eps_tlist.end())
-      //       / HSlab->mean_ht;
-      //   }
-      // }
-      //
-      // eps_ttot = std::max(eps_ttot, eps_t);
+      hslab->eps_tlist.clear();
+      hslab->htlist.clear();
+
+      double eps_t;
+
+      for (auto& layer : hslab->layers) {
+        for (auto& snode : layer->snodes) {
+
+          double eq = std::abs(snode->eqn_ener(time, delt, trans_sim, alpha_heat));
+          hslab->eps_tlist.push_back(eq);
+
+          if (snode->heat_transfer != 0.0)
+            hslab->htlist.push_back(std::abs(snode->heat_transfer));
+        }
+      }
+
+      if (hslab->htlist.empty()) {
+        eps_t = 0.0;
+      }
+      else {
+
+        hslab->mean_ht =  std::accumulate(hslab->htlist.begin(), hslab->htlist.end(), 0.0) / hslab->htlist.size();
+
+        double max_eps_t = *std::max_element(hslab->eps_tlist.begin(),
+                                            hslab->eps_tlist.end());
+
+        eps_t = (hslab->mean_ht < 1.0 && max_eps_t < 1.0)
+                  ? 0.0
+                  : max_eps_t / hslab->mean_ht;
+
+      }
+
+      eps_ttot = std::max(eps_ttot, eps_t);
     }
   }
 

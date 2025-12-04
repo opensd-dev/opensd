@@ -7,7 +7,7 @@
 #include <cstdlib>
 
 #include "opensd/hslab.h"
-#include "opensd/snode.h"
+// #include "opensd/snode.h"
 // #include "opensd/layer.h"
 // #include "opensd/bc.h"
 #include "opensd/error.h"
@@ -166,7 +166,8 @@ void discretize_layers() {
           // ---- Create node ----
           // auto node = add_SNode(name, Ai, Aj, vol, layer->solname,
                                 // layer->sollib, heat_frac, layer);
-          auto snode = std::make_shared<SNode>();
+          auto snode = std::make_shared<SNode>(name);
+          // def __init__(self,identifier,Ai=None,Aj=None,vol=None,solname=None,sollib=None,heat_frac=np.array(1.),layer=None):
           snode->Ai = Ai;
           snode->Aj = Aj;
           snode->vol = vol;
@@ -183,10 +184,143 @@ void discretize_layers() {
             snode->AFF = AFF[j];
             hslab->darea = darea;
           }
-          layer->nodes.push_back(snode);
+          layer->snodes.push_back(snode);
 
         }
       }
+
+      for (int i = 0; i < nnodes - 1; ++i) { //ifaces creation
+        for (int j = 0; j < ninc; ++j) {
+
+          std::string name =
+            "layer" + std::to_string(layer->layerno) +
+            "_iface" + std::to_string(i) + std::to_string(j);
+
+          double area;
+
+          if (hslab->nlayers == 1) {
+            area = (uarea - (i + 0.5)*(uarea - darea)/(nnodes - 1)) / ninc;
+          }
+          else if (layer->layerno == 0) {
+            area = (uarea - (i + 0.5)*(uarea - darea)/(nnodes - 1 + 0.5)) / ninc;
+          }
+          else if (layer->layerno < hslab->nlayers - 1) {
+            area = (uarea - (i + 1)*(uarea - darea)/nnodes) / ninc;
+          }
+          else {
+            area = (uarea - (i + 1)*(uarea - darea)/(nnodes - 1 + 0.5)) / ninc;
+          }
+
+          auto f = std::make_shared<SFace>(
+            name,
+            layer->snodes[j + ninc*i],
+            layer->snodes[j + ninc*(i + 1)],
+            area
+          );
+
+          layer->ifaces.push_back(f);
+        }
+      }
+
+      // ---- Layer interface faces ----
+      if (layer->layerno > 0) {
+        auto& pre = hslab->layers[layer->layerno - 1];
+        for (int j = 0; j < ninc; ++j) {
+          std::string name =
+            "interface" + std::to_string(layer->layerno - 1) +
+            "_iface" + std::to_string(j);
+
+          double area = uarea / ninc;
+
+          auto f = std::make_shared<SFace>(
+            name, pre->snodes[pre->snodes.size() - ninc + j],
+            layer->snodes[j], area);
+
+          layer->ifaces.push_back(f);
+        }
+      }
+
+
+
+      for (int i = 0; i < nnodes; ++i) { //jfaces creation
+        for (int j = 0; j < ninc - 1; ++j) {
+          std::string name =
+            "layer" + std::to_string(layer->layerno) +
+            "_jface" + std::to_string(i) + std::to_string(j);
+
+          double area =
+            0.5 * (layer->snodes[j + ninc*i]->Aj +
+                  layer->snodes[j + ninc*i + 1]->Aj);
+
+          auto f = std::make_shared<SFace>(
+            name,
+            layer->snodes[j + ninc*i],
+            layer->snodes[j + ninc*i + 1],
+            area);
+
+          layer->jfaces.push_back(f);
+        }
+      }
+
+
+      // ifaces attachment to nodes
+      for (int i = 0; i < nnodes; ++i) {
+        for (int j = 0; j < ninc; ++j) {
+
+          auto& node = layer->snodes[j + ninc*i];
+
+          if (i == nnodes - 1) {  // downwind boundary
+            node->eface = nullptr;
+            node->wface = layer->ifaces[j + ninc*(i - 1)];
+          }
+          else if (i == 0) {      // upwind boundary
+            node->eface = layer->ifaces[j + ninc*i];
+            node->wface = nullptr;
+          }
+          else {                  // central nodes
+            node->eface = layer->ifaces[j + ninc*i];
+            node->wface = layer->ifaces[j + ninc*(i - 1)];
+          }
+        }
+      }
+
+      if (layer->layerno > 0) { //layer interface faces
+        auto& pre = hslab->layers[layer->layerno - 1];
+        for (int j = 0; j < ninc; ++j) {
+          pre->snodes[pre->snodes.size() - ninc + j]->eface =
+            layer->ifaces[j + ninc*(nnodes - 1)];
+          layer->snodes[j]->wface =
+            layer->ifaces[j + ninc*(nnodes - 1)];
+        }
+      }
+
+
+      for (int i = 0; i < nnodes; ++i) { //jfaces attachment to nodes
+        for (int j = 0; j < ninc; ++j) {
+          auto& node = layer->snodes[j + ninc*i];
+
+          if (ninc == 1) {
+            node->nface = nullptr;
+            node->sface = nullptr;
+          }
+          else if (j == ninc - 1) {          // top boundary
+            node->nface = nullptr;
+            node->sface = layer->jfaces[j + (ninc - 1)*i - 1];
+          }
+          else if (j == 0) {                  // bottom boundary
+            node->nface = layer->jfaces[j + (ninc - 1)*i];
+            node->sface = nullptr;
+          }
+          else {                              // central nodes
+            node->nface = layer->jfaces[j + (ninc - 1)*i];
+            node->sface = layer->jfaces[j + (ninc - 1)*i - 1];
+          }
+        }
+      }
+
+
+
+
 	}
   }
 }

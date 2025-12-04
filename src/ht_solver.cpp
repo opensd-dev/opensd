@@ -115,7 +115,7 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
 
     int i = -1;
     for (auto &layer : hslab->layers) {
-      for (auto &node : layer->nodes) {
+      for (auto &node : layer->snodes) {
         ++i;
   //       // East face
   //       if (node->eface != nullptr) {

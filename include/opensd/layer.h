@@ -9,6 +9,7 @@
 
 // #include "opensd/hslab.h"
 #include "opensd/snode.h"
+#include "opensd/sface.h"
 #include "opensd/vector.h"
 // #include "hdf5_interface.h"
 // #include <petscksp.h>
@@ -35,9 +36,9 @@ public:
   double darea;
 
   // double mresidue;
-  // vector<std::shared_ptr<Face>> ifaces;
-  // vector<std::shared_ptr<Face>> ofaces;
-  vector<std::shared_ptr<SNode>> nodes;
+  vector<std::shared_ptr<SFace>> ifaces;
+  vector<std::shared_ptr<SFace>> jfaces;
+  vector<std::shared_ptr<SNode>> snodes;
   HSlab* hslab;
   // int node_ind;
   

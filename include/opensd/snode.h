@@ -4,6 +4,7 @@
 #define OPENSD_SNODE_H
 
 // #include <optional>
+#include <iostream>
 // #include "pugixml.hpp"
 
 // #include "opensd/circuit.h"
@@ -14,6 +15,7 @@
 // #include "crossplatform_shared_ptr.h"
 // #include "hdf5_interface.h"
 // #include <petscksp.h>
+#include "opensd/memory.h"
 
 namespace opensd {
 
@@ -21,7 +23,7 @@ namespace opensd {
 // Global variables
 //==============================================================================
 // class Circuit;
-// class Face;
+class SFace;
 
 //==============================================================================
 //! \class SNode
@@ -29,11 +31,15 @@ namespace opensd {
 
 class SNode {
 public:
-  // std::string identifier; //!< User-defined identifier
+  std::string identifier;
   // double mresidue;
   // double msource;
   // vector<std::shared_ptr<Face>> ifaces;
   // vector<std::shared_ptr<Face>> ofaces;
+  std::shared_ptr<SFace> eface;
+  std::shared_ptr<SFace> wface;
+  std::shared_ptr<SFace> nface;
+  std::shared_ptr<SFace> sface;
   // double mflow_in;
   // double mflow_out;
   // Circuit* circuit;
@@ -55,7 +61,9 @@ public:
   // double stemp_gues;
   // double senth_gues;
   
-  // double heat_input;
+  double heat_input;
+  double heat_input_old;
+  double heat_transfer;
   // double elevation;
   
   // std::set<std::string> fixed_var;
@@ -78,7 +86,7 @@ public:
   // PetscScalar brow;
 
   // explicit Node(pugi::xml_node flnode_node);
-  // Node(std::string identifier, double volume, double heat_input, double elevation, double tpres_old = 0.0, double ttemp_old = 0.0, double tenth_old = 0.0); //Circuit* circuit, 
+  SNode(std::string identifier);
   SNode() = default;
   // virtual ~Node() = default;
   // ~Node() {

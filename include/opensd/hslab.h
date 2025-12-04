@@ -42,7 +42,10 @@ public:
   double uarea;
   double darea;
   // double eps_m;
+  vector<double> eps_tlist;
+  vector<double> htlist;
   // double mean_flow;
+  double mean_ht;
   // double eps_h;
   // double eps_p;
   vector<std::shared_ptr<Layer>> layers;
