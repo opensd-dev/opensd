@@ -71,7 +71,7 @@ int opensd_init(int argc, char* argv[], const void* intracomm) {
   }
 
 initialize_circuits(); //assign properties
-
+// initialize_hslabs();
 
 // Print to verify
 for (size_t i = 0; i < model::circuits.size(); ++i) {

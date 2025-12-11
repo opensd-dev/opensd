@@ -6,12 +6,11 @@
 // #include <cmath>
 // #include <stdexcept>
 
-// #include "opensd/error.h"
+#include "opensd/error.h"
 // #include "opensd/xml_interface.h"
-// #include "opensd/circuit.h"
-// #include "opensd/face.h"
-// #include "opensd/fluid.h"
-// #include "opensd/coolprop_adapter.h"
+#include "opensd/hslab.h"
+#include "opensd/sface.h"
+#include "opensd/solid.h"
 
 namespace opensd {
 
@@ -25,7 +24,7 @@ namespace opensd {
 
 SNode::SNode(std::string identifier)
     : identifier(identifier), heat_input(0.0),heat_input_old(0.0) {
-
+  this->assign_prop();
 }
 
 
@@ -191,6 +190,19 @@ double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_en
   // }
 
   return 0;
+}
+
+void SNode::assign_prop() {
+  bool found = false;
+  for (auto& fptr : model::solids) {
+    if (fptr->name() == solname) {
+      ther_gues = fptr->clone(); // deep copy
+      ther_old  = fptr->clone();
+      found = true;
+      break;
+    }
+  }
+  if (!found) fatal_error(fmt::format("Could not find solid '{}'", solname));
 }
 
 } // namespace opensd

@@ -5,7 +5,7 @@
 #include <sstream>
 #include <string>
 
-// #include <fmt/format.h>
+#include <fmt/format.h>
 
 #include "opensd/capi.h"
 #include "opensd/settings.h"

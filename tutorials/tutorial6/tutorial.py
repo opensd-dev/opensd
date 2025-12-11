@@ -89,5 +89,5 @@ settings.run_mode = "steady"
 settings.no_main_iter = 200
 settings.export_to_xml()
 
-opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/home/vikram/Codes/opensd/build/opensd')
+opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/d/codes/opensd/build/opensd')
 

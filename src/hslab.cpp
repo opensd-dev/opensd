@@ -172,6 +172,7 @@ void discretize_layers() {
           snode->Aj = Aj;
           snode->vol = vol;
           snode->heat_frac = heat_frac;
+		  snode->solname = layer->solname;
 
           // ---- Upwind/downwind registration ----
           if (i == 0 && layer->layerno == 0) {
@@ -267,19 +268,19 @@ void discretize_layers() {
       for (int i = 0; i < nnodes; ++i) {
         for (int j = 0; j < ninc; ++j) {
 
-          auto& node = layer->snodes[j + ninc*i];
+          auto& snode = layer->snodes[j + ninc*i];
 
-          if (i == nnodes - 1) {  // downwind boundary
-            node->eface = nullptr;
-            node->wface = layer->ifaces[j + ninc*(i - 1)];
+          if (i == nnodes - 1) {  // downstream boundary
+            snode->eface = nullptr;
+            snode->wface = layer->ifaces[j + ninc*(i - 1)];
           }
-          else if (i == 0) {      // upwind boundary
-            node->eface = layer->ifaces[j + ninc*i];
-            node->wface = nullptr;
+          else if (i == 0) {      // upstream boundary
+            snode->eface = layer->ifaces[j + ninc*i];
+            snode->wface = nullptr;
           }
           else {                  // central nodes
-            node->eface = layer->ifaces[j + ninc*i];
-            node->wface = layer->ifaces[j + ninc*(i - 1)];
+            snode->eface = layer->ifaces[j + ninc*i];
+            snode->wface = layer->ifaces[j + ninc*(i - 1)];
           }
         }
       }
@@ -297,23 +298,23 @@ void discretize_layers() {
 
       for (int i = 0; i < nnodes; ++i) { //jfaces attachment to nodes
         for (int j = 0; j < ninc; ++j) {
-          auto& node = layer->snodes[j + ninc*i];
+          auto& snode = layer->snodes[j + ninc*i];
 
           if (ninc == 1) {
-            node->nface = nullptr;
-            node->sface = nullptr;
+            snode->nface = nullptr;
+            snode->sface = nullptr;
           }
           else if (j == ninc - 1) {          // top boundary
-            node->nface = nullptr;
-            node->sface = layer->jfaces[j + (ninc - 1)*i - 1];
+            snode->nface = nullptr;
+            snode->sface = layer->jfaces[j + (ninc - 1)*i - 1];
           }
           else if (j == 0) {                  // bottom boundary
-            node->nface = layer->jfaces[j + (ninc - 1)*i];
-            node->sface = nullptr;
+            snode->nface = layer->jfaces[j + (ninc - 1)*i];
+            snode->sface = nullptr;
           }
           else {                              // central nodes
-            node->nface = layer->jfaces[j + (ninc - 1)*i];
-            node->sface = layer->jfaces[j + (ninc - 1)*i - 1];
+            snode->nface = layer->jfaces[j + (ninc - 1)*i];
+            snode->sface = layer->jfaces[j + (ninc - 1)*i - 1];
           }
         }
       }
@@ -324,29 +325,30 @@ void discretize_layers() {
 	}
   }
 }
-//
-// void initialize_circuits() {
-//
-// for (auto& circuit : model::circuits) {
-//   for (auto& node : circuit->nodes) {
-// 	bool trans_sim = settings::run_mode == RunMode::TRANSIENT;
-// 	if (not trans_sim) {
-//       node->assign_staticvar();
-// 	}
-//     node->assign_prop();
-//     node->update_gues();
-//   }
-//   for (auto& face : circuit->faces) {
-//     face->assign_statevar();
-//     face->assign_prop();
-//     face->update_gues();
-//
-//   }
-// }
 
-// }
+/* void initialize_hslabs() {
 
+for (auto& hslab : model::hslabs) {
+  for (auto& snode : hslab->snodes) {
+	// bool trans_sim = settings::run_mode == RunMode::TRANSIENT;
+	// if (not trans_sim) {
+      // node->assign_staticvar();
+	// }
+    snode->assign_prop();
+    // node->update_gues();
+  // }
+  // for (auto& face : circuit->faces) {
+    // face->assign_statevar();
+    // face->assign_prop();
+    // face->update_gues();
 
+  // }
+}
+
+}
+
+}
+ */
 // void Circuit::save_to_hdf5(hid_t group_id) const {
 //   write_string(group_id, "identifier", identifier);
 //   write_string(group_id, "flname", flname);

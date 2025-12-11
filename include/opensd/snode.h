@@ -10,9 +10,8 @@
 // #include "opensd/circuit.h"
 #include "opensd/vector.h"
 // #include "CoolProp.h"
-// #include "fluidframe.h"
-// #include "AbstractState.h"
-// #include "crossplatform_shared_ptr.h"
+#include "solidframe.h"
+#include "crossplatform_shared_ptr.h"
 // #include "hdf5_interface.h"
 // #include <petscksp.h>
 #include "opensd/memory.h"
@@ -46,6 +45,7 @@ public:
   // int node_ind;
   double Ai, Aj, vol, heat_frac;
   double AFF;
+  std::string solname;
 
   // double tpres_old;
   // double ttemp_old;
@@ -70,8 +70,8 @@ public:
   // double esource;
   // double hresidue;
   // double volume;
-  // shared_ptr<FluidFrame> ther_gues;
-  // shared_ptr<FluidFrame> ther_old;
+  shared_ptr<SolidFrame> ther_gues;
+  shared_ptr<SolidFrame> ther_old;
   // double velocity;
   // double B1;
   
@@ -101,7 +101,7 @@ public:
   // void update_statictemp();
   // void update_totalenth();
   // void update_staticvar(std::optional<double> velocity_in = std::nullopt);
-  // void assign_prop();
+  void assign_prop();
   // void update_old();
   // void update_staticpres();
   // void update_totaltemp(); 
