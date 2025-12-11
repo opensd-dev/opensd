@@ -7,6 +7,7 @@
 // #include "opensd/constants.h"
 #include "opensd/action.h"
 #include "opensd/fluid.h"
+#include "opensd/solid.h"
 #include "opensd/settings.h"
 #include "opensd/geometry.h"
 #include "opensd/message_passing.h"
@@ -71,7 +72,7 @@ int opensd_init(int argc, char* argv[], const void* intracomm) {
   }
 
 initialize_circuits(); //assign properties
-// initialize_hslabs();
+initialize_hslabs();
 
 // Print to verify
 for (size_t i = 0; i < model::circuits.size(); ++i) {
@@ -180,6 +181,13 @@ void read_separate_xml_files()
   read_fluids_xml();
   for (auto& fptr : opensd::model::fluids) {
     std::cout << "Fluid ID: " << fptr->id()
+              << ", Name: " << fptr->name()
+              << ", Cp: " << fptr->cpmass()
+              << ", Density: " << fptr->rhomass() << " kg/m3" << std::endl;
+  }
+  read_solids_xml();
+  for (auto& fptr : opensd::model::solids) {
+    std::cout << "Solid ID: " << fptr->id()
               << ", Name: " << fptr->name()
               << ", Cp: " << fptr->cpmass()
               << ", Density: " << fptr->rhomass() << " kg/m3" << std::endl;

@@ -97,7 +97,7 @@ protected:
 //==============================================================================
 
 void read_hslabs(pugi::xml_node node);
-// void initialize_hslabs();
+void initialize_hslabs();
 
 } // namespace opensd
 

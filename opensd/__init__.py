@@ -3,6 +3,7 @@ from opensd.geometry import *
 from opensd.executor import *
 from opensd.result import *
 from opensd.fluid import *
+from opensd.solid import *
 from opensd.actions import *
 from opensd.tabular import *
 from opensd.conditions import *

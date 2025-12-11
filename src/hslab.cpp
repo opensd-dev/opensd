@@ -176,8 +176,8 @@ void discretize_layers() {
 
           // ---- Upwind/downwind registration ----
           if (i == 0 && layer->layerno == 0) {
-            hslab->uwnodes.push_back(snode);
             snode->AFF = AFF[j];
+			hslab->uwnodes.push_back(snode);
           }
       
           if (i == nnodes - 1) {
@@ -326,29 +326,30 @@ void discretize_layers() {
   }
 }
 
-/* void initialize_hslabs() {
+void initialize_hslabs() {
 
-for (auto& hslab : model::hslabs) {
-  for (auto& snode : hslab->snodes) {
-	// bool trans_sim = settings::run_mode == RunMode::TRANSIENT;
-	// if (not trans_sim) {
-      // node->assign_staticvar();
-	// }
-    snode->assign_prop();
-    // node->update_gues();
-  // }
-  // for (auto& face : circuit->faces) {
-    // face->assign_statevar();
-    // face->assign_prop();
-    // face->update_gues();
+  for (auto& hslab : model::hslabs) {
+    for (auto &layer : hslab->layers) {
+      for (auto& snode : layer->snodes) {
+  		// bool trans_sim = settings::run_mode == RunMode::TRANSIENT;
+  		// if (not trans_sim) {
+  		  // node->assign_staticvar();
+  		// }
+  		snode->assign_prop();
+  		// node->update_gues();
+  	  // }
+  	  // for (auto& face : circuit->faces) {
+  		// face->assign_statevar();
+  		// face->assign_prop();
+  		// face->update_gues();
+  
+  	  // }
+  	  }
+    }
+  }
 
-  // }
 }
 
-}
-
-}
- */
 // void Circuit::save_to_hdf5(hid_t group_id) const {
 //   write_string(group_id, "identifier", identifier);
 //   write_string(group_id, "flname", flname);

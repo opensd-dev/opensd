@@ -68,6 +68,19 @@ bc4 = circuit2.add_BC("bc4","node3",'P',5.E5)
 bc5 = circuit2.add_BC("bc5","node3",'T',628.)
 bc6 = circuit2.add_BC("bc6","node4",'msource',-1461.)
 
+SS6 = opensd.Solid(name="SS6")
+SS6.rhomass = 7600.0
+SS6.cpmass = 540.0
+SS6.conductivity = 20.0
+
+# Solids collection
+solids = opensd.Solids()
+solids.append(SS6)
+# solids += [SS6]
+
+# Export all solids to a single XML
+solids.export_to_xml()
+
 Au = math.pi*0.019*7.5*3600
 Ad = math.pi*0.0174*7.5*3600
 hslab1 = opensd.HSlab("hslab1",ucomp="pipe1",uvar="pipe",uval=[10000.],dcomp="pipe2",dvar="pipe",dval=[10000.],uarea=Au,config="counter",nlayers=1)

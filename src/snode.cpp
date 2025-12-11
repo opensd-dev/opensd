@@ -24,7 +24,7 @@ namespace opensd {
 
 SNode::SNode(std::string identifier)
     : identifier(identifier), heat_input(0.0),heat_input_old(0.0) {
-  this->assign_prop();
+
 }
 
 
