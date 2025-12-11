@@ -89,18 +89,17 @@ void discretize_layers() {
 	  double thk_elem = layer->thk_elem;
 	  double thk_cros = layer->thk_cros;
 	  
-      double delx;
       if (hslab->nlayers == 1) {
-        delx = thk_elem/(nnodes-1);
+        layer->delx = thk_elem/(nnodes-1);
       }
       else if (layer->layerno == 0) { //first layer
-        delx = thk_elem/(nnodes-1+0.5);
+        layer->delx = thk_elem/(nnodes-1+0.5);
 	  }
 	  else if (layer->layerno < hslab->nlayers-1) {
-        delx = thk_elem/nnodes;
+        layer->delx = thk_elem/nnodes;
 	  }
       else { //last layer
-        delx = thk_elem/(nnodes-1+0.5);
+        layer->delx = thk_elem/(nnodes-1+0.5);
 	  }
 	  	  
 	  double dely = thk_cros/ninc;
@@ -125,8 +124,8 @@ void discretize_layers() {
           }
       
           double delz = Ai / dely;
-          double Aj   = delx * delz;
-          double vol  = delx * Ai;
+          double Aj   = layer->delx * delz;
+          double vol  = layer->delx * Ai;
       
           std::string name =
             "layer" + std::to_string(layer->layerno) +
@@ -173,6 +172,7 @@ void discretize_layers() {
           snode->vol = vol;
           snode->heat_frac = heat_frac;
 		  snode->solname = layer->solname;
+		  snode->layer = layer.get();
 
           // ---- Upwind/downwind registration ----
           if (i == 0 && layer->layerno == 0) {

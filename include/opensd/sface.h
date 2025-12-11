@@ -32,6 +32,7 @@ public:
   std::shared_ptr<SNode> unode;
   std::shared_ptr<SNode> dnode;
   double A;
+  double delx;
 //   double vflow_old;
 //   double vflow_gues;
 //   double mflow;

@@ -15,8 +15,7 @@ class SFace;
     
 class SFaceTher {
 private:
-  // double _Qth = -1000.;
-  // double _rhomass, _cpmass, _viscosity, _conductivity, _hmass, _drho_dp_consth;
+  double _rhomass, _cpmass, _conductivity;
 public:
   // Node unode;
   // Node dnode;
@@ -33,13 +32,13 @@ public:
   // virtual ~FaceTher() = default;
 
   // void update(FlState* flstate=nullptr);
-  // void update();
+  void update();
   // void update_sat(double p=nullptr);
   // void set_rhomass(double val) { _rhomass = val; }
   // double rhomass();
   // double cpmass();
   // double viscosity();
-  // double conductivity();
+  double conductivity();
   // double drho_dp_consth();
   // double Qth();
   // double hmass();

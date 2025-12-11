@@ -34,6 +34,7 @@ public:
   double thk_elem;
   double thk_cros;
   double darea;
+  double delx;
 
   // double mresidue;
   vector<std::shared_ptr<SFace>> ifaces;

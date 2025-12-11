@@ -6,6 +6,7 @@
 // #include <cstdlib>
 //
 // #include "opensd/circuit.h"
+#include "opensd/layer.h"
 // #include "opensd/constants.h"
 // #include "opensd/hdf5_interface.h"
 // #include "opensd/node.h"
@@ -25,6 +26,11 @@ SFace::SFace(std::string identifier, std::shared_ptr<SNode> unode, std::shared_p
 
   // ther_old = new FaceTher(this);
   ther_gues = new SFaceTher(this);
+
+  double delx1 = unode->layer->delx;
+  double delx2 = dnode->layer->delx;
+  delx = 0.5*(delx1+delx2);
+
 
 }
 

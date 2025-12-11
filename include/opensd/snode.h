@@ -7,7 +7,7 @@
 #include <iostream>
 // #include "pugixml.hpp"
 
-// #include "opensd/circuit.h"
+// #include "opensd/layer.h"
 #include "opensd/vector.h"
 // #include "CoolProp.h"
 #include "solidframe.h"
@@ -21,7 +21,7 @@ namespace opensd {
 //==============================================================================
 // Global variables
 //==============================================================================
-// class Circuit;
+class Layer;
 class SFace;
 
 //==============================================================================
@@ -41,7 +41,7 @@ public:
   std::shared_ptr<SFace> sface;
   // double mflow_in;
   // double mflow_out;
-  // Circuit* circuit;
+  Layer* layer;
   // int node_ind;
   double Ai, Aj, vol, heat_frac;
   double AFF;

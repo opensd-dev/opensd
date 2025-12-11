@@ -42,13 +42,13 @@ double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_en
   // }
 
   // EAST face conduction or boundary condition
-  // if (eface != nullptr) {
-  //   y = ( y
-  //        - alpha_ener * eface->A * eface->ther_gues.conductivity()
-  //            * ( eface->dnode->temp_gues - temp_gues ) / eface->delx
+  if (eface != nullptr) {
+    // y = ( y
+         // - alpha_ener * eface->A * eface->ther_gues->conductivity()
+             // * ( eface->dnode->temp_gues - temp_gues ) / eface->delx
   //        - (1.0 - alpha_ener) * eface->A * eface->ther_old.conductivity()
   //            * ( eface->dnode->temp_old - temp_old ) / eface->delx );
-  // }
+  }
   // else {
   //   // Downstream boundary condition depends on hslab.dvar
   //   auto hslab = this->layer->hslab;
