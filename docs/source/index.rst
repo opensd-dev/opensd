@@ -16,6 +16,8 @@ OpenSD is system dynamics code. It is developed with a similar outline structure
    theory/index
    usersguide/index
    devguide/index
+   python_api
+   cpp_api
    io_formats/index
 
 
