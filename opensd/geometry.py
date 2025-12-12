@@ -27,6 +27,8 @@ class Geometry(list):
 
             if type(item)==Circuit:
                 item.get_reference_prop()
+            elif type(item)==HSlab:
+                item.get_reference_prop()
 
     def export_to_xml(self, path: PathLike = 'geometry.xml'):
         """Export geometry to an XML file.

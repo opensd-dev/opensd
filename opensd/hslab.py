@@ -375,6 +375,64 @@ class HSlab:
 
         return element
 
+    def get_reference_prop(self):
+        pass
+        # if len(HSlab.layers)==0:
+            # break
+        # if HSlab.solveSS == False:
+            # print ("HSlab temperature initialized to ambient")
+            # for layer in HSlab.layers:
+                # for node in layer.nodes:
+                    # node.temp_gues = solver_settings.T_ambient
+        # tlist2 = []
+        # for i,node in enumerate(HSlab.uwnodes):
+            # if HSlab.uvar == "pipe" or HSlab.uvar == "pipenl":
+                # flow_elem = HSlab.uval[1][i]
+                # node.temp_old = flow_elem.stemp_gues #may be required in hslab first steps
+                # tlist2.append(node.temp_old)
+            # elif HSlab.uvar == "conv":
+                # node.temp_old = HSlab.uval[1]
+                # tlist2.append(node.temp_old)
+            # elif HSlab.uvar == "node":
+                # flow_elem = HSlab.ucomp
+                # node.temp_old = flow_elem.stemp_gues
+                # tlist2.append(node.temp_old)
+        # for i,node in enumerate(HSlab.dwnodes):
+            # if HSlab.dvar == "pipe" or HSlab.dvar == "pipenl":
+                # flow_elem = HSlab.dval[1][i]
+                # node.temp_old = flow_elem.stemp_gues
+                # tlist2.append(node.temp_old)
+            # elif HSlab.dvar == "conv":
+                # node.temp_old = HSlab.dval[1]
+                # tlist2.append(node.temp_old)
+            # elif HSlab.dvar == "node":
+                # flow_elem = HSlab.dcomp
+                # node.temp_old = flow_elem.stemp_gues
+                # tlist2.append(node.temp_old)
+        # if len(tlist2) == 0:
+            # print ("error: tlist2 empty. cannot calculate initial temp for HSlab. stopping", HSlab.identifier)
+            # sys.exit()
+        # else:
+            # tmean2 = sum(tlist2)/len(tlist2)
+        # tref2=tmean2
+        # for layer in HSlab.layers: #may not be used check pending
+            # for i,node in enumerate(layer.nodes):
+                # if not hasattr(node,'temp_old'):
+                    # node.temp_old = tref2
+                # node.update_gues() 
+            # for face in layer.ifaces:
+                # face.update_temp()
+
+        # for layer in HSlab.layers:
+            # for node in layer.nodes:
+                # node.update_condeff()
+                # node.condeff_old = node.condeff_gues
+            # for face in layer.ifaces:
+                # face.ther_old.update()
+                # face.ther_gues.update()
+            # for face in layer.jfaces:
+                # face.ther_old.update()
+                # face.ther_gues.update()
 
 class Layer(object):
     def __init__(self,layerno,hslab,thk_elem,thk_cros,nnodes,uarea,darea,solname,sollib,ninc,heat_input,AFF,gap,cyl,eps1,eps2):

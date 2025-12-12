@@ -49,6 +49,11 @@ HSlab::HSlab(pugi::xml_node hslab_node)
  // this->layers.back()->hslab = this;
     nlayers++;
   }
+  uvar = get_node_value(hslab_node, "uvar");
+  dvar = get_node_value(hslab_node, "dvar");
+  uval = stod(get_node_value(hslab_node, "uval"));
+  dval = stod(get_node_value(hslab_node, "dval"));
+  
 
 //   this->eps_m = this->mean_flow = this->eps_h = this->eps_p = 0;
 

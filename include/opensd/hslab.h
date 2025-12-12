@@ -41,6 +41,10 @@ public:
   int nlayers;
   double uarea;
   double darea;
+  std::string uvar;
+  std::string dvar;
+  double uval;
+  double dval;
   // double eps_m;
   vector<double> eps_tlist;
   vector<double> htlist;

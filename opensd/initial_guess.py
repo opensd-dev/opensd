@@ -1,18 +1,22 @@
 from pathlib import Path
 import lxml.etree as ET
 from opensd.circuit import Circuit
+from opensd.hslab import HSlab
 from opensd.checkvalue import PathLike
 from ._xml import clean_indentation,reorder_attributes
 
 class InitialGuess:
     def __init__(self, geometry, conditions):
         # Compute initial fields from geometry + BCs
-        for circuit in geometry:
-            if type(circuit)!=Circuit: #for skipping hslabs
-                continue
-            circuit.bcs = [bc for bc in conditions
-                           if bc.circuit.identifier == circuit.identifier]
-            circuit.get_reference_prop()
+        for item in geometry:
+            if type(item)==Circuit:
+                circuit = item
+                circuit.bcs = [bc for bc in conditions
+                               if bc.circuit.identifier == circuit.identifier]
+                circuit.get_reference_prop()
+            elif type(item) == HSlab:
+                hslab = item
+                hslab.get_reference_prop()
         self.geometry = geometry
 
     def export_to_xml(self, path: PathLike = 'initial_guess.xml'):
@@ -55,6 +59,22 @@ class InitialGuess:
                     "ttemp_old": str(node.ttemp_old),
                     "tenth_old": str(node.tenth_old)
                 })
+
+        for hslab in sorted(self.geometry, key=lambda x: x.identifier):
+            if type(hslab) != HSlab:
+                continue
+
+            # circuit_elem = ET.SubElement(element, "circuit", {
+                # "identifier": str(circuit.identifier)
+            # })
+
+            # for node in circuit.nodes:
+                # ET.SubElement(circuit_elem, "node", {
+                    # "identifier": str(node.identifier),
+                    # "tpres_old": str(node.tpres_old),
+                    # "ttemp_old": str(node.ttemp_old),
+                    # "tenth_old": str(node.tenth_old)
+                # })
 
         # Clean the indentation in the file to be user-readable
         clean_indentation(element)
