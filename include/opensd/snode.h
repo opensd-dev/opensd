@@ -64,7 +64,7 @@ public:
   double heat_input;
   double heat_input_old;
   double heat_transfer;
-  // double elevation;
+  double htc;
   
   // std::set<std::string> fixed_var;
   // double esource;

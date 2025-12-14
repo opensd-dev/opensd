@@ -7,6 +7,7 @@
 #include <cstdlib>
 
 #include "opensd/hslab.h"
+#include "opensd/circuit.h"
 // #include "opensd/snode.h"
 // #include "opensd/layer.h"
 // #include "opensd/bc.h"
@@ -51,9 +52,41 @@ HSlab::HSlab(pugi::xml_node hslab_node)
   }
   uvar = get_node_value(hslab_node, "uvar");
   dvar = get_node_value(hslab_node, "dvar");
-  uval = stod(get_node_value(hslab_node, "uval"));
-  dval = stod(get_node_value(hslab_node, "dval"));
+  ucompid = get_node_value(hslab_node, "ucomp");
+  dcompid = get_node_value(hslab_node, "dcomp");
+  // uval = stod(get_node_value(hslab_node, "uval"));
+  // dval = stod(get_node_value(hslab_node, "dval"));
   
+  upipe = get_comp<Pipe>(ucompid);
+  
+  if (upipe) {
+    std::cout << "Found pipe with identifier: " << upipe->identifier << std::endl;
+  } else {
+    std::cout << "Upstream Pipe not found." << std::endl;
+  }  
+  
+  uval1.assign(upipe->faces.begin(),
+             upipe->faces.begin() + upipe->ncell);
+
+  dpipe = get_comp<Pipe>(dcompid);
+  
+  if (dpipe) {
+    std::cout << "Found pipe with identifier: " << dpipe->identifier << std::endl;
+  } else {
+    std::cout << "Downstream Pipe not found." << std::endl;
+  }  
+  
+
+  std::string config = "counter";
+  if (config == "counter") {
+    dval1.assign(dpipe->faces.rbegin(),
+                dpipe->faces.rbegin() + dpipe->ncell);
+  } else {
+    dval1.assign(dpipe->faces.begin(),
+                 dpipe->faces.begin() + dpipe->ncell);
+  }
+
+
 
 //   this->eps_m = this->mean_flow = this->eps_h = this->eps_p = 0;
 
@@ -492,5 +525,30 @@ void initialize_hslabs() {
 //     }
 //     return nullptr; // not found
 // }
+template<typename T>
+std::shared_ptr<T> find_in_vector(
+  const std::vector<std::shared_ptr<T>>& vec,
+  const std::string& obj)
+{
+  for (const auto& item : vec) {
+    if (item->identifier == obj) {
+      return item;
+    }
+  }
+  return nullptr;
+}
+
+template<typename T>
+std::shared_ptr<T> get_comp(const std::string& obj)
+{
+  for (const auto& circuit : model::circuits) {
+    if (auto item = find_in_vector(circuit->pipes, obj))
+      return item;
+    // same for nodes, bcs, pumps, ...
+  }
+
+  std::cerr << "Object not found in project. Stopping: " << obj << std::endl;
+  std::exit(EXIT_FAILURE);
+}
 
 } // namespace opensd

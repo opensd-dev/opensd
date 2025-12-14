@@ -6,9 +6,9 @@
 #include "pugixml.hpp"
 // #include "opensd/constants.h"
 #include "opensd/layer.h"
-// #include "opensd/pipe.h"
+#include "opensd/pipe.h"
 // #include "opensd/bc.h"
-// #include "opensd/face.h"
+#include "opensd/face.h"
 #include "opensd/vector.h"
 #include "opensd/memory.h"
 // #include "hdf5_interface.h"
@@ -43,7 +43,13 @@ public:
   double darea;
   std::string uvar;
   std::string dvar;
+  std::string ucompid;
+  std::string dcompid;
   double uval;
+  vector<std::shared_ptr<Face>> uval1;
+  vector<std::shared_ptr<Face>> dval1;
+  std::shared_ptr<Pipe> upipe;
+  std::shared_ptr<Pipe> dpipe;
   double dval;
   // double eps_m;
   vector<double> eps_tlist;
@@ -102,6 +108,17 @@ protected:
 
 void read_hslabs(pugi::xml_node node);
 void initialize_hslabs();
+
+
+template<typename T>
+std::shared_ptr<T> find_in_vector(
+  const std::vector<std::shared_ptr<T>>& vec,
+  const std::string& obj);
+
+template<typename T>
+std::shared_ptr<T> get_comp(const std::string& obj);
+
+
 
 } // namespace opensd
 
