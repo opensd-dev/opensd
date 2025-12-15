@@ -3,14 +3,19 @@
 
 #include <iostream>
 
-// #include "opensd/capi.h"
+#include "opensd/capi.h"
 // #include "opensd/constants.h"
 #include "opensd/action.h"
+#include "opensd/error.h"
+#include "opensd/file_utils.h"
 #include "opensd/fluid.h"
 #include "opensd/solid.h"
 #include "opensd/settings.h"
 #include "opensd/geometry.h"
 #include "opensd/message_passing.h"
+#include "opensd/openmp_interface.h"
+#include "opensd/output.h"
+#include "opensd/string_utils.h"
 #include <petscsys.h>
 
 int opensd_init(int argc, char* argv[], const void* intracomm) {
@@ -30,9 +35,9 @@ int opensd_init(int argc, char* argv[], const void* intracomm) {
 #endif
 
   // Parse command-line arguments
-  // int err = parse_command_line(argc, argv);
-  // if (err)
-    // return err;
+  int err = parse_command_line(argc, argv);
+  if (err)
+    return err;
 
   // Read XML input files
   // if (!read_model_xml())
@@ -174,6 +179,68 @@ void initialize_mpi(MPI_Comm intracomm)
 }
 #endif // OPENSD_MPI
 
+int parse_command_line(int argc, char* argv[])
+{
+  int last_flag = 0;
+  for (int i = 1; i < argc; ++i) {
+    std::string arg {argv[i]};
+    if (arg[0] == '-') {
+      if (arg == "-s" || arg == "--threads") {
+        // Read number of threads
+        i += 1;
+
+#ifdef _OPENMP
+        // Read and set number of OpenMP threads
+        int n_threads = std::stoi(argv[i]);
+        if (n_threads < 1) {
+          std::string msg {"Number of threads must be positive."};
+          strcpy(opensd_err_msg, msg.c_str());
+          return OPENSD_E_INVALID_ARGUMENT;
+        }
+        omp_set_num_threads(n_threads);
+
+#else
+        if (mpi::master) {
+          warning("Ignoring number of threads specified on command line.");
+        }
+#endif
+
+} else {
+        fmt::print(stderr, "Unknown option: {}\n", argv[i]);
+        print_usage();
+        return OPENSD_E_UNASSIGNED;
+      }
+      last_flag = i;
+    }
+  }
+
+  #pragma omp parallel
+  {
+    #pragma omp single
+    std::cout << "Threads used = " << omp_get_num_threads() << std::endl;
+  }
+
+  // Determine directory where XML input files are
+  if (argc > 1 && last_flag < argc - 1) {
+    settings::path_input = std::string(argv[last_flag + 1]);
+
+    // check that the path is either a valid directory or file
+    if (!dir_exists(settings::path_input) &&
+        !file_exists(settings::path_input)) {
+      fatal_error(fmt::format(
+        "The path specified to the OpenSD executable '{}' does not exist.",
+        settings::path_input));
+    }
+
+    // Add slash at end of directory if it isn't there
+    if (!ends_with(settings::path_input, "/") &&
+        dir_exists(settings::path_input)) {
+      settings::path_input += "/";
+    }
+  }
+
+  return 0;
+}
 
 void read_separate_xml_files()
 {

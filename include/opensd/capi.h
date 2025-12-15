@@ -8,6 +8,10 @@ int opensd_simulation_init();
 int opensd_reset();
 int opensd_finalize();
 
+// Error codes
+extern int OPENSD_E_UNASSIGNED;
+extern int OPENSD_E_INVALID_ARGUMENT;
+
 // Global variables
 extern char opensd_err_msg[256];
 

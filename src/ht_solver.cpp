@@ -170,40 +170,39 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
   
         // Boundary conditions (uwnodes)
         if (std::find(hslab->uwnodes.begin(), hslab->uwnodes.end(), node) != hslab->uwnodes.end()) {
-          auto A_b = exec_bc(hslab->uvar, hslab->uval, hslab->uval1, node->Ai, node, i); // exec_bc returns pair (Ainc,binc) - adapt to your implementation
-          // double Ainc = A_b.Ainc;
-          // double binc = A_b.binc;
-          // b(i) = b(i) + alpha_heat * binc - (1.0 - alpha_heat) * node->heat_transfer_old;
-          // A(i, i) = A(i, i) + alpha_heat * Ainc;
+          auto [Ainc, binc] = exec_bc(hslab->uvar, hslab->uval, hslab->uval1, node->Ai, node, i); // exec_bc returns pair (Ainc,binc) - adapt to your implementation
+          b(i) = b(i) + alpha_heat * binc; // - (1.0 - alpha_heat) * node->heat_transfer_old;
+          A(i, i) = A(i, i) + alpha_heat * Ainc;
         }
-  //
-  //       // Boundary conditions (dwnodes) - note Python used i-n+HSlab.ninc index for bc call
-  //       if (std::find(HSlab->dwnodes.begin(), HSlab->dwnodes.end(), node) != HSlab->dwnodes.end()) {
-  //         int bc_index = i - n + HSlab->ninc; // as in Python
-  //         auto A_b = exec_bc(HSlab->dvar, HSlab->dval, node->Ai, node, bc_index);
-  //         double Ainc = A_b.Ainc;
-  //         double binc = A_b.binc;
-  //         b(i) += alpha_heat * binc - (1.0 - alpha_heat) * node->heat_transfer_old;
-  //         A(i, i) += alpha_heat * Ainc;
-  //       }
+
+        // Boundary conditions (dwnodes) - note Python used i-n+HSlab.ninc index for bc call
+        if (std::find(hslab->dwnodes.begin(), hslab->dwnodes.end(), node) != hslab->dwnodes.end()) {
+          int bc_index = i - n + hslab->ninc; // as in Python
+          auto [Ainc, binc] = exec_bc(hslab->dvar, hslab->dval, hslab->dval1, node->Ai, node, bc_index);
+          b(i) = b(i) + alpha_heat * binc; // - (1.0 - alpha_heat) * node->heat_transfer_old;
+          A(i, i) = A(i, i) + alpha_heat * Ainc;
+        }
       }
     } // end building A, b
-  //
-  //   // Solve linear system A * temp = b
-  //   Eigen::VectorXd tempVec(n);
-  //   bool solved = true;
-  //   if (A.cols() == 0 || A.rows() == 0) {
-  //     solved = false;
-  //   } else {
-  //     // Try LDLT (symmetric PD) first, fallback to full-pivot QR if it fails.
-  //     Eigen::LDLT<Eigen::MatrixXd> ldlt(A);
-  //     if (ldlt.info() == Eigen::Success) {
-  //       tempVec = ldlt.solve(b);
-  //     } else {
-  //       tempVec = A.colPivHouseholderQr().solve(b);
-  //     }
-  //   }
-  //
+
+    // Solve linear system A * temp = b
+    Eigen::VectorXd tempVec(n);
+    bool solved = true;
+    if (A.cols() == 0 || A.rows() == 0) {
+      solved = false;
+    } else {
+      // Try LDLT (symmetric PD) first, fallback to full-pivot QR if it fails.
+      Eigen::LDLT<Eigen::MatrixXd> ldlt(A);
+      if (ldlt.info() == Eigen::Success) {
+        tempVec = ldlt.solve(b);
+      } else {
+        tempVec = A.colPivHouseholderQr().solve(b);
+      }
+    }
+    std::cout<<A<<std::endl<<std::endl;
+    std::cout<<b<<std::endl<<std::endl;
+    std::cout<<tempVec<<std::endl;
+
   //   // Assign temp_gues back to nodes (with relaxation where applied)
   //   i = -1;
   //   for (auto &layer : HSlab->layers) {
@@ -291,7 +290,7 @@ exec_bc(const std::string& bvar,
   double Ainc = 0.0;
   double binc = 0.0;
 
-   if (bvar == "hflux") {
+  if (bvar == "hflux") {
 
     // binc = bval * A * wall_node->AFF;
 
@@ -333,10 +332,10 @@ exec_bc(const std::string& bvar,
 	  wall_node->htc = h;
 
       double Tf = flow_elem->stemp_gues;
-      // double hA = wall_node->htc * A;
+      double hA = wall_node->htc * A;
 
-      // binc = hA * Tf;
-      // Ainc = hA;
+      binc = hA * Tf;
+      Ainc = hA;
 
     }
     else if (bvar == "pipenl") {

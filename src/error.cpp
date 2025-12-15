@@ -11,8 +11,9 @@
 //==============================================================================
 
 // Error codes
-// int OPENSD_E_UNASSIGNED {-1};
+int OPENSD_E_UNASSIGNED {-1};
 // int OPENSD_E_WARNING {1};
+int OPENSD_E_INVALID_ARGUMENT {-5};
 
 // Error message
 char opensd_err_msg[256];

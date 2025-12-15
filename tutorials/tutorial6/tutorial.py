@@ -48,7 +48,7 @@ Af = 0.25*math.pi*1.831**2 - 3600*0.25*math.pi*0.019**2
 Pw = math.pi*(1.831+3600*0.019)
 dh = 4.*Af/(Pw)
 
-pipe1 = circuit1.add_pipe("pipe1",dh,7.5,"node1","node2",'DW',30.,20,cfarea=Af,heat_input=-308.E6) #npar=1
+pipe1 = circuit1.add_pipe("pipe1",dh,7.5,"node1","node2",'DW',30.,3,cfarea=Af) #npar=1
 
 bc1 = circuit1.add_BC("bc1","node1",'P',5.E5)
 bc2 = circuit1.add_BC("bc2","node1",'T',817.)
@@ -62,7 +62,7 @@ circuit2.assign_fluid(flname="Na6",fltype="incompressible",fllib="User")
 node3 = circuit2.add_node("node3")
 node4 = circuit2.add_node("node4")
 
-pipe2=circuit2.add_pipe("pipe2",0.0174,7.5,"node3","node4",'DW',30.,10,npar=3600,heat_input=308.E6)
+pipe2=circuit2.add_pipe("pipe2",0.0174,7.5,"node3","node4",'DW',30.,3,npar=3600) #,heat_input=308.E6
 
 bc4 = circuit2.add_BC("bc4","node3",'P',5.E5)
 bc5 = circuit2.add_BC("bc5","node3",'T',628.)
@@ -102,5 +102,5 @@ settings.run_mode = "steady"
 settings.no_main_iter = 200
 settings.export_to_xml()
 
-opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/c/codes/opensd/build/opensd')
+opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/home/vikram/Codes/opensd/build/opensd',threads=1)
 

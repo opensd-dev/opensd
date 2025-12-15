@@ -54,39 +54,8 @@ HSlab::HSlab(pugi::xml_node hslab_node)
   dvar = get_node_value(hslab_node, "dvar");
   ucompid = get_node_value(hslab_node, "ucomp");
   dcompid = get_node_value(hslab_node, "dcomp");
-  // uval = stod(get_node_value(hslab_node, "uval"));
-  // dval = stod(get_node_value(hslab_node, "dval"));
-  
-  upipe = get_comp<Pipe>(ucompid);
-  
-  if (upipe) {
-    std::cout << "Found pipe with identifier: " << upipe->identifier << std::endl;
-  } else {
-    std::cout << "Upstream Pipe not found." << std::endl;
-  }  
-  
-  uval1.assign(upipe->faces.begin(),
-             upipe->faces.begin() + upipe->ncell);
-
-  dpipe = get_comp<Pipe>(dcompid);
-  
-  if (dpipe) {
-    std::cout << "Found pipe with identifier: " << dpipe->identifier << std::endl;
-  } else {
-    std::cout << "Downstream Pipe not found." << std::endl;
-  }  
-  
-
-  std::string config = "counter";
-  if (config == "counter") {
-    dval1.assign(dpipe->faces.rbegin(),
-                dpipe->faces.rbegin() + dpipe->ncell);
-  } else {
-    dval1.assign(dpipe->faces.begin(),
-                 dpipe->faces.begin() + dpipe->ncell);
-  }
-
-
+  uval = stod(get_node_value(hslab_node, "uval"));
+  dval = stod(get_node_value(hslab_node, "dval"));
 
 //   this->eps_m = this->mean_flow = this->eps_h = this->eps_p = 0;
 
@@ -116,6 +85,39 @@ void discretize_layers() {
 // 		  break;
 // 	    }
 //       }
+
+
+  hslab->upipe = get_comp<Pipe>(hslab->ucompid);
+
+  if (hslab->upipe) {
+    std::cout << "Found pipe with identifier: " << hslab->upipe->identifier << std::endl;
+  } else {
+    std::cout << "Upstream Pipe not found." << std::endl;
+  }
+
+  hslab->uval1.assign(hslab->upipe->faces.begin(),
+             hslab->upipe->faces.begin() + hslab->upipe->ncell);
+
+  hslab->dpipe = get_comp<Pipe>(hslab->dcompid);
+
+  if (hslab->dpipe) {
+    std::cout << "Found pipe with identifier: " << hslab->dpipe->identifier << std::endl;
+  } else {
+    std::cout << "Downstream Pipe not found." << std::endl;
+  }
+
+
+  std::string config = "counter";
+  if (config == "counter") {
+    hslab->dval1.assign(hslab->dpipe->faces.rbegin(),
+                hslab->dpipe->faces.rbegin() + hslab->dpipe->ncell);
+  } else {
+    hslab->dval1.assign(hslab->dpipe->faces.begin(),
+                 hslab->dpipe->faces.begin() + hslab->dpipe->ncell);
+  }
+
+
+
 	for (auto& layer : hslab->layers) {
       // layer->hslab = hslab;
       int nnodes = layer->nnodes;
@@ -375,14 +377,17 @@ void initialize_hslabs() {
   		// }
   		snode->assign_prop();
   		// node->update_gues();
-  	  // }
-  	  // for (auto& face : circuit->faces) {
+  	  }
+  	  for (auto& sface : layer->ifaces) {
   		// face->assign_statevar();
   		// face->assign_prop();
   		// face->update_gues();
+        sface->ther_gues->update();
   
-  	  // }
   	  }
+  	  for (auto& face : layer->jfaces) {
+
+      }
     }
   }
 

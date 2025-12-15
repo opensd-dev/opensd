@@ -12,7 +12,7 @@
 
 namespace opensd {
 
-// int parse_command_line(int argc, char* argv[]);
+int parse_command_line(int argc, char* argv[]);
 #ifdef OPENSD_MPI
 void initialize_mpi(MPI_Comm intracomm);
 #endif

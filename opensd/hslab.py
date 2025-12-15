@@ -1,7 +1,7 @@
 import numpy as np
 import lxml.etree as ET
 import sys,os
-
+from opensd.pipe import Pipe
 comps = {}
 
 def add_SNode(identifier,Ai,Aj,vol,solname,sollib,heat_frac,layer):
@@ -249,12 +249,13 @@ class HSlab:
 
         try:
             self.ucomp = get_comp(ucomp)
-            if isinstance(self.ucomp,comp.Pipe):
+            if isinstance(self.ucomp,Pipe):
                 pipe = self.ucomp
                 uninc = pipe.ncell #no of increments in the upstream pipe
-                self.uval.append([pipe.faces[i] for i in range(pipe.ncell)])
-                for i in range(pipe.ncell):
-                    self.ufaces.append(pipe.faces[i])
+                # self.uval.append([pipe.faces[i] for i in range(pipe.ncell)])
+                # for i in range(pipe.ncell):
+                #     self.ufaces.append(pipe.faces[i])
+
             elif isinstance(self.ucomp,comp.Node):
                 self.uval.append(self.ucomp)
             else:
@@ -264,18 +265,18 @@ class HSlab:
 
         try:
             self.dcomp = get_comp(dcomp)
-            if isinstance(self.dcomp,comp.Pipe):
+            if isinstance(self.dcomp,Pipe):
                 pipe = self.dcomp
                 dninc = pipe.ncell #no of increments in the downstream pipe
-                self.dval.append([])
-                if config == "counter":
-                    for i in range(pipe.ncell):
-                        self.dval[1].append(pipe.faces[pipe.ncell-i-1])
-                        self.dfaces.append(pipe.faces[i])
-                else:
-                    for i in range(pipe.ncell):
-                        self.dval[1].append(pipe.faces[i])
-                        self.dfaces.append(pipe.faces[i])
+                # self.dval.append([])
+                # if config == "counter":
+                #     for i in range(pipe.ncell):
+                #         self.dval[1].append(pipe.faces[pipe.ncell-i-1])
+                #         self.dfaces.append(pipe.faces[i])
+                # else:
+                #     for i in range(pipe.ncell):
+                #         self.dval[1].append(pipe.faces[i])
+                #         self.dfaces.append(pipe.faces[i])
             elif isinstance(self.dcomp,comp.Node):
                 self.dval.append(self.dcomp)
             else:
@@ -355,10 +356,10 @@ class HSlab:
         element.set("identifier", str(self.identifier))
         element.set("ucomp", str(self.ucompid))
         element.set("uvar",  str(self.uvar))
-        element.set("uval",  str(self.uval))
+        element.set("uval",  str(self.uval[0]))
         element.set("dcomp", str(self.dcompid))
         element.set("dvar",  str(self.dvar))
-        element.set("dval",  str(self.dval))
+        element.set("dval",  str(self.dval[0]))
         element.set("uarea", str(self.uarea))
         element.set("ninc", str(self.ninc))
 

@@ -10,11 +10,11 @@
 #include <omp.h>
 int main(int argc, char* argv[])
 {
-  #pragma omp parallel
-  {
-    #pragma omp single
-    std::cout << "Threads used = " << omp_get_num_threads() << std::endl;
-  }
+  // #pragma omp parallel
+  // {
+  //   #pragma omp single
+  //   std::cout << "Threads used = " << omp_get_num_threads() << std::endl;
+  // }
   using namespace opensd;
   int err;
 

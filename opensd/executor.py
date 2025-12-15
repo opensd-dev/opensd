@@ -1,6 +1,7 @@
+from numbers import Integral
 import subprocess
 
-def _process_CLI_arguments(opensd_exec='opensd', mpi_args=None, petsc_args = None):
+def _process_CLI_arguments(opensd_exec='opensd', mpi_args=None, petsc_args = None, threads = None):
     """Converts user-readable flags in to command-line arguments to be run with
     the OpenSD executable via subprocess.
 
@@ -11,6 +12,11 @@ def _process_CLI_arguments(opensd_exec='opensd', mpi_args=None, petsc_args = Non
     mpi_args : list of str, optional
         MPI execute command and any additional MPI arguments to pass,
         e.g., ['mpiexec', '-n', '8'].
+    threads : int, optional
+        Number of OpenMP threads. If OpenSD is compiled with OpenMP threading
+        enabled, the default is implementation-dependent but is usually equal
+        to the number of hardware threads available (or a value set by the
+        :envvar:`OMP_NUM_THREADS` environment variable).
 
     Returns
     -------
@@ -26,6 +32,9 @@ def _process_CLI_arguments(opensd_exec='opensd', mpi_args=None, petsc_args = Non
 
     if petsc_args is not None:
         args += petsc_args
+
+    if isinstance(threads, Integral) and threads > 0:
+        args += ['-s', str(threads)]
 
     return args
 
@@ -61,7 +70,7 @@ def _run(args, output, cwd):
 
         # raise RuntimeError(error_msg)
 
-def run(output=True, cwd='.', opensd_exec='opensd', mpi_args=None, petsc_args=None):
+def run(output=True, cwd='.', opensd_exec='opensd', mpi_args=None, petsc_args=None, threads=None):
     """Run an OpenSD simulation.
 
     Parameters
@@ -76,6 +85,11 @@ def run(output=True, cwd='.', opensd_exec='opensd', mpi_args=None, petsc_args=No
     mpi_args : list of str, optional
         MPI execute command and any additional MPI arguments to pass, e.g.,
         ['mpiexec', '-n', '8'].
+    threads : int, optional
+        Number of OpenMP threads. If OpenSD is compiled with OpenMP threading
+        enabled, the default is implementation-dependent but is usually equal to
+        the number of hardware threads available (or a value set by the
+        :envvar:`OMP_NUM_THREADS` environment variable).
 
     Raises
     ------
@@ -83,6 +97,6 @@ def run(output=True, cwd='.', opensd_exec='opensd', mpi_args=None, petsc_args=No
         If the `opensd` executable returns a non-zero status
 
     """
-    args = _process_CLI_arguments(opensd_exec=opensd_exec, mpi_args=mpi_args, petsc_args=petsc_args)
+    args = _process_CLI_arguments(opensd_exec=opensd_exec, mpi_args=mpi_args, petsc_args=petsc_args, threads=threads)
 
     _run(args, output, cwd)
