@@ -33,6 +33,8 @@ public:
   std::shared_ptr<SNode> dnode;
   double A;
   double delx;
+  double delx1;
+  double delx2;
 //   double vflow_old;
 //   double vflow_gues;
 //   double mflow;
@@ -51,8 +53,7 @@ public:
 //   double stemp_old;
 //   double tpres_gues;
 //   double spres_gues;
-//   double ttemp_gues;
-//   double stemp_gues;
+  double temp_gues;
   SFaceTher* ther_gues;
 //   FaceTher* ther_old;
 //
@@ -72,6 +73,7 @@ public:
 //   void assign_statevar();
 //   void update_statevar();
 //   void update_staticpres();
+  void update_temp();
 //   virtual void update_gues();
 //   void assign_prop();
 //   virtual void update_old();

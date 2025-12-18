@@ -51,16 +51,9 @@ public:
   // double ttemp_old;
   // double tenth_old;
   // double tpres_gues;
-  // double ttemp_gues;
+  double temp_gues;
   // double tenth_gues;
 
-  // double spres_old;
-  // double stemp_old;
-  // double senth_old;
-  // double spres_gues;
-  // double stemp_gues;
-  // double senth_gues;
-  
   double heat_input;
   double heat_input_old;
   double heat_transfer;

@@ -56,6 +56,8 @@ public:
   vector<double> htlist;
   // double mean_flow;
   double mean_ht;
+  double uheat_transfer;
+  double dheat_transfer;
   // double eps_h;
   // double eps_p;
   vector<std::shared_ptr<Layer>> layers;

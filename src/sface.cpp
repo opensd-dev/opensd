@@ -27,11 +27,19 @@ SFace::SFace(std::string identifier, std::shared_ptr<SNode> unode, std::shared_p
   // ther_old = new FaceTher(this);
   ther_gues = new SFaceTher(this);
 
-  double delx1 = unode->layer->delx;
-  double delx2 = dnode->layer->delx;
+  delx1 = unode->layer->delx;
+  delx2 = dnode->layer->delx;
   delx = 0.5*(delx1+delx2);
 
 
+}
+
+void SFace::update_temp(){
+  temp_gues =
+    ( unode->temp_gues * unode->ther_gues->conductivity() * delx2
+    + dnode->temp_gues * dnode->ther_gues->conductivity() * delx1 )
+    / ( unode->ther_gues->conductivity() * delx2
+      + dnode->ther_gues->conductivity() * delx1 );
 }
 
 // void Face::update_statevar(){

@@ -25,6 +25,12 @@ exec_bc(const std::string& bvar,
         std::shared_ptr<SNode> wall_node,
         int bound_ind);
 
+double exec_ht(const std::string& bvar,
+               double bval,
+               vector<std::shared_ptr<Face>> bval1,
+               double A,
+               std::shared_ptr<SNode> wall_node,
+               int bound_ind);
 }
 } // namespace opensd
 

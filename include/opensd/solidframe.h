@@ -14,7 +14,7 @@ public:
   virtual std::shared_ptr<SolidFrame> clone() const = 0;
 
   // Core operations
-  // virtual void update(int input_pair, double val1, double val2) = 0;
+  virtual void update(double temperature) = 0;
 
   // Common accessors used by solvers
   virtual double rhomass() const = 0;

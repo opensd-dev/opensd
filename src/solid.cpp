@@ -49,37 +49,12 @@ Solid::Solid(pugi::xml_node node)
 //   model::fluid_map.erase(id_);
 // }
 
-/* void Fluid::update(int input_pair, double val1, double val2)
+void Solid::update(double temperature)
 {
-  switch (input_pair) {
-    case 9:  // PT_INPUTS
-      T_ = val2;
-      hmass_ = cpmass_ * T_;
-      break;
 
-    case 20:  // HmassP_INPUTS
-      T_ = val1 / cpmass_;
-      hmass_ = cpmass_ * T_;
-      break;
+  // std::cout << "T_" << " " << temperature << std::endl;
 
-    case 2:  // PQ_INPUTS
-      if (val2 >= 0.0 && val2 <= 1.0) {
-        T_ = boiling_point_;
-        hmass_ = cpmass_ * T_ + val2 * enthalpy_vaporization_;
-      } else {
-        throw std::runtime_error("Q out of range in Fluid::update()");
-      }
-      break;
-
-    default:
-      throw std::runtime_error("input_pair not recognized in Fluid::update()");
-  }
-  // std::cout << T_ << " " << input_pair << " " << val1 << " " << val2 << " " << std::endl;
-
-  speed_sound_ = std::sqrt(1.0 / (adiabatic_compressibility_ * rhomass_));
 }
- */
-
 
 
 //==============================================================================

@@ -6,7 +6,7 @@
 // #include <iostream>
 // #include <iomanip>
 #include <Eigen/Dense>   // For matrix manipulations
-// #include <cstdlib>
+#include <cstdlib>
 // #include "opensd/vector.h"
 // #include "opensd/message_passing.h"
 #include "opensd/simulation.h"
@@ -199,76 +199,78 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
         tempVec = A.colPivHouseholderQr().solve(b);
       }
     }
-    std::cout<<A<<std::endl<<std::endl;
-    std::cout<<b<<std::endl<<std::endl;
-    std::cout<<tempVec<<std::endl;
+    // std::cout<<A<<std::endl<<std::endl;
+    // std::cout<<b<<std::endl<<std::endl;
+    // std::cout<<tempVec<<std::endl;
 
-  //   // Assign temp_gues back to nodes (with relaxation where applied)
-  //   i = -1;
-  //   for (auto &layer : HSlab->layers) {
-  //     double relax = 1.0;
-   //     // The original python toggles relax for some cases — kept simple here:
-  //     if (!trans_sim) relax = 1.0;
-  //
-  //     for (auto *node : layer->nodes) {
-  //       ++i;
-  //       if (std::find(HSlab->dwnodes.begin(), HSlab->dwnodes.end(), node) != HSlab->dwnodes.end() ||
-  //           std::find(HSlab->uwnodes.begin(), HSlab->uwnodes.end(), node) != HSlab->uwnodes.end()) {
-  //         node->temp_gues = relax * tempVec(i) + (1.0 - relax) * node->temp_gues;
-  //       } else {
-  //         node->temp_gues = tempVec(i);
-  //       }
-  //     }
-  //   }
+    // Assign temp_gues back to nodes (with relaxation where applied)
+    i = -1;
+    for (auto& layer : hslab->layers) {
+      double relax = 1.0;
+       // The original python toggles relax for some cases — kept simple here:
+      if (!trans_sim) relax = 1.0;
+      for (auto& snode : layer->snodes) {
+        ++i;
+        if (std::find(hslab->dwnodes.begin(), hslab->dwnodes.end(), snode) != hslab->dwnodes.end() ||
+            std::find(hslab->uwnodes.begin(), hslab->uwnodes.end(), snode) != hslab->uwnodes.end()) {
+          snode->temp_gues = relax * tempVec(i) + (1.0 - relax) * snode->temp_gues;
+        } else {
+          snode->temp_gues = tempVec(i);
+        }
+        // std::cout<<snode->identifier<< " " << snode->temp_gues<<std::endl;
+      }
+    }
   } // end first pass over HSlabs
 
-  // // Second pass: compute heat transfers and update thermo states
-  // for (auto *HSlab : HTcomp::HSlab::_registry) {
-  //   int n = 0;
-  //   for (auto &layer : HSlab->layers) n += layer->nnodes;
-  //   n *= HSlab->ninc;
-  //   if (!trans_sim && HSlab->solveSS == false) continue;
-  //
-  //   HSlab->dheat_transfer = 0.0;
-  //   HSlab->uheat_transfer = 0.0;
-  //   int i = -1;
-  //
-  //   for (auto &layer : HSlab->layers) {
-  //     for (auto *node : layer->nodes) {
-  //       ++i;
-  //       if (std::find(HSlab->dwnodes.begin(), HSlab->dwnodes.end(), node) != HSlab->dwnodes.end()) {
-  //         node->heat_transfer = exec_ht(HSlab->dvar, HSlab->dval, node->Ai, node, i - n + HSlab->ninc);
-  //         HSlab->dheat_transfer += node->heat_transfer;
-  //       }
-  //
-  //       if (std::find(HSlab->uwnodes.begin(), HSlab->uwnodes.end(), node) != HSlab->uwnodes.end()) {
-  //         node->heat_transfer = exec_ht(HSlab->uvar, HSlab->uval, node->Ai, node, i);
-  //         HSlab->uheat_transfer += node->heat_transfer;
-  //       }
-  //
-  //       // update guessed thermodynamic state for node
-  //       node->ther_gues.update(node->temp_gues);
-  //     } // end nodes in layer
-  //
-  //     // update interfaces in this layer
-  //     for (auto *iface : layer->ifaces) {
-  //       iface->ther_gues.update();
-  //       iface->update_temp();
-  //     }
-  //     for (auto *jface : layer->jfaces) {
-  //       jface->ther_gues.update();
-  //       jface->update_temp();
-  //     }
-  //   } // end layers loop
-  //
-  //   // final per-node updates for condensate efficiency and heat input
-  //   for (auto &layer : HSlab->layers) {
-  //     for (auto *node : layer->nodes) {
+  // Second pass: compute heat transfers and update thermo states
+  for (auto& hslab : model::hslabs) {
+    int n = 0;
+    for (auto& layer : hslab->layers) n += layer->nnodes;
+    n *= hslab->ninc;
+    // if (!trans_sim && hslab->solveSS == false) continue;
+
+    hslab->dheat_transfer = 0.0;
+    hslab->uheat_transfer = 0.0;
+    int i = -1;
+
+    for (auto& layer : hslab->layers) {
+      for (auto& snode : layer->snodes) {
+        ++i;
+        if (std::find(hslab->dwnodes.begin(), hslab->dwnodes.end(), snode) != hslab->dwnodes.end()) {
+          snode->heat_transfer = exec_ht(hslab->dvar, hslab->dval, hslab->dval1, snode->Ai, snode, i - n + hslab->ninc);
+          hslab->dheat_transfer += snode->heat_transfer;
+        }
+
+        if (std::find(hslab->uwnodes.begin(), hslab->uwnodes.end(), snode) != hslab->uwnodes.end()) {
+          snode->heat_transfer = exec_ht(hslab->uvar, hslab->uval, hslab->uval1, snode->Ai, snode, i);
+          hslab->uheat_transfer += snode->heat_transfer;
+        }
+
+        // update guessed thermodynamic state for node
+        snode->ther_gues->update(snode->temp_gues);
+      } // end nodes in layer
+      // update interfaces in this layer
+      for (auto iface : layer->ifaces) {
+        iface->ther_gues->update();
+        iface->update_temp();
+        // std::cout << iface->temp_gues<<std::endl;
+      }
+      for (auto jface : layer->jfaces) {
+        jface->ther_gues->update();
+        jface->update_temp();
+        // std::cout << jface->temp_gues<<std::endl;
+      }
+    } // end layers loop
+
+    // final per-node updates for condensate efficiency and heat input
+    for (auto& layer : hslab->layers) {
+      for (auto& snode : layer->snodes) {
   //       node->update_condeff();
   //       node->update_heat_input(time, delt);
-  //     }
-  //   }
-  // } // end second pass over HSlabs
+      }
+    }
+  } // end second pass over HSlabs
+  std::exit(0);
 
 
 
@@ -363,6 +365,57 @@ exec_bc(const std::string& bvar,
   return {Ainc, binc};
 }
 
+
+double exec_ht(const std::string& bvar,
+               double bval,
+               vector<std::shared_ptr<Face>> bval1,
+               double A,
+               std::shared_ptr<SNode> wall_node,
+               int bound_ind)
+{
+    double heat_transfer = 0.0;
+    double relax = 0.5;
+
+    if (bvar == "pipe" || bvar == "pipenl") {
+
+        auto flow_elem = bval1[bound_ind];
+
+        if (bvar == "pipe") {
+            double h = wall_node->htc;
+            double Tf = flow_elem->stemp_gues;
+            double hA = h * A;
+            heat_transfer = relax * (wall_node->temp_gues - Tf) * hA + (1.0 - relax) * wall_node->heat_transfer;
+            flow_elem->heat_hslab.push_back(heat_transfer);
+
+    //     } else if (bvar == "pipenl") {
+    //         double Sc = wall_node->Sc;
+    //         double Sp = wall_node->Sp;
+    //         heat_transfer = relax * (-wall_node->temp_gues * Sp - Sc) * A + (1.0 - relax) * wall_node->heat_transfer;
+    //         flow_elem->heat_hslab.push_back(heat_transfer);
+        }
+
+    } else if (bvar == "conv") {
+    //     heat_transfer = std::any_cast<double>(bval[0]) * (wall_node->temp_gues - std::any_cast<double>(bval[1])) * A;
+    //
+    } else if (bvar == "hflux") {
+    //     heat_transfer = -std::any_cast<double>(bval[0]) * A * wall_node->AFF;
+    //
+    } else if (bvar == "node") {
+    //     SNode* flow_node = std::any_cast<SNode*>(bval[1]);
+    //     double h = wall_node->htc;
+    //     double hA = h * A;
+    //     double Tw = wall_node->temp_gues;
+    //     double Tf = flow_node->stemp_gues;
+    //     heat_transfer = relax * (Tw - Tf) * hA + (1.0 - relax) * wall_node->heat_transfer;
+    //     flow_node->heat_hslab.push_back(heat_transfer);
+    //
+    } else {
+        std::cerr << "unknown option in heat transfer. stopping" << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+
+    return heat_transfer;
+}
 
   }
 }
