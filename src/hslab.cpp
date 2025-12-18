@@ -47,7 +47,7 @@ HSlab::HSlab(pugi::xml_node hslab_node)
   for (pugi::xml_node layer_node : hslab_node.children("layer")) {
     this->layers.push_back(std::make_shared<Layer>(layer_node));
  // this->layers.back()->layer_ind = this->layers.size() - 1;
- // this->layers.back()->hslab = this;
+    this->layers.back()->hslab = this;
     nlayers++;
   }
   uvar = get_node_value(hslab_node, "uvar");
@@ -225,6 +225,7 @@ void discretize_layers() {
             snode->AFF = AFF[j];
             hslab->darea = darea;
           }
+          snode->node_ind = layer->snodes.size();
           layer->snodes.push_back(snode);
 
         }

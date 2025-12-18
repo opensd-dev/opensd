@@ -42,7 +42,7 @@ public:
   // double mflow_in;
   // double mflow_out;
   Layer* layer;
-  // int node_ind;
+  int node_ind;
   double Ai, Aj, vol, heat_frac;
   double AFF;
   std::string solname;

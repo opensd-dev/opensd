@@ -270,10 +270,6 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
       }
     }
   } // end second pass over HSlabs
-  std::exit(0);
-
-
-
 
   simulation::time_solid_energy.stop();
   

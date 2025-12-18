@@ -5,6 +5,7 @@
 #include <iostream>
 #include <iomanip>
 #include <tuple>
+//#include <cstdlib>
 
 #include "opensd/initialize.h"
 #include "opensd/message_passing.h"
@@ -122,8 +123,10 @@ std::tuple<bool, double, double, double, double> check_conv(double time, double 
 
           if (snode->heat_transfer != 0.0)
             hslab->htlist.push_back(std::abs(snode->heat_transfer));
+          //std::cout<<snode->identifier<<" "<<snode->temp_gues<<std::endl;
         }
       }
+      // std::exit(0);
 
       if (hslab->htlist.empty()) {
         eps_t = 0.0;

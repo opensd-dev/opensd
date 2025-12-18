@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <Eigen/Dense>   // For matrix manipulations
 #include <cstdlib>
+#include "opensd/hslab.h"
 #include "opensd/vector.h"
 #include "opensd/message_passing.h"
 #include "opensd/simulation.h"
@@ -751,9 +752,9 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
                     * std::max(iface->ther_old->rhomass() * iface->vflow_old, 0.0));
         
         b_local = (b_local
-                  + alpha_ener * (iface->heat_input) // + sum(iface->heat_hslab)) 
+                  + alpha_ener * (iface->heat_input + std::accumulate(iface->heat_hslab.begin(), iface->heat_hslab.end(), 0.0))
                     * std::max(static_cast<double>(!std::signbit(iface->vflow_gues)), 0.0)
-                  + (1.0 - alpha_ener) * (iface->heat_input_old ) //+ sum(iface->heat_hslab_old)) 
+                  + (1.0 - alpha_ener) * (iface->heat_input_old + std::accumulate(iface->heat_hslab_old.begin(), iface->heat_hslab_old.end(), 0.0))
                     * std::max(static_cast<double>(!std::signbit(iface->vflow_old)), 0.0));
         
         b_local = (b_local 
@@ -790,9 +791,9 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
                     * std::max(-oface->ther_old->rhomass() * oface->vflow_old, 0.0));
         
         b_local = (b_local 
-                  + alpha_ener * (oface->heat_input) // + std::accumulate(oface->heat_hslab.begin(), oface->heat_hslab.end(), 0.0)) 
+                  + alpha_ener * (oface->heat_input + std::accumulate(oface->heat_hslab.begin(), oface->heat_hslab.end(), 0.0))
                     * std::max(static_cast<double>(!std::signbit(-oface->vflow_gues)), 0.0)
-                  + (1.0 - alpha_ener) * (oface->heat_input_old) // + std::accumulate(oface->heat_hslab_old.begin(), oface->heat_hslab_old.end(), 0.0)) 
+                  + (1.0 - alpha_ener) * (oface->heat_input_old + std::accumulate(oface->heat_hslab_old.begin(), oface->heat_hslab_old.end(), 0.0))
                     * std::max(static_cast<double>(!std::signbit(-oface->vflow_old)), 0.0));
         
         b_local = (b_local 
@@ -1072,11 +1073,11 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
     // VecGetValues(enth, n_local, circuit->indices_owned.data(), vals_owned.data());
 	
     double relax = 1.;
-    // if (!HT_comp::HSlab::_registry.empty()) {
-  	// if (!trans_sim) {
-  	  // relax = 0.25;
-  	// }
-    // }
+    if (!model::hslabs.empty()) {
+  	if (!trans_sim) {
+  	  relax = 0.25;
+  	}
+    }
 	PetscScalar enth_i;
     for (auto& node : circuit->nodes_owned) {
       int i = circuit->old2new[node->node_ind];
