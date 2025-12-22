@@ -11,6 +11,7 @@
 #include "opensd/face.h"
 #include "opensd/vector.h"
 #include "opensd/memory.h"
+#include "opensd/custom_fun.h"
 // #include "hdf5_interface.h"
 // #include <petscksp.h>
 // #include <petscsnes.h>
@@ -45,12 +46,12 @@ public:
   std::string dvar;
   std::string ucompid;
   std::string dcompid;
-  double uval;
+  Input uval;
   vector<std::shared_ptr<Face>> uval1;
   vector<std::shared_ptr<Face>> dval1;
   std::shared_ptr<Pipe> upipe;
   std::shared_ptr<Pipe> dpipe;
-  double dval;
+  Input dval;
   // double eps_m;
   vector<double> eps_tlist;
   vector<double> htlist;

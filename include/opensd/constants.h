@@ -4,6 +4,8 @@
 #ifndef OPENSD_CONSTANTS_H
 #define OPENSD_CONSTANTS_H
 
+#include <iostream>
+#include <cstdlib>
 
 namespace opensd {
 
@@ -43,6 +45,13 @@ inline FluidType string_to_fluid_type(const std::string& str) {
   if (str == "unset")          return FluidType::UNSET;
   throw std::runtime_error("Unrecognized FluidType string: " + str);
 }
+
+enum class InputType {
+  CONSTANT, // default value,
+  FUNCTION,
+  TABULAR
+};
+
 
 } // namespace opensd
 

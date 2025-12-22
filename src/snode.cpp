@@ -8,6 +8,7 @@
 
 #include "opensd/error.h"
 // #include "opensd/xml_interface.h"
+#include "opensd/custom_fun.h"
 #include "opensd/hslab.h"
 #include "opensd/sface.h"
 #include "opensd/solid.h"
@@ -68,7 +69,7 @@ double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_he
       if (dvar == "pipe") {
         // direct call mapping
         // h = calc_value(hslab->dval[0], flow_elem, this);
-        h = hslab->dval;
+        h = eval(hslab->dval, flow_elem, this);
       }
   //     else if (dvar == "pipenl") {
   //       // pipenl: dval[0] is callable that returns (Sc, Sp, h)
@@ -131,7 +132,7 @@ double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_he
       double h = 0.0;
       if (uvar == "pipe") {
         // h = calc_value(hslab->uval[0], flow_elem, this);
-        h = hslab->uval;
+        h = eval(hslab->uval, flow_elem, this);
       }
   //     else if (uvar == "pipenl") {
   //       auto tup = hslab->uval[0](flow_elem, this); // adjust signature
@@ -189,6 +190,14 @@ double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_he
 }
 
 void SNode::assign_prop() {
+
+
+      // if (circuit->sollib=="thinmam") {
+  // ther_gues = std::make_shared<opensd::CoolPropAdapter>("INCOMP", circuit->flname);
+  // ther_old = std::make_shared<opensd::CoolPropAdapter>("INCOMP", circuit->flname);
+  // ther_old  = node->ther_gues->clone();
+      // } else { //circuit->sollib=="User"
+
   bool found = false;
   for (auto& fptr : model::solids) {
     if (fptr->name() == solname) {
@@ -200,5 +209,6 @@ void SNode::assign_prop() {
   }
   if (!found) fatal_error(fmt::format("Could not find solid '{}'", solname));
 }
+      // }
 
 } // namespace opensd

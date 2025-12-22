@@ -279,7 +279,7 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
 // Return (Ainc, binc)
 std::pair<double, double>
 exec_bc(const std::string& bvar,
-        double bval, //const auto& bval,
+        Input bval, //const auto& bval,
 		vector<std::shared_ptr<Face>> bval1,
         double A,
         std::shared_ptr<SNode> wall_node,
@@ -323,7 +323,7 @@ exec_bc(const std::string& bvar,
     if (bvar == "pipe") {
 
       // h = calc_value(bval[0], flow_elem, wall_node);
-	  double h = bval;
+	  double h = eval(bval,flow_elem,wall_node.get());
 
       // double relax = 1.0;
       // wall_node->htc = relax * h + (1.0 - relax) * wall_node->htc;
@@ -363,7 +363,7 @@ exec_bc(const std::string& bvar,
 
 
 double exec_ht(const std::string& bvar,
-               double bval,
+               Input bval,
                vector<std::shared_ptr<Face>> bval1,
                double A,
                std::shared_ptr<SNode> wall_node,

@@ -32,6 +32,8 @@ pkg_check_modules(PETSC REQUIRED IMPORTED_TARGET petsc)
 find_package(fmt REQUIRED)
 find_package(GSL REQUIRED)
 
+find_package(pybind11 REQUIRED)
+
 set(COOLPROP_STATIC_LIBRARY ON CACHE BOOL "Build static CoolProp library" FORCE)
 SET(EXENAME opensd)
 
@@ -110,6 +112,7 @@ target_link_libraries(${EXENAME}
 	GSL::gsl
 	GSL::gslcblas
 	OpenMP::OpenMP_CXX
+	pybind11::embed
 )
 
 # if (OPENSD_USE_MPI)

@@ -15,6 +15,7 @@
 // #include "opensd/vector.h"
 #include "opensd/xml_interface.h"
 // #include "opensd/constants.h"
+#include "opensd/custom_fun.h"
 
 namespace opensd {
 
@@ -54,8 +55,54 @@ HSlab::HSlab(pugi::xml_node hslab_node)
   dvar = get_node_value(hslab_node, "dvar");
   ucompid = get_node_value(hslab_node, "ucomp");
   dcompid = get_node_value(hslab_node, "dcomp");
-  uval = stod(get_node_value(hslab_node, "uval"));
-  dval = stod(get_node_value(hslab_node, "dval"));
+
+
+  std::string type = get_node_value(hslab_node, "utype");
+
+  if (type == "constant") {
+    uval.type = InputType::CONSTANT;
+    uval.constant_value = stod(get_node_value(hslab_node, "uval"));
+
+  } else if (type == "function") {
+    uval.type = InputType::FUNCTION;
+    std::string fname = get_node_value(hslab_node, "uval");
+
+  py::module scripts = py::module::import("scripts");
+  py::object f = scripts.attr(fname.c_str());
+
+  if (!PyCallable_Check(f.ptr())) {
+    fatal_error("uval function '" + fname + "' is not callable");
+  }
+
+  uval.py_callable = f;
+
+  } else {
+    fatal_error("Unknown utype: " + type);
+  }
+
+
+  type = get_node_value(hslab_node, "dtype");
+
+  if (type == "constant") {
+    dval.type = InputType::CONSTANT;
+    dval.constant_value = stod(get_node_value(hslab_node, "dval"));
+
+  } else if (type == "function") {
+    dval.type = InputType::FUNCTION;
+    std::string fname = get_node_value(hslab_node, "dval");
+
+  py::module scripts = py::module::import("scripts");
+  py::object f = scripts.attr(fname.c_str());
+
+  if (!PyCallable_Check(f.ptr())) {
+    fatal_error("dval function '" + fname + "' is not callable");
+  }
+
+  dval.py_callable = f;
+
+  } else {
+    fatal_error("Unknown utype: " + type);
+  }
 
 //   this->eps_m = this->mean_flow = this->eps_h = this->eps_p = 0;
 

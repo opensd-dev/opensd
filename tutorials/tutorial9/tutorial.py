@@ -80,10 +80,21 @@ bc6 = circuit2.add_BC("bc6","node4",'msource',-70.3)
 Au = math.pi*do*L*N
 Ad = math.pi*di*L*N
 
-hslab1 = opensd.HSlab("hslab1",ucomp="pipe1",uvar="pipe",uval=[10000],dcomp="pipe2",dvar="pipenl",dval=[10000],uarea=Au,config="parallel")
-hslab1.add_layer(thk_elem=(do-di)/2.,thk_cros=L,nnodes=3,darea=Ad,solname='chromoly',sollib="thinmam")
+chromoly = opensd.Solid(name="chromoly")
+chromoly.rhomass = 7600.0
+chromoly.cpmass = 540.0
+chromoly.conductivity = 20.0
 
-# geometry = opensd.Geometry([circuit1,circuit2,hslab1])
+# Solids collection
+solids = opensd.Solids()
+solids.append(chromoly)
+
+# Export all solids to a single XML
+solids.export_to_xml()
+
+hslab1 = opensd.HSlab("hslab1",ucomp="pipe1",uvar="pipe",utype="script",uval="script1",dcomp="pipe2",dvar="pipe",dtype="constant",dval=10000,uarea=Au,config="parallel")
+hslab1.add_layer(thk_elem=(do-di)/2.,thk_cros=L,nnodes=3,darea=Ad,solname='chromoly',sollib="User")
+
 geometry = opensd.Geometry([circuit1,circuit2,hslab1])
 geometry.export_to_xml()
 

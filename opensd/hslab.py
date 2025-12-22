@@ -23,10 +23,11 @@ class SNode(object):
             if sollib == "User":
                 # a_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                 # sys.path.insert(0,os.getcwd() + "/")
-                mod = __import__(f"opensd.{solname}", fromlist=[''])
-                mat_clas = getattr(mod,'solid')
-                self.ther_old = mat_clas()
-                self.ther_gues = mat_clas()
+                # mod = __import__(f"opensd.{solname}", fromlist=[''])
+                # mat_clas = getattr(mod,'solid')
+                # self.ther_old = mat_clas()
+                # self.ther_gues = mat_clas()
+                pass
             elif sollib == "thinmam":
                 import thinmam
                 self.ther_old = thinmam.state(solname)
@@ -195,7 +196,7 @@ class HSlab:
     """
     _registry = []
     
-    def __init__(self,identifier,ucomp,uvar,uval,dcomp,dvar,dval,uarea,config=None,solveSS=True,nlayers=0,AFF=None,ninc=1):
+    def __init__(self,identifier,ucomp,uvar,utype,uval,dcomp,dvar,dtype,dval,uarea,config=None,solveSS=True,nlayers=0,AFF=None,ninc=1):
         """!@param identifier identifier text for the heat slab (string)
             @param ucomp upstream component identifier text (string)
             @param uvar upstream boundary condition
@@ -209,8 +210,10 @@ class HSlab:
         self.identifier = identifier
         self.uvar = uvar
         self.uval = uval
+        self.utype = utype
         self.dvar = dvar
         self.dval = dval
+        self.dtype = dtype
         self.solveSS=solveSS
         self.nlayers = nlayers
         self.ucompid = ucomp
@@ -356,10 +359,12 @@ class HSlab:
         element.set("identifier", str(self.identifier))
         element.set("ucomp", str(self.ucompid))
         element.set("uvar",  str(self.uvar))
-        element.set("uval",  str(self.uval[0]))
+        element.set("uval",  str(self.uval))
+        element.set("uval",  str(self.utype))
         element.set("dcomp", str(self.dcompid))
         element.set("dvar",  str(self.dvar))
-        element.set("dval",  str(self.dval[0]))
+        element.set("dval",  str(self.dval))
+        element.set("dval",  str(self.dtype))
         element.set("uarea", str(self.uarea))
         element.set("ninc", str(self.ninc))
 
