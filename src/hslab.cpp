@@ -67,14 +67,26 @@ HSlab::HSlab(pugi::xml_node hslab_node)
     uval.type = InputType::FUNCTION;
     std::string fname = get_node_value(hslab_node, "uval");
 
-  py::module scripts = py::module::import("scripts");
-  py::object f = scripts.attr(fname.c_str());
+    py::gil_scoped_acquire gil;
+    py::module sys = py::module::import("sys");
 
-  if (!PyCallable_Check(f.ptr())) {
-    fatal_error("uval function '" + fname + "' is not callable");
-  }
+    sys.attr("path").attr("insert")(0, ".");
 
-  uval.py_callable = f;
+    py::module scripts = py::module::import("scripts");
+    // py::module bindings = py::module::import("bindings");
+    std::cout << "[HSlab] scripts module loaded from "
+              << py::str(scripts.attr("__file__")).cast<std::string>()
+              << std::endl;
+
+    py::object f = scripts.attr(fname.c_str());
+
+    if (!PyCallable_Check(f.ptr())) {
+      fatal_error("uval function '" + fname + "' is not callable");
+    }
+    std::cout << "[HSlab] uval read successfully (function): "
+              << fname << std::endl;
+
+    uval.py_callable = f;
 
   } else {
     fatal_error("Unknown utype: " + type);
@@ -91,8 +103,25 @@ HSlab::HSlab(pugi::xml_node hslab_node)
     dval.type = InputType::FUNCTION;
     std::string fname = get_node_value(hslab_node, "dval");
 
-  py::module scripts = py::module::import("scripts");
-  py::object f = scripts.attr(fname.c_str());
+    py::gil_scoped_acquire gil;
+    py::module sys = py::module::import("sys");
+
+    sys.attr("path").attr("insert")(0, ".");
+
+    py::module scripts = py::module::import("scripts");
+    std::cout << "[HSlab] scripts module loaded from "
+              << py::str(scripts.attr("__file__")).cast<std::string>()
+              << std::endl;
+
+    py::object f = scripts.attr(fname.c_str());
+
+    if (!PyCallable_Check(f.ptr())) {
+      fatal_error("dval function '" + fname + "' is not callable");
+    }
+    std::cout << "[HSlab] dval read successfully (function): "
+              << fname << std::endl;
+
+    dval.py_callable = f;
 
   if (!PyCallable_Check(f.ptr())) {
     fatal_error("dval function '" + fname + "' is not callable");

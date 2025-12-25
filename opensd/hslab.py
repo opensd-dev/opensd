@@ -196,7 +196,7 @@ class HSlab:
     """
     _registry = []
     
-    def __init__(self,identifier,ucomp,uvar,utype,uval,dcomp,dvar,dtype,dval,uarea,config=None,solveSS=True,nlayers=0,AFF=None,ninc=1):
+    def __init__(self,identifier,ucomp,uvar,uval,dcomp,dvar,dval,uarea,config=None,solveSS=True,nlayers=0,AFF=None,ninc=1):
         """!@param identifier identifier text for the heat slab (string)
             @param ucomp upstream component identifier text (string)
             @param uvar upstream boundary condition
@@ -210,10 +210,44 @@ class HSlab:
         self.identifier = identifier
         self.uvar = uvar
         self.uval = uval
-        self.utype = utype
+
+        if isinstance(uval, (int, float)):
+            self.utype = "constant"
+
+        elif isinstance(uval, str):
+            import scripts
+
+            if hasattr(scripts, uval) and callable(getattr(scripts, uval)):
+                self.utype = "function"
+                self.func = getattr(scripts, uval)
+            else:
+                raise ValueError(
+                    f"String uval '{uval}' is not a valid function in scripts.py"
+                )
+
+        else:
+            raise TypeError(f"Unsupported uval type: {type(uval)}")
+
         self.dvar = dvar
         self.dval = dval
-        self.dtype = dtype
+
+        if isinstance(dval, (int, float)):
+            self.dtype = "constant"
+
+        elif isinstance(dval, str):
+            import scripts
+
+            if hasattr(scripts, dval) and callable(getattr(scripts, dval)):
+                self.dtype = "function"
+                self.func = getattr(scripts, dval)
+            else:
+                raise ValueError(
+                    f"String uval '{dval}' is not a valid function in scripts.py"
+                )
+
+        else:
+            raise TypeError(f"Unsupported uval type: {type(dval)}")
+
         self.solveSS=solveSS
         self.nlayers = nlayers
         self.ucompid = ucomp
@@ -360,11 +394,11 @@ class HSlab:
         element.set("ucomp", str(self.ucompid))
         element.set("uvar",  str(self.uvar))
         element.set("uval",  str(self.uval))
-        element.set("uval",  str(self.utype))
+        element.set("utype",  str(self.utype))
         element.set("dcomp", str(self.dcompid))
         element.set("dvar",  str(self.dvar))
         element.set("dval",  str(self.dval))
-        element.set("dval",  str(self.dtype))
+        element.set("dtype",  str(self.dtype))
         element.set("uarea", str(self.uarea))
         element.set("ninc", str(self.ninc))
 

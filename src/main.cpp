@@ -7,7 +7,10 @@
 #include "opensd/constants.h"
 #include "opensd/error.h"
 #include <petscsys.h>
+#include <pybind11/embed.h>
 #include <omp.h>
+
+namespace py = pybind11;
 int main(int argc, char* argv[])
 {
   // #pragma omp parallel
@@ -20,6 +23,7 @@ int main(int argc, char* argv[])
 
 #ifdef OPENSD_MPI
 
+  py::scoped_interpreter guard{};
   PetscInitialize(&argc, &argv, NULL, NULL); // Also initializes MPI
   MPI_Comm world = PETSC_COMM_WORLD;
   err = opensd_init(argc, argv, &world);

@@ -121,7 +121,8 @@ public:
   void update_old() override;
   void update_gues() override;
   void update_velocity() override;
-  
+  void update_Re();
+
   void update_fricfact() override;
   void update_heat_input() override;
 
