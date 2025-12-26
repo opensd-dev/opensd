@@ -10,6 +10,7 @@
 #include "opensd/node.h"
 #include "opensd/pipe.h"
 #include "opensd/ger.h"
+//#include "opensd/pump.h"
 #include "opensd/bc.h"
 #include "opensd/error.h"
 #include "opensd/vector.h"
@@ -106,7 +107,64 @@ Circuit::Circuit(pugi::xml_node cir_node) : fltype(FluidType::UNSET)
 
   }
 
+  // for (pugi::xml_node hpump : cir_node.children("hpump")) {
+  //
+  //   auto hpump1 = std::make_shared<HPump>(hpump);
+  //
+  //   for (auto& node : this->nodes) {
+  //     if (node->identifier == hpump1->unode_str)
+  //       hpump1->unode = node;
+  //     else if (node->identifier == hpump1->dnode_str)
+  //       hpump1->dnode = node;
+  //
+  //     if (hpump1->unode && hpump1->dnode)
+  //       break;
+  //   }
+  //
+  //   if (!hpump1->unode || !hpump1->dnode) {
+  //     std::cerr << "Error: HPump " << hpump1->identifier
+  //               << " refers to unknown nodes ("
+  //               << hpump1->unode_str << ", "
+  //               << hpump1->dnode_str << ")\n";
+  //     std::exit(EXIT_FAILURE);
+  //   }
+  //
+  //   hpump1->unode->ofaces.push_back(hpump1);
+  //   hpump1->dnode->ifaces.push_back(hpump1);
+  //
+  //   // this->gers.push_back(ger1);
+  //   this->faces.push_back(hpump1);
+  //
+  // }
 
+  // for (pugi::xml_node vspump : cir_node.children("vspump")) {
+  //
+  //   auto vspump1 = std::make_shared<VSPump>(vspump);
+  //
+  //   for (auto& node : this->nodes) {
+  //     if (node->identifier == vspump1->unode_str)
+  //       vspump1->unode = node;
+  //     else if (node->identifier == vspump1->dnode_str)
+  //       vspump1->dnode = node;
+  //
+  //     if (vspump1->unode && vspump1->dnode)
+  //       break;
+  //   }
+  //
+  //   if (!vspump1->unode || !vspump1->dnode) {
+  //     std::cerr << "Error: VSPump " << vspump1->identifier
+  //               << " refers to unknown nodes ("
+  //               << vspump1->unode_str << ", "
+  //               << vspump1->dnode_str << ")\n";
+  //     std::exit(EXIT_FAILURE);
+  //   }
+  //
+  //   vspump1->unode->ofaces.push_back(vspump1);
+  //   vspump1->dnode->ifaces.push_back(vspump1);
+  //
+  //   this->faces.push_back(vspump1);
+  //
+  // }
 
   for (pugi::xml_node bc : cir_node.children("bc")) {
     this->bcs.push_back(BC(bc));

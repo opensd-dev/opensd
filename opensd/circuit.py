@@ -121,11 +121,11 @@ class Circuit:
             sys.exit("pump " + identifier + " connected to tptank. please specify upstream connection fraction. stopping")
         if isinstance(dnode,Reservoir) and dfrac is None:
             sys.exit("pump " + identifier + " connected to tptank. please specify downstream connection fraction. stopping")
-        from PINET import turbo_components as turbo_comp
+        from opensd.turbo import VSPump,HPump
         if opt=="curves":
-            pump = turbo_comp.VSPump(identifier,unode,ufrac,dnode,dfrac,data,Nop,flowreg)
+            pump = VSPump(identifier,unode,ufrac,dnode,dfrac,data,Nop,flowreg)
         elif opt=="homo":
-            pump = turbo_comp.HPump(identifier,unode,ufrac,dnode,dfrac,data,Nop,flowreg)
+            pump = HPump(identifier,unode,ufrac,dnode,dfrac,data,Nop,flowreg)
         else:
             sys.exit ("check pump modeling option. stopping")
         self.pumps.append(pump)
@@ -354,6 +354,10 @@ class Circuit:
         if self.gers:
             for ger in self.gers:
                 ger.to_xml_element(element)
+
+        if self.pumps:
+            for pump in self.pumps:
+                pump.to_xml_element(element)
 
         if self.bcs:
             for bc in self.bcs:
