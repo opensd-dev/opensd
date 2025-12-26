@@ -9,6 +9,7 @@
 #include "opensd/circuit.h"
 #include "opensd/node.h"
 #include "opensd/pipe.h"
+#include "opensd/ger.h"
 #include "opensd/bc.h"
 #include "opensd/error.h"
 #include "opensd/vector.h"
@@ -74,6 +75,38 @@ Circuit::Circuit(pugi::xml_node cir_node) : fltype(FluidType::UNSET)
   // for (pugi::xml_node face : cir_node.children("face")) {
     // this->faces.push_back(std::make_shared<Face>(face));
   // }
+
+  for (pugi::xml_node ger : cir_node.children("ger")) {
+
+    auto ger1 = std::make_shared<GER>(ger);
+
+    for (auto& node : this->nodes) {
+      if (node->identifier == ger1->unode_str)
+        ger1->unode = node;
+      else if (node->identifier == ger1->dnode_str)
+        ger1->dnode = node;
+
+      if (ger1->unode && ger1->dnode)
+        break;
+    }
+
+    if (!ger1->unode || !ger1->dnode) {
+      std::cerr << "Error: GER " << ger1->identifier
+                << " refers to unknown nodes ("
+                << ger1->unode_str << ", "
+                << ger1->dnode_str << ")\n";
+      std::exit(EXIT_FAILURE);
+    }
+
+    ger1->unode->ofaces.push_back(ger1);
+    ger1->dnode->ifaces.push_back(ger1);
+
+    // this->gers.push_back(ger1);
+    this->faces.push_back(ger1);
+
+  }
+
+
 
   for (pugi::xml_node bc : cir_node.children("bc")) {
     this->bcs.push_back(BC(bc));

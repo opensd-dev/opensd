@@ -31,49 +31,29 @@ class SFace;
 class SNode {
 public:
   std::string identifier;
-  // double mresidue;
-  // double msource;
-  // vector<std::shared_ptr<Face>> ifaces;
-  // vector<std::shared_ptr<Face>> ofaces;
   std::shared_ptr<SFace> eface;
   std::shared_ptr<SFace> wface;
   std::shared_ptr<SFace> nface;
   std::shared_ptr<SFace> sface;
-  // double mflow_in;
-  // double mflow_out;
   Layer* layer;
   int node_ind;
   double Ai, Aj, vol, heat_frac;
   double AFF;
   std::string solname;
 
-  // double tpres_old;
-  // double ttemp_old;
-  // double tenth_old;
-  // double tpres_gues;
   double temp_gues;
-  // double tenth_gues;
 
   double heat_input;
   double heat_input_old;
   double heat_transfer;
   double htc;
   
-  // std::set<std::string> fixed_var;
   // double esource;
   // double hresidue;
   // double volume;
   shared_ptr<SolidFrame> ther_gues;
   shared_ptr<SolidFrame> ther_old;
-  // double velocity;
-  // double B1;
   
-  // double _heat_input_esource;
-  // double _heat_input_msource;
-  // double _heat_input_faceconv;
-  // double _heat_input_faceconv2;
-  // double _heat_input_facegen;
-  // std::vector<double> heat_hslab;
   // std::vector<PetscScalar> Acols;
   // std::vector<PetscScalar> Avals;
   // PetscScalar brow;
@@ -87,18 +67,10 @@ public:
   // delete ther_gues;
   // }
 
-  // double eqn_cont(double time, double delt, bool trans_sim, double alpha_mom);
   double eqn_ener(double time, double delt, bool trans_sim, double alpha_ener);
   // void update_gues();
-  // void assign_staticvar();
-  // void update_statictemp();
-  // void update_totalenth();
-  // void update_staticvar(std::optional<double> velocity_in = std::nullopt);
   void assign_prop();
   // void update_old();
-  // void update_staticpres();
-  // void update_totaltemp(); 
-  // void update_staticenth();
 
   // void save_to_hdf5(hid_t group_id) const;
   // void load_from_hdf5(hid_t group_id);

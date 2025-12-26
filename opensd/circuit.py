@@ -46,6 +46,7 @@ class Circuit:
         self.bcs =[]
         self.pumps=[]
         self.orifices=[]
+        self.gers=[]
         self.Pbound_ind = []
         self.eps_m = self.mean_flow = self.eps_h = self.eps_p = 0.
         self.faces = []
@@ -138,6 +139,14 @@ class Circuit:
         self.orifices.append(orifice)
         return orifice
         
+    def add_ger(self,identifier,unode,dnode,Ck,m=None,n=None,ufrac=None,dfrac=None):
+        unode = get_comp(unode)
+        dnode = get_comp(dnode)
+        from opensd.face import GER
+        ger = GER(identifier,self,unode,ufrac,dnode,dfrac,Ck,m,n)
+        self.gers.append(ger)
+        return ger
+
     def add_BC(self,identifier,bnode,bvar,val,msrc_cond=None,trans=True,enabled=True):
         bnode = get_comp(bnode)
         bc = BC(identifier,bnode,bvar,val,msrc_cond,trans,enabled,self)
@@ -342,6 +351,10 @@ class Circuit:
             # for face in self.faces:
                 # face.to_xml_element(element)
                 
+        if self.gers:
+            for ger in self.gers:
+                ger.to_xml_element(element)
+
         if self.bcs:
             for bc in self.bcs:
                 bc.to_xml_element(element)
