@@ -9,6 +9,7 @@
 #include <petscsys.h>
 #include <pybind11/embed.h>
 #include <omp.h>
+// #include <gsl/gsl_errno.h>
 
 namespace py = pybind11;
 int main(int argc, char* argv[])
@@ -22,7 +23,7 @@ int main(int argc, char* argv[])
   int err;
 
 #ifdef OPENSD_MPI
-
+  // gsl_set_error_handler_off();
   py::scoped_interpreter guard{};
   PetscInitialize(&argc, &argv, NULL, NULL); // Also initializes MPI
   MPI_Comm world = PETSC_COMM_WORLD;

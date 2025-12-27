@@ -48,11 +48,11 @@ void writeHeader() {
   std::vector<std::vector<std::string>> node_items = {{"tpres_gues"}, {"spres_gues"}, {"ttemp_gues"}, {"tenth_gues"}, {"ther_gues", "rhomass"}, {"msource"}, {"esource"} };
   
   for (const auto& circuit : model::circuits_owned) {
-    // for (const auto& pipe : circuit.pipes) {
-      // for (const auto& item : pipe_items) {
-        // f1 << " " << item << ":" << pipe.identifier;
+    for (const auto& ger : circuit->gers) {
+      // for (const auto& item : ger_items) {
+        f1 << "," << "vflow_gues" << ":" << ger->identifier;
       // }
-    // }
+    }
     for (const auto& item : node_items) {
       for (const auto& node : circuit->nodes) {
         if (item.size() == 1) {
@@ -74,11 +74,11 @@ void writeValue(double time, double delt) {
   std::vector<std::vector<std::string>> node_items = {{"tpres_gues"}, {"spres_gues"}, {"ttemp_gues"}, {"tenth_gues"}, {"ther_gues", "rhomass"}, {"msource"}, {"esource"} };
 
   for (const auto& circuit : model::circuits_owned) {
-    // for (const auto& pipe : circuit.pipes) {
+    for (const auto& ger : circuit->gers) {
       // for (const auto& item : pipe_items) {
-        // f1 << " " << std::setw(7) << std::setprecision(7) << 0.0; // Replace 0.0 with the actual value
+        f1 << "," << std::setw(7) << std::setprecision(7) << ger->vflow_gues*ger->ther_gues->rhomass(); // Replace 0.0 with the actual value
       // }
-    // }
+    }
     for (const auto& item : node_items) {
       for (const auto& node : circuit->nodes) {
         if (item.size() == 1) {

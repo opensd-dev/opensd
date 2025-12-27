@@ -8,6 +8,7 @@
 #include <Eigen/Dense>   // For matrix manipulations
 #include <cstdlib>
 #include "opensd/hslab.h"
+#include "opensd/pump.h"
 #include "opensd/vector.h"
 #include "opensd/message_passing.h"
 #include "opensd/simulation.h"
@@ -40,6 +41,7 @@ struct FaceWrapper {
   double delt;
   bool trans_sim;
   double alpha_mom;
+  int main_iter;
 };
 
 // Define the residual f(x) for one face
@@ -67,6 +69,18 @@ double solve_face(FaceWrapper& fw, double x_guess) {
   // Initial bracket: you must provide [x_lo, x_hi] that contains the root
   double x_lo = -1.E5;
   double x_hi = 1.E5;
+
+
+  // auto* pump = dynamic_cast<VSPump*>(fw.face.get());
+  // const bool is_pump = (pump != nullptr);
+  //
+  // if (is_pump and fw.main_iter == 0) {
+  //   std::cout<<"flag2 "<<x_guess<<::endl;
+  //     return x_guess;
+  //   }
+
+
+
   gsl_root_fsolver_set(s, &F, x_lo, x_hi);
 
   int status;
@@ -136,7 +150,7 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
 
   #pragma omp parallel for
   for (PetscInt i = 0; i < n_faces_owned; ++i) {
-    FaceWrapper fw {circuit->faces_owned[i], time, delt, trans_sim, alpha_mom};
+    FaceWrapper fw {circuit->faces_owned[i], time, delt, trans_sim, alpha_mom,main_iter};
 
     double guess = circuit->faces_owned[i]->vflow_gues;
     double root;

@@ -102,7 +102,7 @@ Circuit::Circuit(pugi::xml_node cir_node) : fltype(FluidType::UNSET)
     ger1->unode->ofaces.push_back(ger1);
     ger1->dnode->ifaces.push_back(ger1);
 
-    // this->gers.push_back(ger1);
+    this->gers.push_back(ger1);
     this->faces.push_back(ger1);
 
   }
