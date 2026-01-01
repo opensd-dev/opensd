@@ -158,8 +158,12 @@ for (size_t i = 0; i < model::circuits.size(); ++i) {
   
 }
 
-	
-	
+  for (size_t i = 0; i < model::hslabs.size(); ++i) {
+    const auto& hslab = model::hslabs[i];
+    std::cout << "HSlab [" << i << "] ID: " << hslab->identifier << "\n";
+    std::cout << "  mean_ht: " << hslab->mean_ht << "\n";
+    // std::cout << "  eps_h: " << circuit->eps_h << "\n";
+  }
 	
   return 0;
 }
