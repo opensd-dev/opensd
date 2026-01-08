@@ -180,6 +180,16 @@ class SNode(object):
     def update_heat_input(self,time,delt):
         self.heat_input = self.heat_frac*self.layer.heat_input
 
+    def to_xml_element(self):
+        """Create an 'snode' element to be written to an XML file.
+
+        """
+
+        # Reset xml element tree
+        element = ET.Element("snode")
+        element.set("identifier", self.identifier)
+        return element
+
 class HSlab:
     """Heat slab.
 
@@ -317,7 +327,7 @@ class HSlab:
             elif isinstance(self.dcomp,comp.Node):
                 self.dval.append(self.dcomp)
             else:
-                sys.exit("dcomp connection not defined. stopping" + self.dcomp.identifer)
+                sys.exit("dcomp connection not defined. stopping" + self.dcomp.identifier)
         except:
             pass
 

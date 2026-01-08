@@ -116,6 +116,7 @@ class Settings:
         self._create_flow_iter_subelement(element)
         self._create_temp_solve_subelement(element)
         self._create_flag_write_subelement(element)
+        self._create_T_ambient_subelement(element)
         
         # Clean the indentation in the file to be user-readable
         clean_indentation(element)
@@ -140,6 +141,10 @@ class Settings:
     def _create_alpha_mom_subelement(self, root):
         elem = ET.SubElement(root, "alpha_mom")
         elem.text = str(self._alpha_mom)
+
+    def _create_T_ambient_subelement(self, root):
+        elem = ET.SubElement(root, "T_ambient")
+        elem.text = str(self.T_ambient)
 
     def _create_alpha_ener_subelement(self, root):
         elem = ET.SubElement(root, "alpha_ener")

@@ -42,8 +42,8 @@ struct Input {
 //==============================================================================
 
 double eval(const Input& input,
-            std::shared_ptr<Face> flow_elem,
-            SNode* wall_node);
+            std::shared_ptr<Face> flow_elem=nullptr,
+            SNode* wall_node=nullptr);
 
 
 } // namespace opensd

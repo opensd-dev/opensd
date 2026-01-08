@@ -162,8 +162,8 @@ void discretize_layers() {
 // 	    }
 //       }
 
-
-  hslab->upipe = get_comp<Pipe>(hslab->ucompid);
+  if (hslab->uvar == "pipe"){
+    hslab->upipe = get_comp<Pipe>(hslab->ucompid);
 
   if (hslab->upipe) {
     std::cout << "Found pipe with identifier: " << hslab->upipe->identifier << std::endl;
@@ -173,7 +173,9 @@ void discretize_layers() {
 
   hslab->uval1.assign(hslab->upipe->faces.begin(),
              hslab->upipe->faces.begin() + hslab->upipe->ncell);
+  }
 
+  if (hslab->dvar == "pipe"){
   hslab->dpipe = get_comp<Pipe>(hslab->dcompid);
 
   if (hslab->dpipe) {
@@ -181,7 +183,6 @@ void discretize_layers() {
   } else {
     std::cout << "Downstream Pipe not found." << std::endl;
   }
-
 
   std::string config = "counter";
   if (config == "counter") {
@@ -191,7 +192,7 @@ void discretize_layers() {
     hslab->dval1.assign(hslab->dpipe->faces.begin(),
                  hslab->dpipe->faces.begin() + hslab->dpipe->ncell);
   }
-
+  }
 
 
 	for (auto& layer : hslab->layers) {

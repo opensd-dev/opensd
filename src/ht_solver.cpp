@@ -15,6 +15,7 @@
 
 #include "opensd/hslab.h"
 #include "opensd/circuit.h"
+#include "opensd/settings.h"
 // #include <numeric>     // For std::accumulate
 // #include <copy>          // For std::copy in Arow and brow
 // #include <petscksp.h>
@@ -295,9 +296,9 @@ exec_bc(const std::string& bvar,
   }
   else if (bvar == "conv") {
 
-    // // bval[0] = h, bval[1] = Tf
-    // binc = A * bval[0] * bval[1];
-    // Ainc = bval[0] * A;
+    // bval[0] = h, bval[1] = Tf
+    binc = A * eval(bval) * settings::T_ambient;
+    Ainc = eval(bval) * A;
 
   }
   else if (bvar == "node") {
@@ -391,8 +392,9 @@ double exec_ht(const std::string& bvar,
         }
 
     } else if (bvar == "conv") {
-    //     heat_transfer = std::any_cast<double>(bval[0]) * (wall_node->temp_gues - std::any_cast<double>(bval[1])) * A;
-    //
+
+        heat_transfer = eval(bval) * (wall_node->temp_gues - settings::T_ambient) * A;
+
     } else if (bvar == "hflux") {
     //     heat_transfer = -std::any_cast<double>(bval[0]) * A * wall_node->AFF;
     //

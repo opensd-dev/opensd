@@ -10,6 +10,7 @@
 // #include "opensd/xml_interface.h"
 #include "opensd/custom_fun.h"
 #include "opensd/hslab.h"
+#include "opensd/settings.h"
 #include "opensd/sface.h"
 #include "opensd/solid.h"
 
@@ -90,11 +91,11 @@ double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_he
       // std::cout<<" flag3 "<<y<< " " << alpha_heat<<" "<< Tf << " " << temp_gues << std::endl;
 
     }
-  //   else if (dvar == "conv") {
-  //     // dval[0] is h coefficient, dval[1] is reference temperature
-  //     y = y + hslab->dval[0] * (this->temp_gues - hslab->dval[1]) * this->Ai * alpha_heat
-  //           + this->heat_transfer_old * (1.0 - alpha_heat);
-  //   }
+    else if (dvar == "conv") {
+      // dval[0] is h coefficient, dval[1] is reference temperature
+      y = y + eval(hslab->dval) * (temp_gues - settings::T_ambient) * Ai * alpha_heat; //hslab->dval1
+            // + this->heat_transfer_old * (1.0 - alpha_heat);
+    }
   //   else if (dvar == "node") {
   //     // dval[1] is a node-like object with stemp_gues
   //     y = y + hslab->dval[0] * (this->temp_gues - hslab->dval[1].stemp_gues) * this->Ai * alpha_heat
@@ -147,10 +148,10 @@ double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_he
 
       // std::cout<<" flag5 "<<y<< " " << alpha_heat<<" "<< Tf << " " << temp_gues << std::endl;
     }
-  //   else if (uvar == "conv") {
-  //     y = y + alpha_heat * hslab->uval[0] * (this->temp_gues - hslab->uval[1]) * this->Ai
-  //           + (1.0 - alpha_heat) * this->heat_transfer_old;
-  //   }
+    else if (uvar == "conv") {
+      y = y + alpha_heat * eval(hslab->uval) * (temp_gues - settings::T_ambient) * Ai; //hslab->uval1
+            // + (1.0 - alpha_heat) * this->heat_transfer_old;
+    }
   //   else if (uvar == "node") {
   //     auto& flow_node = hslab->uval[1];
   //     double Tf = flow_node.stemp_gues;

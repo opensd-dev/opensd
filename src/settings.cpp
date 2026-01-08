@@ -29,6 +29,7 @@ namespace settings {
   double conv_crit_temp_SS {1.E-10};
   double conv_crit_temp_trans {conv_crit_temp_SS};
   double conv_crit_ht {1.E-10};
+  double T_ambient {300.};
 } // namespace settings
 
 //==============================================================================
@@ -106,6 +107,7 @@ void read_settings_xml(pugi::xml_node root)
   alpha_mom = stod(get_node_value(root, "alpha_mom"));
   alpha_ener = stod(get_node_value(root, "alpha_ener"));
   alpha_heat = stod(get_node_value(root, "alpha_heat"));
+  T_ambient = stod(get_node_value(root, "T_ambient"));
   tim_slot = get_node_array<double>(root, "tim_slot");
   no_main_iter = stod(get_node_value(root, "no_main_iter"));
   no_flow_iter = stod(get_node_value(root, "no_flow_iter"));
