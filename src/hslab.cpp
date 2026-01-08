@@ -222,6 +222,8 @@ void discretize_layers() {
 
       std::vector<double> AFF(ninc, 1.0 / ninc);
 
+      layer->snodes.clear();
+      hslab->dwnodes.clear();
       for (int i = 0; i < nnodes; ++i) {
         for (int j = 0; j < ninc; ++j) {
       
