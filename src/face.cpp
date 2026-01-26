@@ -247,6 +247,8 @@ void PFace::update_abcoef(double time, double delt, double trans_sim, double alp
 
     bplus = bminus = spres_gues / tpres_gues * 0.5 * ther_gues->drho_dp_consth();
 
+	// std::cout<<"aplus="<<aplus<<" bplus="<<bplus<<std::endl;
+
     // if (aplus < 0.0 || aminus < 0.0) {
       // if ((true && trans_sim) || (!trans_sim)) { // replace true with appropriate condition if `show_warn` is a variable
         // std::cout << "warning. acoef negative." << pipe.identifier << faceno << aplus << aminus << unode.ther_gues.rhomass() << dnode.ther_gues.rhomass() << A << B << dr << vflow_gues << std::endl;

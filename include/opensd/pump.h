@@ -74,7 +74,7 @@ public:
   double dHdQfuncs(double Q) const;
 
   void update_abcoef(double time, double delt,
-                    bool trans_sim, double alpha_mom);
+                    double trans_sim, double alpha_mom);
 
   double eqn_mom(double x, double time, double delt,
                 bool trans_sim, double alpha_mom);

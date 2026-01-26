@@ -178,7 +178,6 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
     //   std::cerr << "Solver error at face " << fw.face->faceno << ": " << e.what() << "\n";
     //   // handle error: reduce timestep, skip this face, etc.
     // }
-    std::cout<<"flag1 "<<root<<std::endl;
 
     circuit->faces_owned[i]->vflow_gues = root;
 

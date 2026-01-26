@@ -163,9 +163,9 @@ double VSPump::dHdQfuncs(double Q) const
 }
 
 void VSPump::update_abcoef(double time, double delt,
-                         bool trans_sim, double alpha_mom)
+                         double trans_sim, double alpha_mom)
 {
-  double relax = 1.0;
+  double relax = 1.0; 
 
   double drho_dp = ther_gues->drho_dp_consth();
 
