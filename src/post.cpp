@@ -10,14 +10,14 @@ std::vector<Calculate*> Calculate::registry;
 
 // Map to access Node attributes by string
 std::unordered_map<std::string, std::function<double(const Node&)>> nodeAttributeMap = {
-  {"tpres_gues", &Node::tpres_gues},
-  {"spres_gues", &Node::spres_gues},
+  // {"tpres_gues", &Node::tpres_gues},
+  // {"spres_gues", &Node::spres_gues},
   {"ttemp_gues", &Node::ttemp_gues},
   {"tenth_gues", &Node::tenth_gues},
-  {"msource", &Node::msource},
-  {"esource", &Node::esource},
-  {"volume", &Node::volume},
-  {"velocity", &Node::velocity},
+  // {"msource", &Node::msource},
+  // {"esource", &Node::esource},
+  // {"volume", &Node::volume},
+  // {"velocity", &Node::velocity},
   // Add other mappings as needed
 };
 

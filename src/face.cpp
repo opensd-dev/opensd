@@ -186,11 +186,12 @@ double PFace::eqn_mom(double x, double time, double delt, bool trans_sim, double
 //   std::cout << "flag1 " << faceno << std::endl
 //             << std::setprecision(12) << std::fixed
 //             << "  alpha_mom = " << alpha_mom << std::endl
+//             << "  fricfact_gues = " << fricfact_gues << std::endl
 //             << "  delp_fr = " << delp_fr << std::endl
 //             << "  delp_gr = " << delp_gr << std::endl
 //             << "  Term_old = " << term_old << std::endl
 //             << "  trans_term = " << trans_sim * delx * ther_gues->rhomass() * (x - vflow_old) / (delt * cfarea) << std::endl
-//             << "  second_term = " << (dnode->tpres_gues - unode->tpres_gues) << std::endl
+//             << "  second_term = " << (downstream->tpres_gues - upstream->tpres_gues) << std::endl
 //             << "  y = " << y << std::endl;
 // }
 
@@ -211,7 +212,7 @@ void PFace::update_abcoef(double time, double delt, double trans_sim, double alp
     double dr;
     dr = (trans_sim * ther_gues->rhomass() * delx / (cfarea * delt)
                  + alpha_mom * (2 * (fricfact_gues * delx / diameter) * ther_gues->rhomass() * fabs(vflow_gues) / (2 * pow(cfarea, 2))
-                                + 0.0 * 2.0 * vflow_gues * (unode->ther_gues->rhomass() - dnode->ther_gues->rhomass()) / (2 * pow(cfarea, 2))));
+                                + 0.0 * 2.0 * vflow_gues * (upstream->rhomass_gues - downstream->rhomass_gues) / (2 * pow(cfarea, 2))));
 
     if (faceno == 0) {
       dr += alpha_mom * 2.0 * pipe->Kforward * ther_gues->rhomass() * fabs(vflow_gues) / (2 * pow(cfarea, 2));

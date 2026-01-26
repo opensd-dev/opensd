@@ -1,107 +1,123 @@
+#!/usr/bin/env python3
+"""
+opensd_to_qvge.py
+Convert OpenSD geometry XML -> 100% QvGe-native GraphML.
+
+Usage:
+    python opensd_to_qvge.py input.xml output.graphml
+"""
+
 import sys
 import xml.etree.ElementTree as ET
 
-# ---------------------------------------------------------------------
-# QvGe GraphML header (canonical, minimal)
-# ---------------------------------------------------------------------
 QVG_HEADER = """<?xml version="1.0" encoding="UTF-8"?>
 <graphml xmlns="http://graphml.graphdrawing.org/xmlns"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+         xmlns:y="http://www.yworks.com/xml/graphml"
+         xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns
+                             http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
 
-    <!-- QvGe standard keys -->
-    <key id="comment" attr.name="comment" for="graph" attr.type="string"><default/></key>
-    <key id="creator" attr.name="creator" for="graph" attr.type="string">
-        <default>Qt Visual Graph Editor 0.7.0</default>
-    </key>
-    <key id="labels.policy" attr.name="labels.policy" for="graph" attr.type="integer"><default>0</default></key>
+  <!-- Standard QvGe keys -->
+  <key id="d0" for="node" attr.name="x" attr.type="double"/>
+  <key id="d1" for="node" attr.name="y" attr.type="double"/>
+  <key id="d2" for="node" attr.name="width" attr.type="double"/>
+  <key id="d3" for="node" attr.name="height" attr.type="double"/>
 
-    <key id="color" attr.name="color" for="edge" attr.type="string"><default>#a0a0a4</default></key>
-    <key id="direction" attr.name="direction" for="edge" attr.type="string"><default>directed</default></key>
-    <key id="labels.visibleIds" attr.name="labels.visibleIds" for="edge" attr.type="string"><default>label</default></key>
-    <key id="points" attr.name="points" for="edge" attr.type="string"><default/></key>
-    <key id="style" attr.name="style" for="edge" attr.type="string"><default>solid</default></key>
-    <key id="weight" attr.name="weight" for="edge" attr.type="double"><default>1</default></key>
+  <key id="d4" for="edge" attr.name="points" attr.type="string"/>
+  <key id="d5" for="edge" attr.name="style" attr.type="string"/>
+  <key id="d6" for="edge" attr.name="color" attr.type="string"/>
+  <key id="d7" for="edge" attr.name="weight" attr.type="double"/>
 
-    <key id="color" attr.name="color" for="node" attr.type="string"><default>#ff00ff</default></key>
-    <key id="label.position" attr.name="label.position" for="node" attr.type="integer"><default>0</default></key>
-    <key id="labels.visibleIds" attr.name="labels.visibleIds" for="node" attr.type="string"><default>label</default></key>
-    <key id="shape" attr.name="shape" for="node" attr.type="string"><default>disc</default></key>
-    <key id="stroke.color" attr.name="stroke.color" for="node" attr.type="string"><default>#000000</default></key>
-    <key id="stroke.size" attr.name="stroke.size" for="node" attr.type="double"><default>1</default></key>
-    <key id="stroke.style" attr.name="stroke.style" for="node" attr.type="string"><default>solid</default></key>
-    <key id="x" attr.name="x" for="node" attr.type="float"><default>0</default></key>
-    <key id="y" attr.name="y" for="node" attr.type="float"><default>0</default></key>
+  <!-- Custom OpenSD attributes passed through QvGe -->
+  <key id="d10" for="node" attr.name="opensd.fixed_var" attr.type="string"/>
+  <key id="d11" for="node" attr.name="opensd.msource" attr.type="string"/>
+  <key id="d12" for="node" attr.name="opensd.volume" attr.type="string"/>
+  <key id="d13" for="node" attr.name="opensd.heat_input" attr.type="string"/>
+
+  <key id="d20" for="edge" attr.name="opensd.cfarea" attr.type="string"/>
+  <key id="d21" for="edge" attr.name="opensd.diameter" attr.type="string"/>
+  <key id="d22" for="edge" attr.name="opensd.length" attr.type="string"/>
+  <key id="d23" for="edge" attr.name="opensd.ncell" attr.type="string"/>
+  <key id="d24" for="edge" attr.name="opensd.roughness" attr.type="string"/>
+
 """
 
-# ---------------------------------------------------------------------
-# MAIN CONVERTER
-# ---------------------------------------------------------------------
 def main(input_xml_path, output_graphml_path):
     tree = ET.parse(input_xml_path)
     root = tree.getroot()
 
-    # Start GraphML
-    out = [QVG_HEADER, '    <graph edgedefault="directed">']
+    out = [QVG_HEADER, '  <graph edgedefault="directed">']
 
     y_offset = 0
 
     for circuit in root.findall("circuit"):
-        nodes = []
-        pipes = []
+        nodes = circuit.findall("node")
+        pipes = circuit.findall("pipe")
 
-        # collect nodes
-        for n in circuit.findall("node"):
-            node_id = n.attrib["identifier"]
-            nodes.append(node_id)
+        # --- layout constants ---
+        XCOL = -200
 
-        # collect pipes
-        for p in circuit.findall("pipe"):
-            pipes.append((
-                p.attrib["identifier"],
-                p.attrib["unode"],
-                p.attrib["dnode"],
-                p.attrib.get("cfarea"),
-                p.attrib.get("diameter"),
-                p.attrib.get("length"),
-                p.attrib.get("ncell"),
-            ))
+        # --- NODES ---
+        for i, n in enumerate(nodes):
+            nid = n.get("identifier")
 
-        # generate QvGe nodes with layout
-        x = -200
-        for i, nid in enumerate(nodes):
-            y = -200 + 100 * i + y_offset
+            x = XCOL
+            y = -200 + 100*i + y_offset
+
             out.append(f"""
-        <node id="{nid}">
-            <data key="height">11</data>
-            <data key="width">11</data>
-            <data key="x">{x}</data>
-            <data key="y">{y}</data>
-        </node>""")
+    <node id="{nid}">
+      <data key="d0">{x}</data>
+      <data key="d1">{y}</data>
+      <data key="d2">14</data>
+      <data key="d3">14</data>""")
 
-        # pipes as edges
-        for pid, src, tgt, cfarea, diameter, length, ncell in pipes:
+            # optional metadata
+            if n.get("fixed_var"):
+                out.append(f'      <data key="d10">{n.get("fixed_var")}</data>')
+            if n.get("msource"):
+                out.append(f'      <data key="d11">{n.get("msource")}</data>')
+            if n.get("volume"):
+                out.append(f'      <data key="d12">{n.get("volume")}</data>')
+            if n.get("heat_input"):
+                out.append(f'      <data key="d13">{n.get("heat_input")}</data>')
+
+            out.append("    </node>")
+
+        # --- EDGES ---
+        for p in pipes:
+            pid = p.get("identifier")
+            src = p.get("unode")
+            tgt = p.get("dnode")
+
             out.append(f"""
-        <edge id="{pid}" source="{src}" target="{tgt}">
-            <data key="cfarea">{cfarea}</data>
-            <data key="diameter">{diameter}</data>
-            <data key="length">{length}</data>
-            <data key="ncell">{ncell}</data>
-        </edge>""")
+    <edge id="{pid}" source="{src}" target="{tgt}">
+      <data key="d5">solid</data>
+      <data key="d6">#808080</data>
+      <data key="d7">1.0</data>""")
 
-        y_offset += 300  # vertical separation between circuits
+            # OpenSD attributes stored cleanly:
+            if p.get("cfarea"):
+                out.append(f'      <data key="d20">{p.get("cfarea")}</data>')
+            if p.get("diameter"):
+                out.append(f'      <data key="d21">{p.get("diameter")}</data>')
+            if p.get("length"):
+                out.append(f'      <data key="d22">{p.get("length")}</data>')
+            if p.get("ncell"):
+                out.append(f'      <data key="d23">{p.get("ncell")}</data>')
+            if p.get("roughness"):
+                out.append(f'      <data key="d24">{p.get("roughness")}</data>')
 
-    out.append("    </graph>\n</graphml>")
+            out.append("    </edge>")
+
+        y_offset += 300
+
+    out.append("  </graph>\n</graphml>")
 
     with open(output_graphml_path, "w", encoding="utf-8") as f:
         f.write("\n".join(out))
 
-    print(f"Written: {output_graphml_path}")
+    print("Written:", output_graphml_path)
 
-
-# ---------------------------------------------------------------------
-# USAGE EXAMPLE
-# ---------------------------------------------------------------------
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:

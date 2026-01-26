@@ -1,6 +1,6 @@
 from enum import Enum
 import numpy as np
-from numbers import Integral
+from numbers import Integral, Real
 from pathlib import Path
 import lxml.etree as ET
 from collections import abc
@@ -117,6 +117,7 @@ class Settings:
         self._create_temp_solve_subelement(element)
         self._create_flag_write_subelement(element)
         self._create_T_ambient_subelement(element)
+        self._create_conv_crit_flow_subelement(element)
         
         # Clean the indentation in the file to be user-readable
         clean_indentation(element)
@@ -145,6 +146,10 @@ class Settings:
     def _create_T_ambient_subelement(self, root):
         elem = ET.SubElement(root, "T_ambient")
         elem.text = str(self.T_ambient)
+
+    def _create_conv_crit_flow_subelement(self, root):
+        elem = ET.SubElement(root, "conv_crit_flow")
+        elem.text = str(self._conv_crit_flow)
 
     def _create_alpha_ener_subelement(self, root):
         elem = ET.SubElement(root, "alpha_ener")
@@ -234,3 +239,13 @@ class Settings:
             cv.check_type('t_end', t_end, (int, float))
 
         self._tim_slot = tim_slot
+
+    @property
+    def conv_crit_flow(self) -> float:
+        return self._conv_crit_flow
+
+    @conv_crit_flow.setter
+    def conv_crit_flow(self, conv_crit_flow: float):
+        cv.check_type('conv_crit_flow', conv_crit_flow, Real)
+        cv.check_greater_than('conv_crit_flow', conv_crit_flow, 0)
+        self._conv_crit_flow = conv_crit_flow

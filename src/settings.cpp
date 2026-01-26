@@ -111,7 +111,7 @@ void read_settings_xml(pugi::xml_node root)
   tim_slot = get_node_array<double>(root, "tim_slot");
   no_main_iter = stod(get_node_value(root, "no_main_iter"));
   no_flow_iter = stod(get_node_value(root, "no_flow_iter"));
-  // conv_crit_flow = stod(get_node_value(root, "conv_crit_flow"));
+  conv_crit_flow = stod(get_node_value(root, "conv_crit_flow"));
   flag_write = get_node_value_bool(root, "flag_write");
   temp_solve = get_node_value_bool(root, "temp_solve");
 
