@@ -23,6 +23,7 @@
 #include <fstream>
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_roots.h>
+#include <gsl/gsl_multiroots.h>
 
 namespace opensd {
 
@@ -45,30 +46,35 @@ struct FaceWrapper {
 };
 
 // Define the residual f(x) for one face
-double face_residual(double x, void* params) {
+int face_residual_vec(const gsl_vector* x, void* params,
+                      gsl_vector* f) {
   auto* fw = static_cast<FaceWrapper*>(params);
 
-  // Example: call your existing residual calculation here
-  return fw->face->eqn_mom(x, fw->time, fw->delt,
-                                    fw->trans_sim, fw->alpha_mom);
+  double v = gsl_vector_get(x, 0);
+  double r = fw->face->eqn_mom(v, fw->time, fw->delt,
+                               fw->trans_sim, fw->alpha_mom);
+
+  gsl_vector_set(f, 0, r);
+  return GSL_SUCCESS;
 }
 
 // Solve nonlinear equation for one face using GSL
 double solve_face(FaceWrapper& fw, double x_guess) {
-  const gsl_root_fsolver_type* T;
-  gsl_root_fsolver* s;
+  const gsl_multiroot_fsolver_type* T;
+   gsl_multiroot_fsolver* s;
 
-  gsl_function F;
-  F.function = &face_residual;
+  gsl_multiroot_function F;
+  F.f = &face_residual_vec;
   F.params = &fw;
+  F.n = 1;
 
   // Choose solver type
-  T = gsl_root_fsolver_brent;
-  s = gsl_root_fsolver_alloc(T);
+  T = gsl_multiroot_fsolver_hybrids;
+  s = gsl_multiroot_fsolver_alloc(T, 1);
 
   // Initial bracket: you must provide [x_lo, x_hi] that contains the root
-  double x_lo = -1.E5;
-  double x_hi = 1.E5;
+  // double x_lo = -1.E5;
+  // double x_hi = 1.E5;
 
 
   // auto* pump = dynamic_cast<VSPump*>(fw.face.get());
@@ -79,35 +85,46 @@ double solve_face(FaceWrapper& fw, double x_guess) {
   //     return x_guess;
   //   }
 
+  gsl_vector* x = gsl_vector_alloc(1);
+  gsl_vector_set(x, 0, x_guess);
 
-
-  gsl_root_fsolver_set(s, &F, x_lo, x_hi);
+  gsl_multiroot_fsolver_set(s, &F, x);
 
   int status;
   int iter = 0, max_iter = 100;
-  double r = x_guess;
+  // double r = x_guess;
 
   do {
     iter++;
-    status = gsl_root_fsolver_iterate(s);
-    r = gsl_root_fsolver_root(s);
-    x_lo = gsl_root_fsolver_x_lower(s);
-    x_hi = gsl_root_fsolver_x_upper(s);
+    status = gsl_multiroot_fsolver_iterate(s);
 
-    status = gsl_root_test_interval(x_lo, x_hi, 1e-8, 0.0);
+    if (status) break;
+
+    status = gsl_multiroot_test_residual(s->f, 1e-8);
+
   } while (status == GSL_CONTINUE && iter < max_iter);
 
-  gsl_root_fsolver_free(s);
+  double root = gsl_vector_get(s->x, 0);
+
+  gsl_vector_free(x);
+  gsl_multiroot_fsolver_free(s);
+
+//   double r = gsl_vector_get(s->x, 0);
+// double fres = fw.face->eqn_mom(
+//   r, fw.time, fw.delt, fw.trans_sim, fw.alpha_mom);
+//
+// std::cout << "root = " << r
+//           << " residual = " << fres << std::endl;
 
   // Throw exception if not converged
   if (status != GSL_SUCCESS) {
     throw std::runtime_error(
-      "Face root solver did not converge within " + std::to_string(max_iter) +
-      " iterations. Last approximate root: " + std::to_string(r)
-    );
+      "Multiroot solver failed. Last value = "
+      + std::to_string(root));
   }
 
-  return r;
+
+  return root;
 }
 
 
@@ -154,13 +171,14 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
 
     double guess = circuit->faces_owned[i]->vflow_gues;
     double root;
-    try {
+    // try {
       root = solve_face(fw, guess);
-    } catch (const std::runtime_error& e) {
-      std::cerr << "Solver error at face " << fw.face->faceno << ": " << e.what() << "\n";
-      // handle error: reduce timestep, skip this face, etc.
-    }
 
+    // } catch (const std::runtime_error& e) {
+    //   std::cerr << "Solver error at face " << fw.face->faceno << ": " << e.what() << "\n";
+    //   // handle error: reduce timestep, skip this face, etc.
+    // }
+    std::cout<<"flag1 "<<root<<std::endl;
 
     circuit->faces_owned[i]->vflow_gues = root;
 

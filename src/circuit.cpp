@@ -161,7 +161,7 @@ Circuit::Circuit(pugi::xml_node cir_node) : fltype(FluidType::UNSET)
 
     vspump1->unode->ofaces.push_back(vspump1);
     vspump1->dnode->ifaces.push_back(vspump1);
-
+    vspump1->delz = vspump1->dnode->elevation - vspump1->unode->elevation;
     this->faces.push_back(vspump1);
 
   }

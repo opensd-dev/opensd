@@ -29,6 +29,8 @@ Node::Node(pugi::xml_node flnode_node)
     ttemp_old  = stod(get_node_value(flnode_node, "ttemp_old"));
     tenth_old  = stod(get_node_value(flnode_node, "tenth_old"));
     volume     = stod(get_node_value(flnode_node, "volume"));
+    // elevation  = stod(get_node_value(flnode_node, "elevation"));
+    elevation = 0.;
     msource    = stod(get_node_value(flnode_node, "msource"));
     heat_input = stod(get_node_value(flnode_node, "heat_input"));
 

@@ -35,7 +35,8 @@ pipe1 = circuit1.add_pipe("pipe1",0.0174,2.5,"node1","node2",'DW',30.,5)
 bc1 = circuit1.add_BC("bc1","node1",'P',5.E5)
 bc2 = circuit1.add_BC("bc2","node1",'T',673.)
 
-bc3 = circuit1.add_BC("bc3","node2",'msource',-1.6)
+# bc3 = circuit1.add_BC("bc3","node2",'msource',-1.6)
+# bc3 = circuit1.add_BC("bc3","node2",'P',367231.4161161)
 
 # def fun1(time,delt):
 #     if time <= 5:
@@ -46,7 +47,7 @@ bc3 = circuit1.add_BC("bc3","node2",'msource',-1.6)
 #
 # action_setup.Action(None,None,fun1)
 
-# pump1 = circuit1.add_pump("pump1","node2","node1",[[50.,"speed2.csv"],[100.,"speed1.csv"]],100.)
+pump1 = circuit1.add_pump("pump1","node2","node1",[[100.,"speed1.csv"]],100.)
 
 geometry = opensd.Geometry([circuit1])
 geometry.export_to_xml()
