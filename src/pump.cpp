@@ -194,7 +194,6 @@ double VSPump::eqn_mom(double x, double time, double delt,
     QHfuncs(x)
     - (dnode->tpres_gues - unode->tpres_gues)
     - ther_gues->rhomass() * grav * delz;
-  std::cout<<"flag2 "<<z<<" "<<x<<" "<<QHfuncs(x)<<" "<<dnode->tpres_gues - unode->tpres_gues<<" "<<ther_gues->rhomass() * grav * delz<<std::endl;
 
   return z;
 }
