@@ -21,8 +21,8 @@ namespace opensd {
 // Face implementation
 //==============================================================================
 
-Face::Face(int faceno, std::shared_ptr<Node> unode, double ufrac, std::shared_ptr<Node> dnode, double dfrac)
-    : faceno(faceno), unode(unode), ufrac(ufrac), dnode(dnode), dfrac(dfrac),
+Face::Face(int faceno, std::shared_ptr<Node> unode, double ufrac, std::shared_ptr<Node> dnode, double dfrac, double delz)
+    : faceno(faceno), unode(unode), ufrac(ufrac), dnode(dnode), dfrac(dfrac), delz(delz),
       vflow_old{1.0E-8}, vflow_gues{1.0E-8}, mflow(0.0), velocity(0.0), choked(false), 
 	  presidue(0.0), Gcr(1.0E8), pcr(0.0),heat_input_old(0.0), heat_input(0.0),
 	  heat_hslab_old{}, owner(0) {
@@ -151,9 +151,9 @@ void Face::update_old() {
 
 PFace::PFace(int faceno, std::shared_ptr<Pipe> pipe, std::shared_ptr<Node> unode, double ufrac, std::shared_ptr<Node> dnode, double dfrac,
             double diameter, double cfarea, double delx, double delz, double fricopt, double roughness)
-  : Face(faceno, unode, ufrac, dnode, dfrac),
+  : Face(faceno, unode, ufrac, dnode, dfrac, delz),
     circuit(pipe->circuit), pipe(pipe), diameter(diameter), cfarea(cfarea),
-    delx(delx), delz(delz), roughness(roughness), Re(0.0), fricopt(fricopt),
+    delx(delx), roughness(roughness), Re(0.0), fricopt(fricopt),
     fricfact_old(64.0), fricfact_gues(64.0), opening(1.0) {
 }
 

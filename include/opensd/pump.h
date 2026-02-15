@@ -28,17 +28,18 @@ public:
   // double delp_gr;
 
   int Nop;
-  double ufrac;
-  double dfrac;
+  // double ufrac;
+  // double dfrac;
   // int flowreg;
 
-  double delz;
+  // double delz;
 
   // std::shared_ptr<Circuit> circuit;
 
   Pump(const std::string& identifier,
       double ufrac,
       double dfrac,
+      double delz,
       int Nop); //int flowreg
 
   Pump() = default;

@@ -214,6 +214,7 @@ void discretize_pipes() {
       }
 	  
       double delx = pipe->length/pipe->ncell;
+	  double delz = (pipe->dnode->elevation - pipe->unode->elevation)/pipe->ncell;
 
       for (int i = 0; i < pipe->ncell - 1; ++i) {
         auto node = std::make_shared<Node>();
@@ -235,7 +236,7 @@ void discretize_pipes() {
 
       double ufrac;
       double dfrac;
-      double delz = 0.;
+      // double delz = 0.;
       double fricopt;
 
       for (int i = 0; i < pipe->ncell; ++i) {

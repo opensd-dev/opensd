@@ -45,8 +45,8 @@ class Node(object):
     def to_xml_element(self,element):
         subelement = ET.SubElement(element, "node")
         subelement.set("identifier", self.identifier)
-        if self.elevation != 0.:
-            subelement.set("elevation", str(self.elevation))
+        # if self.elevation != 0.:
+        subelement.set("elevation", str(self.elevation))
         subelement.set("tpres_old", str(self.tpres_old))
         subelement.set("ttemp_old", str(self.ttemp_old))
         subelement.set("tenth_old", str(self.tenth_old))

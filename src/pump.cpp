@@ -29,8 +29,9 @@ namespace opensd {
 Pump::Pump(const std::string& identifier,
            double ufrac,
            double dfrac,
+		   double delz,
            int Nop)
-  : Face(0, nullptr, ufrac, nullptr, dfrac),
+  : Face(0, nullptr, ufrac, nullptr, dfrac, delz),
     Nop(Nop)
     // flowreg(flowreg)
 {
@@ -84,6 +85,7 @@ VSPump::VSPump(pugi::xml_node vsp_node)
       "pump1",//get_node_value(vsp_node, "identifier")
       0.0,
       0.0,
+	  0.0,
       0 //std::stod(get_node_value(vsp_node, "Nop"))
     )
 {

@@ -32,6 +32,7 @@ public:
   std::shared_ptr<Node> dnode;
   double dfrac;
   double dheight;
+  double delz;
   double vflow_old;
   double vflow_gues;
   double mflow;
@@ -65,7 +66,7 @@ public:
   int owner;
   
   
-  Face(int faceno, std::shared_ptr<Node> unode, double ufrac, std::shared_ptr<Node> dnode, double dfrac);
+  Face(int faceno, std::shared_ptr<Node> unode, double ufrac, std::shared_ptr<Node> dnode, double dfrac, double delz);
   Face() = default;
   virtual ~Face() = default;
   void assign_statevar();
@@ -98,7 +99,7 @@ public:
   double diameter;
   double cfarea;
   double delx;
-  double delz;
+  // double delz;
   double roughness;
   double Re;
   double fricopt;

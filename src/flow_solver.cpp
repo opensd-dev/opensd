@@ -180,6 +180,7 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
     // }
 
     circuit->faces_owned[i]->vflow_gues = root;
+	// std::cout << std::defaultfloat << std::setprecision(10) << "faceno= " << circuit->faces_owned[i]->faceno << " delz = "   << circuit->faces_owned[i]->delz << std::endl;
 
 //        auto pface = std::static_pointer_cast<PFace>(face);
 //        std::cout << std::defaultfloat << std::setprecision(10) << "pdnode = "   << pface->dnode->tpres_gues << std::endl;
@@ -725,7 +726,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
     simulation::time_pressure_correction.stop();
   }
-
+  // std::exit(0);
   simulation::time_massmom.stop();
 }
 
