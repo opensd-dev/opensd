@@ -58,7 +58,73 @@ int face_residual_vec(const gsl_vector* x, void* params,
   return GSL_SUCCESS;
 }
 
+// Define the residual f(x) for one face
+double face_residual(double x, void* params) {
+  auto* fw = static_cast<FaceWrapper*>(params);
+
+  // Example: call your existing residual calculation here
+  return fw->face->eqn_mom(x, fw->time, fw->delt,
+                                    fw->trans_sim, fw->alpha_mom);
+}
+
 // Solve nonlinear equation for one face using GSL
+double solve_face(FaceWrapper& fw, double x_guess) {
+  const gsl_root_fsolver_type* T;
+  gsl_root_fsolver* s;
+
+  gsl_function F;
+  F.function = &face_residual;
+  F.params = &fw;
+
+  // Choose solver type
+  T = gsl_root_fsolver_brent;
+  s = gsl_root_fsolver_alloc(T);
+
+  // Initial bracket: you must provide [x_lo, x_hi] that contains the root
+  double x_lo = -1.E5;
+  double x_hi = 1.E5;
+
+
+  // auto* pump = dynamic_cast<VSPump*>(fw.face.get());
+  // const bool is_pump = (pump != nullptr);
+  //
+  // if (is_pump and fw.main_iter == 0) {
+  //   std::cout<<"flag2 "<<x_guess<<::endl;
+  //     return x_guess;
+  //   }
+
+
+
+  gsl_root_fsolver_set(s, &F, x_lo, x_hi);
+
+  int status;
+  int iter = 0, max_iter = 100;
+  double r = x_guess;
+
+  do {
+    iter++;
+    status = gsl_root_fsolver_iterate(s);
+    r = gsl_root_fsolver_root(s);
+    x_lo = gsl_root_fsolver_x_lower(s);
+    x_hi = gsl_root_fsolver_x_upper(s);
+
+    status = gsl_root_test_interval(x_lo, x_hi, 1e-8, 0.0);
+  } while (status == GSL_CONTINUE && iter < max_iter);
+
+  gsl_root_fsolver_free(s);
+
+  // Throw exception if not converged
+  if (status != GSL_SUCCESS) {
+    throw std::runtime_error(
+      "Face root solver did not converge within " + std::to_string(max_iter) +
+      " iterations. Last approximate root: " + std::to_string(r)
+    );
+  }
+
+  return r;
+}
+
+/* // Solve nonlinear equation for one face using GSL
 double solve_face(FaceWrapper& fw, double x_guess) {
   const gsl_multiroot_fsolver_type* T;
    gsl_multiroot_fsolver* s;
@@ -126,6 +192,7 @@ double solve_face(FaceWrapper& fw, double x_guess) {
 
   return root;
 }
+ */
 
 
 void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int main_iter, std::shared_ptr<Circuit> circuit) {

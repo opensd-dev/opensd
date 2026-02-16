@@ -26,14 +26,12 @@ circuit1.add_BC("bc3","node4",'P',1.E5)
 geometry = opensd.Geometry([circuit1])
 geometry.export_to_xml()
 
-# from PINET import solver_settings
-# solver_settings.conv_crit_temp_SS = 1.E-7
-# solver_settings.conv_crit_flow = 1.E-7
-
 settings = opensd.Settings()
 settings.verbosity = 3
 settings.temp_solve = True
 settings.run_mode = "steady"
+settings.conv_crit_flow = 1.E-7
+settings.conv_crit_temp_SS = 1.E-7
 settings.export_to_xml()
 
 opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/c/codes/opensd/build/opensd')

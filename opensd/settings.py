@@ -118,6 +118,7 @@ class Settings:
         self._create_flag_write_subelement(element)
         self._create_T_ambient_subelement(element)
         self._create_conv_crit_flow_subelement(element)
+        self._create_conv_crit_temp_SS_subelement(element)
         
         # Clean the indentation in the file to be user-readable
         clean_indentation(element)
@@ -150,6 +151,10 @@ class Settings:
     def _create_conv_crit_flow_subelement(self, root):
         elem = ET.SubElement(root, "conv_crit_flow")
         elem.text = str(self._conv_crit_flow)
+
+    def _create_conv_crit_temp_SS_subelement(self, root):
+        elem = ET.SubElement(root, "conv_crit_temp_SS")
+        elem.text = str(self._conv_crit_temp_SS)
 
     def _create_alpha_ener_subelement(self, root):
         elem = ET.SubElement(root, "alpha_ener")
@@ -249,3 +254,14 @@ class Settings:
         cv.check_type('conv_crit_flow', conv_crit_flow, Real)
         cv.check_greater_than('conv_crit_flow', conv_crit_flow, 0)
         self._conv_crit_flow = conv_crit_flow
+
+    @property
+    def conv_crit_temp_SS(self) -> float:
+        return self._conv_crit_temp_SS
+
+    @conv_crit_temp_SS.setter
+    def conv_crit_temp_SS(self, conv_crit_temp_SS: float):
+        cv.check_type('conv_crit_temp_SS', conv_crit_temp_SS, Real)
+        cv.check_greater_than('conv_crit_temp_SS', conv_crit_temp_SS, 0)
+        self._conv_crit_temp_SS = conv_crit_temp_SS
+
