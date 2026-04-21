@@ -19,7 +19,7 @@ double eval(const Input& input,
         // py::object ret =
         //   input.py_callable(flow_elem, wall_node);
         py::object ret =
-          input.py_callable(flow_elem->velocity);
+          input.py_callable(flow_elem);
         // std::cout<<"flag1 "<<flow_elem->velocity<<std::endl;
         // std::exit(0);
 

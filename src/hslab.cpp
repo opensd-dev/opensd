@@ -5,6 +5,7 @@
 #include <iostream>
 #include <cmath>
 #include <cstdlib>
+#include <filesystem>
 
 #include "opensd/hslab.h"
 #include "opensd/circuit.h"
@@ -70,10 +71,15 @@ HSlab::HSlab(pugi::xml_node hslab_node)
     py::gil_scoped_acquire gil;
     py::module sys = py::module::import("sys");
 
-    sys.attr("path").attr("insert")(0, ".");
+    // get executable path
+    std::filesystem::path exe = std::filesystem::canonical("/proc/self/exe");
+    std::filesystem::path exe_dir = exe.parent_path();
+
+    // add that directory
+    sys.attr("path").attr("insert")(0, exe_dir.string());
 
     py::module scripts = py::module::import("scripts");
-    // py::module bindings = py::module::import("bindings");
+    py::module bindings = py::module::import("bindings");
     std::cout << "[HSlab] scripts module loaded from "
               << py::str(scripts.attr("__file__")).cast<std::string>()
               << std::endl;

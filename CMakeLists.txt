@@ -36,31 +36,35 @@ find_package(fmt REQUIRED)
 find_package(GSL REQUIRED)
 
 find_package(pybind11 REQUIRED)
-# find_package(Python COMPONENTS Interpreter Development REQUIRED)
-# # Add bindings library
-# add_library(bindings MODULE src/bindings.cpp)
-#
-# # Ensure Python and pybind11 headers are visible
-# target_include_directories(bindings
-#     PRIVATE
-#         include
-#         ${Python_INCLUDE_DIRS}        # <--- this is key for Python.h
-#         ${CMAKE_SOURCE_DIR}/externals/CoolProp/include
-#         ${MPI_CXX_INCLUDE_DIRS}
-# )
-#
-# # Link libraries
-# target_link_libraries(bindings
-#     PRIVATE
-#         pybind11::embed
-#         ${Python_LIBRARIES}
-#         PkgConfig::PETSC
-# )
-#
-# # Make the Python module importable
-# set_target_properties(bindings PROPERTIES PREFIX "" SUFFIX ".so")
-# message(STATUS "Python include dirs: ${Python_INCLUDE_DIRS}")
-# message(STATUS "Python libraries: ${Python_LIBRARIES}")
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
+
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# Add bindings library
+add_library(bindings MODULE src/bindings.cpp)
+
+# Ensure Python and pybind11 headers are visible
+target_include_directories(bindings
+    PRIVATE
+        include
+        ${Python_INCLUDE_DIRS}        # <--- this is key for Python.h
+        ${CMAKE_SOURCE_DIR}/externals/CoolProp/include
+        ${MPI_CXX_INCLUDE_DIRS}
+)
+
+# Link libraries
+target_link_libraries(bindings
+    PRIVATE
+        opensd_core
+        pybind11::embed
+        ${Python_LIBRARIES}
+        PkgConfig::PETSC
+)
+
+# Make the Python module importable
+set_target_properties(bindings PROPERTIES PREFIX "" SUFFIX ".so" BUILD_RPATH "${CMAKE_BINARY_DIR}")
+message(STATUS "Python include dirs: ${Python_INCLUDE_DIRS}")
+message(STATUS "Python libraries: ${Python_LIBRARIES}")
 
 set(COOLPROP_STATIC_LIBRARY ON CACHE BOOL "Build static CoolProp library" FORCE)
 SET(EXENAME opensd)
@@ -112,9 +116,13 @@ add_subdirectory ("${CMAKE_SOURCE_DIR}/externals/CoolProp")
 include_directories(${HDF5_INCLUDE_DIRS})
 include_directories(include)
 
-file(GLOB SOURCES "src/*.cpp")
-# list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/bindings.cpp")
-add_executable(${EXENAME} ${SOURCES})
+file(GLOB CORE_SOURCES "src/*.cpp")
+list(REMOVE_ITEM CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/bindings.cpp")
+
+add_library(opensd_core SHARED ${CORE_SOURCES})
+
+# executable
+add_executable(${EXENAME} src/main.cpp)
 
 target_include_directories(${EXENAME} PUBLIC
   include
@@ -123,26 +131,47 @@ target_include_directories(${EXENAME} PUBLIC
   external/fmtlib
   ${MPI_CXX_INCLUDE_DIRS}
   ${METIS_INCLUDE_DIRS}
-  # ${Python_INCLUDE_DIRS}
+  ${Python_INCLUDE_DIRS}
 )
 
-if (OPENSD_USE_MPI)
-  target_compile_definitions(${EXENAME} PUBLIC -DOPENSD_MPI)
-endif()
+target_include_directories(opensd_core PUBLIC
+  include
+  externals/CoolProp/externals/Eigen
+  externals/CoolProp/include
+  external/fmtlib
+  ${MPI_CXX_INCLUDE_DIRS}
+  ${METIS_INCLUDE_DIRS}
+  ${Python_INCLUDE_DIRS}
+)
 
-target_link_libraries(${EXENAME}
+target_link_libraries(opensd_core
   PUBLIC
     CoolProp
     pugixml
-	${HDF5_C_LIBRARIES} ${HDF5_HL_LIBRARIES}
-	MPI::MPI_CXX
+    ${HDF5_C_LIBRARIES} ${HDF5_HL_LIBRARIES}
+    MPI::MPI_CXX
     PkgConfig::PETSC
     fmt::fmt-header-only
-	${METIS_LIBRARY}
-	GSL::gsl
-	GSL::gslcblas
-	OpenMP::OpenMP_CXX
+    ${METIS_LIBRARY}
+    GSL::gsl
+    GSL::gslcblas
+    OpenMP::OpenMP_CXX
+)
+
+
+if (OPENSD_USE_MPI)
+  target_compile_definitions(opensd_core PUBLIC -DOPENSD_MPI)
+endif()
+
+# if (OPENSD_USE_MPI)
+#   target_compile_definitions(${EXENAME} PUBLIC -DOPENSD_MPI)
+# endif()
+
+target_link_libraries(${EXENAME}
+  PUBLIC
+    opensd_core
 	pybind11::embed
+	stdc++
 )
 
 # if (OPENSD_USE_MPI)

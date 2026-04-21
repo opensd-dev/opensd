@@ -10,8 +10,8 @@
 #     h = Nu * flow_elem.ther_gues.conductivity() / flow_elem.diameter
 #     return h
 
-def script1(velocity):
-    # print("python flag1",velocity)
+def script1(flow_elem):
+    print("python flag1",flow_elem.velocity,flow_elem.diameter,flow_elem.faceno)
     h = 10000
     return h
 
