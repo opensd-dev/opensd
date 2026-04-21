@@ -16,12 +16,8 @@ double eval(const Input& input,
     case InputType::FUNCTION: {
       py::gil_scoped_acquire gil;
 
-        // py::object ret =
-        //   input.py_callable(flow_elem, wall_node);
         py::object ret =
-          input.py_callable(flow_elem);
-        // std::cout<<"flag1 "<<flow_elem->velocity<<std::endl;
-        // std::exit(0);
+          input.py_callable(flow_elem, wall_node);
 
       return ret.cast<double>();
     }
