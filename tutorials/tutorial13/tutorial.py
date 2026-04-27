@@ -3,7 +3,7 @@
 import opensd
 
 # Define sodium (shell side)
-Na13 = opensd.Fluid(name="Na6")
+Na13 = opensd.Fluid(name="Na13")
 Na13.rhomass = 860.0
 Na13.molarmass = 23E-3
 Na13.viscosity = 3.75E-4
@@ -64,7 +64,7 @@ solids.export_to_xml()
 
 snode1 = opensd.SNode("snode1")
 
-hslab1 = opensd.HSlab("hslab1",ucomp="pipe1",uvar="pipe",uval=[script1],dcomp="snode1",dvar="hflux",dval=0.0,uarea=3.642,nlayers=3)
+hslab1 = opensd.HSlab("hslab1",ucomp="pipe1",uvar="pipe",uval="script1",dcomp="snode1",dvar="conv",dval=0.0,uarea=3.642,nlayers=3)
 hslab1.add_layer(thk_elem=3.81E-4,thk_cros=0.9144,nnodes=2,darea=3.167,solname='SS13',sollib="User")
 hslab1.add_layer(thk_elem=7.5E-5,thk_cros=0.9144,nnodes=2,darea=3.079,solname='gap13',sollib="User",heat_input=0.)
 hslab1.add_layer(thk_elem=0.00247,thk_cros=0.9144,nnodes=2,darea=3.079,solname='MOX13',sollib="User",heat_input=3174806.,AFF=[0.0740, 0.0937, 0.1107, 0.1222, 0.1271, 0.1248,0.1156, 0.0999, 0.0786, 0.0534])
@@ -72,7 +72,11 @@ hslab1.add_layer(thk_elem=0.00247,thk_cros=0.9144,nnodes=2,darea=3.079,solname='
 geometry = opensd.Geometry([circuit1,hslab1])
 geometry.export_to_xml()
 
-conditions = opensd.Conditions([bc1,bc2,bc3,bc4,bc5,bc6])
+bc1 = circuit1.add_BC("bc1","node1",'P',7.E5)
+bc2 = circuit1.add_BC("bc2","node1",'T',598.899)
+bc3 = circuit1.add_BC("bc3","node2",'msource',-25.3928)
+
+conditions = opensd.Conditions([bc1,bc2,bc3])
 conditions.export_to_xml('conditions.xml')
 
 initial_guess = opensd.InitialGuess(geometry,conditions)
