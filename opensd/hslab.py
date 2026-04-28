@@ -640,6 +640,7 @@ class Layer(object):
         subelement.set("thk_cros", str(self.thk_cros))
         subelement.set("nnodes", str(self.nnodes))
         subelement.set("darea", str(self.darea))
+        subelement.set("heat_input", str(self.heat_input))
 
 class Face(object):
     def __init__(self,identifier,unode,dnode,A):

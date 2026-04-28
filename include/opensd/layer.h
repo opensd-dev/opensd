@@ -34,6 +34,7 @@ public:
   double thk_elem;
   double thk_cros;
   double darea;
+  double heat_input;
   double delx;
 
   // double mresidue;

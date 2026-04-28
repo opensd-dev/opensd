@@ -26,6 +26,7 @@ Layer::Layer(pugi::xml_node layer_node)
     nnodes   = stod(get_node_value(layer_node, "nnodes"));
     thk_elem = stod(get_node_value(layer_node, "thk_elem"));
     thk_cros = stod(get_node_value(layer_node, "thk_cros"));
+	heat_input = stod(get_node_value(layer_node, "heat_input"));
     solname  = get_node_value(layer_node, "solname");
     sollib   = get_node_value(layer_node, "sollib");
 
