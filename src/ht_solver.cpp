@@ -163,7 +163,7 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
  */  
 
         // Heat input and transient contribution
-        // b(i) = b(i) + alpha_heat * node->heat_input + (1.0 - alpha_heat) * node->heat_input_old;
+        b(i) = b(i) + alpha_heat * node->heat_input + (1.0 - alpha_heat) * node->heat_input_old;
         // if (trans_sim) {
           // b(i) = b(i) + node->ther_old.cpmass() * node->ther_old.rhomass() * node->volume / delt * node->temp_old;
           // A(i, i) = A(i, i) + node->ther_gues.cpmass() * node->ther_gues.rhomass() * node->volume / delt;

@@ -298,6 +298,8 @@ void discretize_layers() {
           snode->heat_frac = heat_frac;
 		  snode->solname = layer->solname;
 		  snode->layer = layer.get();
+		  snode->heat_input = heat_frac*layer->heat_input;
+		  snode->heat_input_old = heat_frac*layer->heat_input;
 
           // ---- Upwind/downwind registration ----
           if (i == 0 && layer->layerno == 0) {
