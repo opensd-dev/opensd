@@ -402,6 +402,8 @@ void Node::save_to_hdf5(hid_t group_id) const {
   H5LTset_attribute_double(group_id, ".", "elevation", &elevation, 1);
   H5LTset_attribute_double(group_id, ".", "tpres_gues", &tpres_gues, 1);
   H5LTset_attribute_double(group_id, ".", "spres_gues", &spres_gues, 1);
+  H5LTset_attribute_double(group_id, ".", "ttemp_gues", &ttemp_gues, 1);
+  H5LTset_attribute_double(group_id, ".", "stemp_gues", &stemp_gues, 1);
   H5LTset_attribute_double(group_id, ".", "tenth_gues", &tenth_gues, 1);
   H5LTset_attribute_double(group_id, ".", "senth_gues", &senth_gues, 1);
   H5LTset_attribute_double(group_id, ".", "velocity", &velocity, 1);
@@ -415,6 +417,12 @@ void Node::load_from_hdf5(hid_t group_id) {
   elevation = opensd::read_double_attribute(group_id, "elevation");
   tpres_old = opensd::read_double_attribute(group_id, "tpres_gues");
   spres_old = opensd::read_double_attribute(group_id, "spres_gues");
+  ttemp_old = H5Aexists(group_id, "ttemp_gues") > 0
+    ? opensd::read_double_attribute(group_id, "ttemp_gues")
+    : ttemp_old;
+  stemp_old = H5Aexists(group_id, "stemp_gues") > 0
+    ? opensd::read_double_attribute(group_id, "stemp_gues")
+    : stemp_old;
   tenth_old = opensd::read_double_attribute(group_id, "tenth_gues");
   senth_old = opensd::read_double_attribute(group_id, "senth_gues");
   velocity = opensd::read_double_attribute(group_id, "velocity");
