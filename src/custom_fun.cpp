@@ -16,8 +16,13 @@ double eval(const Input& input,
     case InputType::FUNCTION: {
       py::gil_scoped_acquire gil;
 
-        py::object ret =
-          input.py_callable(flow_elem, wall_node);
+      if (!flow_elem) {
+        throw std::runtime_error(
+          "Python heat-transfer function requires a pipe face, but none was provided.");
+      }
+
+      py::object ret =
+        input.py_callable(flow_elem, wall_node);
 
       return ret.cast<double>();
     }
