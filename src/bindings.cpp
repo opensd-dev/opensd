@@ -17,7 +17,8 @@ PYBIND11_MODULE(bindings, m) {
     py::class_<opensd::FaceTher>(m, "FaceTher")
         .def("rhomass", &opensd::FaceTher::rhomass)
         .def("cpmass", &opensd::FaceTher::cpmass)
-        .def("conductivity", &opensd::FaceTher::conductivity);
+        .def("conductivity", &opensd::FaceTher::conductivity)
+        .def("viscosity", &opensd::FaceTher::viscosity);
 
     // ---------------------------
     // Face binding
