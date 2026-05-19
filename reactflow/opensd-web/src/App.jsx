@@ -3,6 +3,7 @@ import ReactFlow, {
   Background,
   Controls,
   MiniMap,
+  Position,
   addEdge,
   useNodesState,
   useEdgesState
@@ -36,6 +37,14 @@ const kindClasses = {
   hslab: "model-node hslab-node",
   bc: "model-node bc-node"
 };
+
+function withSideHandles(node) {
+  return {
+    sourcePosition: Position.Right,
+    targetPosition: Position.Left,
+    ...node
+  };
+}
 
 function attr(element, name, fallback = "") {
   return element?.getAttribute(name) ?? fallback;
@@ -275,7 +284,7 @@ function parseGeometryXml(xmlText) {
 
     stats.circuits += 1;
 
-    pushNode({
+    pushNode(withSideHandles({
       id: circuitNodeId,
       type: "default",
       className: kindClasses.circuit,
@@ -285,7 +294,7 @@ function parseGeometryXml(xmlText) {
           attr(circuit, "solveSS") && `solveSS ${attr(circuit, "solveSS")}`
         ])
       }
-    });
+    }));
 
     const nodes = Array.from(circuit.querySelectorAll(":scope > node"));
     nodes.forEach((node, nodeIndex) => {
@@ -294,18 +303,18 @@ function parseGeometryXml(xmlText) {
 
       stats.nodes += 1;
 
-      pushNode({
+      pushNode(withSideHandles({
         id: nodeId,
         type: "default",
         className: kindClasses.node,
-        position: { x: baseX + 80 + nodeIndex * 280, y: baseY + 170 },
+        position: { x: baseX + 220, y: baseY + nodeIndex * 96 },
         data: {
           label: makeLabel(nodeName, [
             attr(node, "fixed_var") && `fixed ${attr(node, "fixed_var")}`,
             attr(node, "volume") && `vol ${Number(attr(node, "volume")).toExponential(2)}`
           ])
         }
-      });
+      }));
 
       pushEdge({
         id: `${circuitNodeId}->${nodeId}`,
@@ -325,18 +334,18 @@ function parseGeometryXml(xmlText) {
 
       stats.pipes += 1;
 
-      pushNode({
+      pushNode(withSideHandles({
         id: pipeId,
         type: "default",
         className: kindClasses.pipe,
-        position: { x: baseX + 210 + pipeIndex * 280, y: baseY + 320 },
+        position: { x: baseX + 440, y: baseY + pipeIndex * 96 },
         data: {
           label: makeLabel(pipeName, [
             attr(pipe, "ncell") && `${attr(pipe, "ncell")} cells`,
             attr(pipe, "diameter") && `D ${attr(pipe, "diameter")} m`
           ])
         }
-      });
+      }));
 
       pushEdge({
         id: `node:${unode}->${pipeId}`,
@@ -363,17 +372,17 @@ function parseGeometryXml(xmlText) {
 
       stats.bcs += 1;
 
-      pushNode({
+      pushNode(withSideHandles({
         id: bcId,
         type: "default",
         className: kindClasses.bc,
-        position: { x: baseX + 80 + bcIndex * 180, y: baseY + 500 },
+        position: { x: baseX + 660, y: baseY + bcIndex * 96 },
         data: {
           label: makeLabel(bcName, [
             attr(bc, "var") && `${attr(bc, "var")} = ${attr(bc, "val")}`
           ])
         }
-      });
+      }));
 
       pushEdge({
         id: `${bcId}->node:${targetNode}`,
@@ -394,11 +403,11 @@ function parseGeometryXml(xmlText) {
 
     stats.hslabs += 1;
 
-    pushNode({
+    pushNode(withSideHandles({
       id: hslabId,
       type: "default",
       className: kindClasses.hslab,
-      position: { x: 430 + firstCircuitOffset, y: 700 },
+      position: { x: 430 + firstCircuitOffset, y: 520 },
       data: {
         label: makeLabel(hslabName, [
           `${layers.length} layers`,
@@ -406,7 +415,7 @@ function parseGeometryXml(xmlText) {
           attr(hslab, "dvar") && `d ${attr(hslab, "dvar")}`
         ])
       }
-    });
+    }));
 
     const ucomp = attr(hslab, "ucomp");
     const dcomp = attr(hslab, "dcomp");
@@ -434,18 +443,18 @@ function parseGeometryXml(xmlText) {
     layers.forEach((layer, layerIndex) => {
       const layerId = `layer:${hslabName}:${layerIndex}`;
 
-      pushNode({
+      pushNode(withSideHandles({
         id: layerId,
         type: "default",
         className: "model-node layer-node",
-        position: { x: 430 + firstCircuitOffset + layerIndex * 190, y: 870 },
+        position: { x: 660 + firstCircuitOffset, y: 520 + layerIndex * 96 },
         data: {
           label: makeLabel(`layer ${attr(layer, "layerno", String(layerIndex))}`, [
             attr(layer, "solname"),
             attr(layer, "nnodes") && `${attr(layer, "nnodes")} radial nodes`
           ])
         }
-      });
+      }));
 
       pushEdge({
         id: `${hslabId}->${layerId}`,
@@ -492,6 +501,8 @@ export default function App() {
       if (!type) return;
 
       const newNode = {
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
         id: getId(),
         type: "default",
         className: "model-node manual-node",
