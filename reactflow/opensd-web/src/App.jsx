@@ -1,16 +1,23 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import ReactFlow, {
-  Background,
-  Controls,
-  MiniMap,
-  Position,
-  addEdge,
-  useNodesState,
-  useEdgesState
-} from "reactflow";
+import { addEdge, useEdgesState, useNodesState } from "reactflow";
+
+import {
+  FLOW_MARKER,
+  HEAT_MARKER,
+  buildHeatHandleMap,
+  resolveHeatHandles
+} from "./edgeUtils.js";
 
 import "reactflow/dist/style.css";
 import "./App.css";
+import ModelFlowCanvas from "./ModelFlowCanvas.jsx";
+import {
+  CIRCUIT_ROW_GAP,
+  PIPE_STEP,
+  buildHorizontalSequence,
+  layoutCircuitRow,
+  nodeData
+} from "./circuitLayout.js";
 
 const componentTypes = ["Node", "Pipe", "Pump", "Valve", "HSlab", "BC"];
 const initialNodes = [];
@@ -30,19 +37,75 @@ const nodeVariables = [
 let id = 0;
 const getId = () => `manual_${id++}`;
 
-const kindClasses = {
-  circuit: "model-node circuit-node",
-  node: "model-node flow-node",
-  pipe: "model-node pipe-node",
-  hslab: "model-node hslab-node",
-  bc: "model-node bc-node"
-};
+function emptyHeat() {
+  return { htIn: false, htOut: false, htSideIn: false, htSideOut: false };
+}
 
-function withSideHandles(node) {
+function heatFor(id, heatHandleMap) {
+  return heatHandleMap.get(id) ?? emptyHeat();
+}
+
+function buildFlowNode({ id, position, identifier, details = [], heatHandleMap }) {
   return {
-    sourcePosition: Position.Right,
-    targetPosition: Position.Left,
-    ...node
+    id,
+    type: "flow",
+    position,
+    data: { ...nodeData(identifier, details), heat: heatFor(id, heatHandleMap) }
+  };
+}
+
+function buildPipeNode({ id, position, identifier, details = [], kind = "pipe", heatHandleMap }) {
+  return {
+    id,
+    type: "pipe",
+    position,
+    data: { ...nodeData(identifier, details), kind, heat: heatFor(id, heatHandleMap) }
+  };
+}
+
+function buildBcNode({ id, position, identifier, details = [] }) {
+  return {
+    id,
+    type: "bc",
+    position,
+    data: nodeData(identifier, details)
+  };
+}
+
+function flowEdge(id, source, target) {
+  return {
+    id,
+    source,
+    target,
+    sourceHandle: "flow-out",
+    targetHandle: "flow-in",
+    type: "straight",
+    markerEnd: FLOW_MARKER
+  };
+}
+
+function bcEdge(id, source, target) {
+  return {
+    id,
+    source,
+    target,
+    sourceHandle: "bc-out",
+    targetHandle: "bc-in",
+    type: "straight",
+    className: "bc-edge"
+  };
+}
+
+function hslabEdge(id, source, target) {
+  return {
+    id,
+    source,
+    target,
+    ...resolveHeatHandles(source, target),
+    type: "smoothstep",
+    animated: false,
+    className: "hslab-edge",
+    markerEnd: HEAT_MARKER
   };
 }
 
@@ -50,17 +113,23 @@ function attr(element, name, fallback = "") {
   return element?.getAttribute(name) ?? fallback;
 }
 
-function makeLabel(title, details = []) {
-  const filteredDetails = details.filter(Boolean);
+function layerTooltipLines(layers) {
+  if (!layers.length) return [];
 
-  return (
-    <div className="node-label">
-      <strong>{title}</strong>
-      {filteredDetails.map((detail) => (
-        <span key={detail}>{detail}</span>
-      ))}
-    </div>
-  );
+  const lines = [`${layers.length} layer(s):`];
+  layers.forEach((layer, layerIndex) => {
+    const layerNo = attr(layer, "layerno", String(layerIndex));
+    const summary = [
+      `L${layerNo}`,
+      attr(layer, "solname"),
+      attr(layer, "nnodes") && `${attr(layer, "nnodes")} radial nodes`
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    lines.push(`  ${summary}`);
+  });
+
+  return lines;
 }
 
 function naturalCompare(a, b) {
@@ -250,6 +319,8 @@ function parseGeometryXml(xmlText) {
     throw new Error("Could not find a <geometry> root element.");
   }
 
+  const heatHandleMap = buildHeatHandleMap(geometry, attr);
+
   const flowNodes = [];
   const flowEdges = [];
   const nodeIds = new Set();
@@ -279,190 +350,192 @@ function parseGeometryXml(xmlText) {
   circuits.forEach((circuit, circuitIndex) => {
     const circuitId = attr(circuit, "identifier", `circuit_${circuitIndex + 1}`);
     const circuitNodeId = `circuit:${circuitId}`;
-    const baseX = circuitIndex * 900;
-    const baseY = 40;
 
     stats.circuits += 1;
 
-    pushNode(withSideHandles({
-      id: circuitNodeId,
-      type: "default",
-      className: kindClasses.circuit,
-      position: { x: baseX, y: baseY },
-      data: {
-        label: makeLabel(circuitId, [
-          attr(circuit, "solveSS") && `solveSS ${attr(circuit, "solveSS")}`
-        ])
-      }
-    }));
+    const nodeElements = Array.from(circuit.querySelectorAll(":scope > node"));
+    const pipeElements = Array.from(circuit.querySelectorAll(":scope > pipe"));
+    const bcElements = Array.from(circuit.querySelectorAll(":scope > bc"));
 
-    const nodes = Array.from(circuit.querySelectorAll(":scope > node"));
-    nodes.forEach((node, nodeIndex) => {
-      const nodeName = attr(node, "identifier", `node_${nodeIndex + 1}`);
-      const nodeId = `node:${nodeName}`;
+    const nodeByName = new Map();
+    const nodeNames = [];
 
+    nodeElements.forEach((nodeEl, nodeIndex) => {
+      const nodeName = attr(nodeEl, "identifier", `node_${nodeIndex + 1}`);
+      nodeNames.push(nodeName);
+      nodeByName.set(nodeName, nodeEl);
       stats.nodes += 1;
-
-      pushNode(withSideHandles({
-        id: nodeId,
-        type: "default",
-        className: kindClasses.node,
-        position: { x: baseX + 220, y: baseY + nodeIndex * 96 },
-        data: {
-          label: makeLabel(nodeName, [
-            attr(node, "fixed_var") && `fixed ${attr(node, "fixed_var")}`,
-            attr(node, "volume") && `vol ${Number(attr(node, "volume")).toExponential(2)}`
-          ])
-        }
-      }));
-
-      pushEdge({
-        id: `${circuitNodeId}->${nodeId}`,
-        source: circuitNodeId,
-        target: nodeId,
-        type: "smoothstep",
-        animated: false
-      });
     });
 
-    const pipes = Array.from(circuit.querySelectorAll(":scope > pipe"));
-    pipes.forEach((pipe, pipeIndex) => {
-      const pipeName = attr(pipe, "identifier", `pipe_${pipeIndex + 1}`);
-      const pipeId = `pipe:${pipeName}`;
-      const unode = attr(pipe, "unode");
-      const dnode = attr(pipe, "dnode");
-
+    const pipes = pipeElements.map((pipeEl, pipeIndex) => {
+      const pipeName = attr(pipeEl, "identifier", `pipe_${pipeIndex + 1}`);
       stats.pipes += 1;
-
-      pushNode(withSideHandles({
-        id: pipeId,
-        type: "default",
-        className: kindClasses.pipe,
-        position: { x: baseX + 440, y: baseY + pipeIndex * 96 },
-        data: {
-          label: makeLabel(pipeName, [
-            attr(pipe, "ncell") && `${attr(pipe, "ncell")} cells`,
-            attr(pipe, "diameter") && `D ${attr(pipe, "diameter")} m`
-          ])
-        }
-      }));
-
-      pushEdge({
-        id: `node:${unode}->${pipeId}`,
-        source: `node:${unode}`,
-        target: pipeId,
-        type: "smoothstep",
-        label: "up"
-      });
-
-      pushEdge({
-        id: `${pipeId}->node:${dnode}`,
-        source: pipeId,
-        target: `node:${dnode}`,
-        type: "smoothstep",
-        label: "down"
-      });
+      return {
+        name: pipeName,
+        unode: attr(pipeEl, "unode"),
+        dnode: attr(pipeEl, "dnode"),
+        element: pipeEl
+      };
     });
 
-    const bcs = Array.from(circuit.querySelectorAll(":scope > bc"));
-    bcs.forEach((bc, bcIndex) => {
-      const bcName = attr(bc, "identifier", `bc_${bcIndex + 1}`);
-      const bcId = `bc:${circuitId}:${bcName}`;
-      const targetNode = attr(bc, "node");
-
+    const bcRecords = bcElements.map((bcEl, bcIndex) => {
+      const bcName = attr(bcEl, "identifier", `bc_${bcIndex + 1}`);
       stats.bcs += 1;
-
-      pushNode(withSideHandles({
-        id: bcId,
-        type: "default",
-        className: kindClasses.bc,
-        position: { x: baseX + 660, y: baseY + bcIndex * 96 },
-        data: {
-          label: makeLabel(bcName, [
-            attr(bc, "var") && `${attr(bc, "var")} = ${attr(bc, "val")}`
-          ])
-        }
-      }));
-
-      pushEdge({
-        id: `${bcId}->node:${targetNode}`,
-        source: bcId,
-        target: `node:${targetNode}`,
-        type: "smoothstep",
-        label: "sets"
-      });
+      return {
+        id: `bc:${circuitId}:${bcName}`,
+        name: bcName,
+        targetNode: attr(bcEl, "node"),
+        element: bcEl
+      };
     });
+
+    const sequence = buildHorizontalSequence(nodeNames, pipes, naturalCompare);
+    const { positions } = layoutCircuitRow({
+      circuitIndex,
+      circuitId,
+      sequence,
+      bcRecords
+    });
+
+    pushNode(
+      buildPipeNode({
+        id: circuitNodeId,
+        position: positions.get(circuitNodeId),
+        identifier: circuitId,
+        kind: "circuit",
+        details: [attr(circuit, "solveSS") && `solveSS ${attr(circuit, "solveSS")}`],
+        heatHandleMap
+      })
+    );
+
+    const pipeByName = new Map(pipes.map((pipe) => [pipe.name, pipe]));
+
+    for (const item of sequence) {
+      if (item.kind === "node") {
+        const nodeEl = nodeByName.get(item.name);
+        pushNode(
+          buildFlowNode({
+            id: `node:${item.name}`,
+            position: positions.get(`node:${item.name}`),
+            identifier: item.name,
+            details: [
+              attr(nodeEl, "fixed_var") && `fixed ${attr(nodeEl, "fixed_var")}`,
+              attr(nodeEl, "volume") && `vol ${Number(attr(nodeEl, "volume")).toExponential(2)}`
+            ],
+            heatHandleMap
+          })
+        );
+        continue;
+      }
+
+      const pipe = pipeByName.get(item.name);
+      pushNode(
+        buildPipeNode({
+          id: `pipe:${item.name}`,
+          position: positions.get(`pipe:${item.name}`),
+          identifier: item.name,
+          details: [
+            attr(pipe.element, "ncell") && `${attr(pipe.element, "ncell")} cells`,
+            attr(pipe.element, "diameter") && `D ${attr(pipe.element, "diameter")} m`,
+            pipe.unode && pipe.dnode && `${pipe.unode} → ${pipe.dnode}`
+          ],
+          heatHandleMap
+        })
+      );
+    }
+
+    for (const pipe of pipes) {
+      for (const nodeName of [pipe.unode, pipe.dnode]) {
+        if (!nodeName || !nodeByName.has(nodeName)) continue;
+        const nodeId = `node:${nodeName}`;
+        if (nodeIds.has(nodeId)) continue;
+
+        const nodeEl = nodeByName.get(nodeName);
+        const fallbackX = (positions.get(`pipe:${pipe.name}`)?.x ?? 0) + PIPE_STEP;
+        pushNode(
+          buildFlowNode({
+            id: nodeId,
+            position: positions.get(nodeId) ?? { x: fallbackX, y: positions.get(circuitNodeId)?.y ?? 50 },
+            identifier: nodeName,
+            details: [
+              attr(nodeEl, "fixed_var") && `fixed ${attr(nodeEl, "fixed_var")}`,
+              attr(nodeEl, "volume") && `vol ${Number(attr(nodeEl, "volume")).toExponential(2)}`
+            ],
+            heatHandleMap
+          })
+        );
+      }
+    }
+
+    for (const bc of bcRecords) {
+      const bcPosition = positions.get(bc.id);
+      if (!bcPosition) continue;
+
+      const bcEl = bc.element;
+      pushNode(
+        buildBcNode({
+          id: bc.id,
+          position: bcPosition,
+          identifier: bc.name,
+          details: [
+            attr(bcEl, "var") && `${attr(bcEl, "var")} = ${attr(bcEl, "val")}`,
+            bc.targetNode && `node ${bc.targetNode}`
+          ]
+        })
+      );
+    }
+
+    if (sequence.length > 0) {
+      const first = sequence[0];
+      const firstId = first.kind === "node" ? `node:${first.name}` : `pipe:${first.name}`;
+      pushEdge(flowEdge(`${circuitNodeId}->${firstId}`, circuitNodeId, firstId));
+    }
+
+    for (const pipe of pipes) {
+      const pipeId = `pipe:${pipe.name}`;
+      pushEdge(flowEdge(`node:${pipe.unode}->${pipeId}`, `node:${pipe.unode}`, pipeId));
+      pushEdge(flowEdge(`${pipeId}->node:${pipe.dnode}`, pipeId, `node:${pipe.dnode}`));
+    }
+
+    for (const bc of bcRecords) {
+      if (!positions.get(bc.id)) continue;
+      pushEdge(bcEdge(`${bc.id}->node:${bc.targetNode}`, bc.id, `node:${bc.targetNode}`));
+    }
   });
 
   const hslabs = Array.from(geometry.querySelectorAll(":scope > hslab"));
+  const hslabBaseY = 50 + circuits.length * CIRCUIT_ROW_GAP + 60;
+
   hslabs.forEach((hslab, hslabIndex) => {
     const hslabName = attr(hslab, "identifier", `hslab_${hslabIndex + 1}`);
     const hslabId = `hslab:${hslabName}`;
     const layers = Array.from(hslab.querySelectorAll(":scope > layer"));
-    const firstCircuitOffset = hslabIndex * 360;
+    const hslabOffset = hslabIndex * 220;
 
     stats.hslabs += 1;
 
-    pushNode(withSideHandles({
-      id: hslabId,
-      type: "default",
-      className: kindClasses.hslab,
-      position: { x: 430 + firstCircuitOffset, y: 520 },
-      data: {
-        label: makeLabel(hslabName, [
-          `${layers.length} layers`,
+    pushNode(
+      buildPipeNode({
+        id: hslabId,
+        position: { x: 220 + hslabOffset, y: hslabBaseY },
+        identifier: hslabName,
+        kind: "hslab",
+        details: [
           attr(hslab, "uvar") && `u ${attr(hslab, "uvar")}`,
-          attr(hslab, "dvar") && `d ${attr(hslab, "dvar")}`
-        ])
-      }
-    }));
+          attr(hslab, "dvar") && `d ${attr(hslab, "dvar")}`,
+          ...layerTooltipLines(layers)
+        ],
+        heatHandleMap
+      })
+    );
 
     const ucomp = attr(hslab, "ucomp");
     const dcomp = attr(hslab, "dcomp");
     const upstreamId = attr(hslab, "uvar") === "pipe" ? `pipe:${ucomp}` : `node:${ucomp}`;
     const downstreamId = attr(hslab, "dvar") === "pipe" ? `pipe:${dcomp}` : `node:${dcomp}`;
 
-    pushEdge({
-      id: `${upstreamId}->${hslabId}`,
-      source: upstreamId,
-      target: hslabId,
-      type: "smoothstep",
-      label: "u side",
-      animated: true
-    });
-
-    pushEdge({
-      id: `${hslabId}->${downstreamId}`,
-      source: hslabId,
-      target: downstreamId,
-      type: "smoothstep",
-      label: "d side",
-      animated: true
-    });
-
-    layers.forEach((layer, layerIndex) => {
-      const layerId = `layer:${hslabName}:${layerIndex}`;
-
-      pushNode(withSideHandles({
-        id: layerId,
-        type: "default",
-        className: "model-node layer-node",
-        position: { x: 660 + firstCircuitOffset, y: 520 + layerIndex * 96 },
-        data: {
-          label: makeLabel(`layer ${attr(layer, "layerno", String(layerIndex))}`, [
-            attr(layer, "solname"),
-            attr(layer, "nnodes") && `${attr(layer, "nnodes")} radial nodes`
-          ])
-        }
-      }));
-
-      pushEdge({
-        id: `${hslabId}->${layerId}`,
-        source: hslabId,
-        target: layerId,
-        type: "smoothstep"
-      });
-    });
+    pushEdge(hslabEdge(`${upstreamId}->${hslabId}`, upstreamId, hslabId));
+    pushEdge(hslabEdge(`${hslabId}->${downstreamId}`, hslabId, downstreamId));
   });
 
   return { nodes: flowNodes, edges: flowEdges, stats };
@@ -482,6 +555,7 @@ export default function App() {
   const [selectedPipe, setSelectedPipe] = useState("__all__");
   const [selectedVariable, setSelectedVariable] = useState("ttemp_gues");
   const [cpValue, setCpValue] = useState("1267");
+  const [fitViewTrigger, setFitViewTrigger] = useState(0);
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge({ ...params, type: "smoothstep" }, eds)),
@@ -500,20 +574,19 @@ export default function App() {
       const type = event.dataTransfer.getData("application/reactflow");
       if (!type) return;
 
-      const newNode = {
-        sourcePosition: Position.Right,
-        targetPosition: Position.Left,
-        id: getId(),
-        type: "default",
-        className: "model-node manual-node",
-        position: {
-          x: event.clientX - 260,
-          y: event.clientY - 60
-        },
-        data: {
-          label: makeLabel(type)
-        }
-      };
+      const isPipe = type === "Pipe" || type === "Pump" || type === "Valve";
+      const newNode = isPipe
+        ? buildPipeNode({
+            id: getId(),
+            position: { x: event.clientX - 260, y: event.clientY - 60 },
+            identifier: type,
+            kind: "manual"
+          })
+        : buildFlowNode({
+            id: getId(),
+            position: { x: event.clientX - 260, y: event.clientY - 60 },
+            identifier: type
+          });
 
       setNodes((nds) => nds.concat(newNode));
     },
@@ -536,6 +609,7 @@ export default function App() {
         setNodes(parsed.nodes);
         setEdges(parsed.edges);
         setModelStats(parsed.stats);
+        setFitViewTrigger((count) => count + 1);
         setImportStatus(`Loaded ${file.name}`);
         setActiveWorkspace("model");
       } catch (error) {
@@ -706,22 +780,16 @@ export default function App() {
         </div>
 
         {activeWorkspace === "model" && (
-          <section className="workspace-pane canvas-wrap">
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
-              onDrop={onDrop}
-              onDragOver={onDragOver}
-              fitView
-            >
-              <Background color="#c6ccd6" gap={22} />
-              <Controls />
-              <MiniMap nodeStrokeWidth={3} zoomable pannable />
-            </ReactFlow>
-          </section>
+          <ModelFlowCanvas
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            fitViewTrigger={fitViewTrigger}
+          />
         )}
 
         {activeWorkspace === "postprocess" && (

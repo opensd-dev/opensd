@@ -172,8 +172,46 @@ button {
 }
 
 .canvas-wrap {
+  position: relative;
   min-width: 0;
   min-height: 0;
+  height: 100%;
+}
+
+.canvas-wrap .react-flow {
+  width: 100%;
+  height: 100%;
+}
+
+.flow-toolbar {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 6;
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid #d7dde8;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.1);
+}
+
+.flow-tool-button {
+  min-width: 36px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid #d7dde8;
+  border-radius: 5px;
+  color: #344054;
+  background: #f8fafc;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.flow-tool-button:hover {
+  background: #eef2f7;
 }
 
 .postprocess-view {
@@ -354,76 +392,148 @@ button {
   font-weight: 650;
 }
 
-.model-node {
-  width: 154px;
-  border-radius: 7px;
-  border: 1px solid #cdd5df;
-  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.08);
-  background: #ffffff;
-  color: #101827;
-}
-
-.node-label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
-  text-align: left;
-}
-
-.node-label strong {
-  overflow-wrap: anywhere;
-  color: #101827;
-  font-size: 13px;
-  line-height: 1.15;
-}
-
-.node-label span {
-  overflow-wrap: anywhere;
-  color: #667085;
-  font-size: 11px;
-  line-height: 1.25;
-}
-
-.circuit-node {
+.node-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  z-index: 10;
+  transform: translateX(-50%);
+  min-width: 120px;
+  max-width: 260px;
+  padding: 6px 8px;
+  border: 1px solid #d7dde8;
+  border-radius: 6px;
   background: #111827;
-  border-color: #111827;
+  color: #f9fafb;
+  box-shadow: 0 8px 20px rgba(16, 24, 40, 0.2);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
 }
 
-.circuit-node .node-label strong,
-.circuit-node .node-label span {
-  color: #ffffff;
+.node-tooltip div:first-child {
+  font-weight: 700;
 }
 
 .flow-node {
-  border-color: #70b7a8;
+  position: relative;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid #70b7a8;
+  box-shadow: 0 4px 12px rgba(16, 24, 40, 0.12);
   background: #f2fbf8;
+  color: #101827;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.flow-node__label {
+  max-width: 28px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  pointer-events: none;
 }
 
 .pipe-node {
-  border-color: #8fb6f4;
+  position: relative;
+  min-width: 64px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0 8px;
+  border-radius: 5px;
+  border: 2px solid #8fb6f4;
+  box-shadow: 0 4px 12px rgba(16, 24, 40, 0.1);
   background: #f3f7ff;
+  color: #101827;
+  font-size: 10px;
+  font-weight: 700;
 }
 
-.hslab-node {
+.pipe-node__label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.pipe-node--circuit {
+  min-width: 72px;
+  border-color: #111827;
+  background: #111827;
+  color: #ffffff;
+}
+
+.pipe-node--hslab {
   border-color: #d8a957;
   background: #fff8e8;
 }
 
-.layer-node {
+.pipe-node--layer {
   border-color: #d1b2e8;
   background: #fbf7ff;
 }
 
-.bc-node {
-  border-color: #f0a4a4;
-  background: #fff6f6;
-}
-
-.manual-node {
+.pipe-node--manual {
   border-color: #aeb8c8;
   background: #ffffff;
 }
+
+.bc-node {
+  position: relative;
+  min-width: 52px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 5px;
+  border: 2px solid #f0a4a4;
+  box-shadow: 0 4px 10px rgba(16, 24, 40, 0.1);
+  background: #fff6f6;
+  color: #101827;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.bc-node__label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.react-flow__edge:not(.hslab-edge):not(.bc-edge) path {
+  stroke: #3468b5;
+  stroke-width: 2;
+}
+
+.react-flow__edge.bc-edge path {
+  stroke: #e57373;
+  stroke-width: 2;
+}
+
+.react-flow__edge.hslab-edge path {
+  stroke: #e67e22;
+  stroke-width: 2;
+}
+
+.react-flow__handle.handle-heat {
+  width: 7px;
+  height: 7px;
+  background: #e67e22;
+  border: 1px solid #ffffff;
+}
+
 
 @media (max-width: 760px) {
   .app-shell {

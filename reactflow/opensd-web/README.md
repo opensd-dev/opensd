@@ -1,16 +1,38 @@
-# React + Vite
+# OpenSD web GUI (`opensd-web`)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Browser-based viewer for OpenSD **geometry** (XML) and **results** (HDF5).
 
-Currently, two official plugins are available:
+## Quick start
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+npm run dev
+```
 
-## React Compiler
+Open the URL shown in the terminal (typically `http://localhost:5173`).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Features
 
-## Expanding the ESLint configuration
+- **Model** — Import `geometry.xml`, interactive graph (fluid nodes, pipes, BCs, hslabs).
+- **Postprocess** — Import HDF5, plot node variables along pipes.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Requirements
+
+Functional requirements are maintained under [requirements/](requirements/):
+
+- [opensd-web-gui.md](requirements/opensd-web-gui.md) — GUI behavior (`GUI-###`)
+
+Solver requirements: [../../requirements/opensd-solver.md](../../requirements/opensd-solver.md) (`SOL-###`).
+
+## Stack
+
+- [React](https://react.dev/) + [Vite](https://vitejs.dev/)
+- [React Flow](https://reactflow.dev/) v11
+- [h5wasm](https://github.com/usnistgov/h5wasm) for HDF5 in the browser
+
+## Build
+
+```bash
+npm run build
+npm run preview
+```
