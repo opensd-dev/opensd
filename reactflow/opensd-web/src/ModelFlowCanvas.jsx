@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import ReactFlow, {
   Background,
+  ConnectionMode,
   Controls,
   MiniMap,
   ReactFlowProvider,
@@ -21,9 +22,10 @@ function ModelFlowInner({
   onConnect,
   onDrop,
   onDragOver,
+  onPaneClick,
   fitViewTrigger
 }) {
-  const { fitView, zoomIn, zoomOut } = useReactFlow();
+  const { fitView, screenToFlowPosition, zoomIn, zoomOut } = useReactFlow();
 
   useEffect(() => {
     if (fitViewTrigger <= 0) return undefined;
@@ -34,6 +36,17 @@ function ModelFlowInner({
 
     return () => cancelAnimationFrame(frame);
   }, [fitViewTrigger, fitView]);
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+    onDrop(event, position);
+  };
+
+  const handlePaneClick = (event) => {
+    const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+    onPaneClick(event, position);
+  };
 
   return (
     <>
@@ -70,8 +83,14 @@ function ModelFlowInner({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        onDrop={onDrop}
+        onDrop={handleDrop}
         onDragOver={onDragOver}
+        onPaneClick={handlePaneClick}
+        connectionMode={ConnectionMode.Loose}
+        deleteKeyCode={["Backspace", "Delete"]}
+        multiSelectionKeyCode={null}
+        panOnDrag={[1, 2]}
+        selectionOnDrag
         fitView
         minZoom={0.05}
         maxZoom={2.5}

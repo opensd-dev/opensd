@@ -1,11 +1,9 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { addEdge, useEdgesState, useNodesState } from "reactflow";
 
 import {
   FLOW_MARKER,
   HEAT_MARKER,
-  buildHeatHandleMap,
-  resolveHeatHandles
 } from "./edgeUtils.js";
 
 import "reactflow/dist/style.css";
@@ -22,6 +20,9 @@ import {
 const componentTypes = ["Node", "Pipe", "Pump", "Valve", "HSlab", "BC"];
 const initialNodes = [];
 const initialEdges = [];
+const LAYOUT_STORAGE_KEY = "opensd-web:component-layouts:v1";
+const MANUAL_LAYOUT_KEY = "manual";
+const MAX_UNDO_STEPS = 80;
 const nodeVariables = [
   { value: "temperature_from_tenth", label: "Temperature from total enthalpy" },
   { value: "ttemp_gues", label: "Total temperature" },
@@ -34,15 +35,34 @@ const nodeVariables = [
   { value: "msource", label: "Mass source" }
 ];
 
+function componentKindForType(type) {
+  if (type === "Node") return "flow";
+  if (type === "BC") return "bc";
+  if (type === "HSlab") return "hslab";
+  if (type === "Pump" || type === "Valve") return type.toLowerCase();
+  return "pipe";
+}
+
 let id = 0;
 const getId = () => `manual_${id++}`;
 
 function emptyHeat() {
-  return { htIn: false, htOut: false, htSideIn: false, htSideOut: false };
+  return {
+    htTopIn: false,
+    htTopOut: false,
+    htBottomIn: false,
+    htBottomOut: false,
+    htSideIn: false,
+    htSideOut: false
+  };
+}
+
+function emptyFlowConnections() {
+  return { upstream: false, downstream: false };
 }
 
 function heatFor(id, heatHandleMap) {
-  return heatHandleMap.get(id) ?? emptyHeat();
+  return heatHandleMap?.get(id) ?? emptyHeat();
 }
 
 function buildFlowNode({ id, position, identifier, details = [], heatHandleMap }) {
@@ -50,8 +70,35 @@ function buildFlowNode({ id, position, identifier, details = [], heatHandleMap }
     id,
     type: "flow",
     position,
-    data: { ...nodeData(identifier, details), heat: heatFor(id, heatHandleMap) }
+    data: { ...nodeData(identifier, details), heat: heatFor(id, heatHandleMap), rotation: 0 }
   };
+}
+
+function buildManualComponent(type, position) {
+  const componentKind = componentKindForType(type);
+
+  if (componentKind === "flow") {
+    return buildFlowNode({
+      id: getId(),
+      position,
+      identifier: type
+    });
+  }
+
+  if (componentKind === "bc") {
+    return buildBcNode({
+      id: getId(),
+      position,
+      identifier: type
+    });
+  }
+
+  return buildPipeNode({
+    id: getId(),
+    position,
+    identifier: type,
+    kind: componentKind
+  });
 }
 
 function buildPipeNode({ id, position, identifier, details = [], kind = "pipe", heatHandleMap }) {
@@ -59,7 +106,13 @@ function buildPipeNode({ id, position, identifier, details = [], kind = "pipe", 
     id,
     type: "pipe",
     position,
-    data: { ...nodeData(identifier, details), kind, heat: heatFor(id, heatHandleMap) }
+    data: {
+      ...nodeData(identifier, details),
+      kind,
+      heat: heatFor(id, heatHandleMap),
+      flowConnections: emptyFlowConnections(),
+      rotation: 0
+    }
   };
 }
 
@@ -68,7 +121,7 @@ function buildBcNode({ id, position, identifier, details = [] }) {
     id,
     type: "bc",
     position,
-    data: nodeData(identifier, details)
+    data: { ...nodeData(identifier, details), rotation: 0 }
   };
 }
 
@@ -80,6 +133,7 @@ function flowEdge(id, source, target) {
     sourceHandle: "flow-out",
     targetHandle: "flow-in",
     type: "straight",
+    className: "flow-edge",
     markerEnd: FLOW_MARKER
   };
 }
@@ -96,21 +150,227 @@ function bcEdge(id, source, target) {
   };
 }
 
-function hslabEdge(id, source, target) {
+function heatHandlesFromPositions(source, target, positionById) {
+  const sourceY = positionById.get(source)?.y ?? 0;
+  const targetY = positionById.get(target)?.y ?? sourceY;
+  const targetIsBelow = targetY >= sourceY;
+
+  return targetIsBelow
+    ? { sourceHandle: "ht-bottom-out", targetHandle: "ht-top-in" }
+    : { sourceHandle: "ht-top-out", targetHandle: "ht-bottom-in" };
+}
+
+function hslabEdge(id, source, target, positionById) {
   return {
     id,
     source,
     target,
-    ...resolveHeatHandles(source, target),
-    type: "smoothstep",
+    ...heatHandlesFromPositions(source, target, positionById),
+    type: "straight",
     animated: false,
     className: "hslab-edge",
     markerEnd: HEAT_MARKER
   };
 }
 
+function markHeatEndpoint(flags, nodeId, handleId) {
+  if (!nodeId || !handleId) return;
+  if (!flags.has(nodeId)) flags.set(nodeId, emptyHeat());
+  const entry = flags.get(nodeId);
+
+  if (handleId === "ht-top-in") entry.htTopIn = true;
+  if (handleId === "ht-top-out") entry.htTopOut = true;
+  if (handleId === "ht-bottom-in") entry.htBottomIn = true;
+  if (handleId === "ht-bottom-out") entry.htBottomOut = true;
+  if (handleId === "ht-side-in") entry.htSideIn = true;
+  if (handleId === "ht-side-out") entry.htSideOut = true;
+}
+
+function buildHeatHandleMapFromEdges(edges) {
+  const flags = new Map();
+
+  for (const edge of edges) {
+    if (edge.className !== "hslab-edge") continue;
+    markHeatEndpoint(flags, edge.source, edge.sourceHandle);
+    markHeatEndpoint(flags, edge.target, edge.targetHandle);
+  }
+
+  return flags;
+}
+
+function applyHeatHandleMap(nodes, heatHandleMap) {
+  return nodes.map((node) => ({
+    ...node,
+    data: {
+      ...node.data,
+      heat: heatFor(node.id, heatHandleMap)
+    }
+  }));
+}
+
+function rerouteHeatEdges(nodes, edges) {
+  const positionById = new Map(nodes.map((node) => [node.id, node.position]));
+
+  return edges.map((edge) => {
+    if (edge.className !== "hslab-edge") return edge;
+
+    return {
+      ...edge,
+      type: "straight",
+      ...heatHandlesFromPositions(edge.source, edge.target, positionById)
+    };
+  });
+}
+
+function flowHandlesFromPositions(source, target, positionById) {
+  const sourceX = positionById.get(source)?.x ?? 0;
+  const targetX = positionById.get(target)?.x ?? sourceX;
+  const targetIsRight = targetX >= sourceX;
+
+  return targetIsRight
+    ? { sourceHandle: "flow-out", targetHandle: "flow-in" }
+    : { sourceHandle: "flow-in", targetHandle: "flow-out" };
+}
+
+function rerouteFlowEdges(nodes, edges) {
+  const positionById = new Map(nodes.map((node) => [node.id, node.position]));
+
+  return edges.map((edge) => {
+    if (edge.className !== "flow-edge") return edge;
+
+    return {
+      ...edge,
+      ...flowHandlesFromPositions(edge.source, edge.target, positionById)
+    };
+  });
+}
+
 function attr(element, name, fallback = "") {
   return element?.getAttribute(name) ?? fallback;
+}
+
+function layoutKeyForFile(file) {
+  return file?.name ? `geometry:${file.name}` : MANUAL_LAYOUT_KEY;
+}
+
+function readStoredLayouts() {
+  try {
+    const stored = window.localStorage.getItem(LAYOUT_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+}
+
+function readStoredLayout(layoutKey) {
+  return readStoredLayouts()[layoutKey] ?? null;
+}
+
+function saveStoredLayout(layoutKey, nodes) {
+  if (!layoutKey || !nodes.length) return;
+
+  const layout = {};
+  for (const node of nodes) {
+    layout[node.id] = {
+      position: node.position,
+      rotation: node.data?.rotation ?? 0
+    };
+  }
+
+  const layouts = readStoredLayouts();
+  layouts[layoutKey] = {
+    savedAt: new Date().toISOString(),
+    nodes: layout
+  };
+
+  try {
+    window.localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layouts));
+  } catch {
+    // Layout persistence is helpful, but storage limits should not block graph editing.
+  }
+}
+
+function applyStoredLayout(nodes, storedLayout) {
+  if (!storedLayout?.nodes) return nodes;
+
+  return nodes.map((node) => {
+    const saved = storedLayout.nodes[node.id];
+    if (!saved) return node;
+
+    return {
+      ...node,
+      position: saved.position ?? node.position,
+      data: {
+        ...node.data,
+        rotation: saved.rotation ?? node.data?.rotation ?? 0
+      }
+    };
+  });
+}
+
+function clearStoredLayout(layoutKey) {
+  const layouts = readStoredLayouts();
+  delete layouts[layoutKey];
+
+  try {
+    window.localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layouts));
+  } catch {
+    // A failed cleanup should not block returning to the default generated layout.
+  }
+}
+
+function isFlowNodeId(nodeId) {
+  return nodeId?.startsWith("node:");
+}
+
+function buildFlowConnectionMap(nodes, edges) {
+  const nodeTypeById = new Map(nodes.map((node) => [node.id, node.type]));
+  const connections = new Map();
+
+  for (const node of nodes) {
+    if (node.type === "pipe") connections.set(node.id, emptyFlowConnections());
+  }
+
+  for (const edge of edges) {
+    const sourceIsFluidNode = nodeTypeById.get(edge.source) === "flow" || isFlowNodeId(edge.source);
+    const targetIsFluidNode = nodeTypeById.get(edge.target) === "flow" || isFlowNodeId(edge.target);
+
+    if (connections.has(edge.target) && edge.targetHandle === "flow-in" && sourceIsFluidNode) {
+      connections.get(edge.target).upstream = true;
+    }
+
+    if (connections.has(edge.source) && edge.sourceHandle === "flow-out" && targetIsFluidNode) {
+      connections.get(edge.source).downstream = true;
+    }
+  }
+
+  return connections;
+}
+
+function normalizedFlowConnection(params, nodes) {
+  const nodeTypeById = new Map(nodes.map((node) => [node.id, node.type]));
+  const sourceIsPipe = nodeTypeById.get(params.source) === "pipe";
+  const targetIsPipe = nodeTypeById.get(params.target) === "pipe";
+
+  return {
+    ...params,
+    sourceHandle: sourceIsPipe ? "flow-out" : params.sourceHandle,
+    targetHandle: targetIsPipe ? "flow-in" : params.targetHandle,
+    type: "straight",
+    className: "flow-edge",
+    markerEnd: FLOW_MARKER
+  };
+}
+
+function cloneGraphState(nodes, edges) {
+  return {
+    nodes: nodes.map((node) => ({
+      ...node,
+      position: { ...node.position },
+      data: { ...node.data }
+    })),
+    edges: edges.map((edge) => ({ ...edge }))
+  };
 }
 
 function layerTooltipLines(layers) {
@@ -305,6 +565,20 @@ function LinePlot({ data, variableLabel }) {
   );
 }
 
+function ComponentGlyph({ type }) {
+  const kind = componentKindForType(type);
+
+  if (kind === "flow") {
+    return <span className="component-glyph component-glyph--node" aria-hidden="true" />;
+  }
+
+  if (kind === "bc") {
+    return <span className="component-glyph component-glyph--bc" aria-hidden="true" />;
+  }
+
+  return <span className={`component-glyph component-glyph--pipe component-glyph--${kind}`} aria-hidden="true" />;
+}
+
 function parseGeometryXml(xmlText) {
   const parser = new DOMParser();
   const document = parser.parseFromString(xmlText, "application/xml");
@@ -318,8 +592,6 @@ function parseGeometryXml(xmlText) {
   if (!geometry) {
     throw new Error("Could not find a <geometry> root element.");
   }
-
-  const heatHandleMap = buildHeatHandleMap(geometry, attr);
 
   const flowNodes = [];
   const flowEdges = [];
@@ -404,7 +676,6 @@ function parseGeometryXml(xmlText) {
         identifier: circuitId,
         kind: "circuit",
         details: [attr(circuit, "solveSS") && `solveSS ${attr(circuit, "solveSS")}`],
-        heatHandleMap
       })
     );
 
@@ -421,8 +692,7 @@ function parseGeometryXml(xmlText) {
             details: [
               attr(nodeEl, "fixed_var") && `fixed ${attr(nodeEl, "fixed_var")}`,
               attr(nodeEl, "volume") && `vol ${Number(attr(nodeEl, "volume")).toExponential(2)}`
-            ],
-            heatHandleMap
+            ]
           })
         );
         continue;
@@ -438,8 +708,7 @@ function parseGeometryXml(xmlText) {
             attr(pipe.element, "ncell") && `${attr(pipe.element, "ncell")} cells`,
             attr(pipe.element, "diameter") && `D ${attr(pipe.element, "diameter")} m`,
             pipe.unode && pipe.dnode && `${pipe.unode} → ${pipe.dnode}`
-          ],
-          heatHandleMap
+          ]
         })
       );
     }
@@ -460,8 +729,7 @@ function parseGeometryXml(xmlText) {
             details: [
               attr(nodeEl, "fixed_var") && `fixed ${attr(nodeEl, "fixed_var")}`,
               attr(nodeEl, "volume") && `vol ${Number(attr(nodeEl, "volume")).toExponential(2)}`
-            ],
-            heatHandleMap
+            ]
           })
         );
       }
@@ -524,8 +792,7 @@ function parseGeometryXml(xmlText) {
           attr(hslab, "uvar") && `u ${attr(hslab, "uvar")}`,
           attr(hslab, "dvar") && `d ${attr(hslab, "dvar")}`,
           ...layerTooltipLines(layers)
-        ],
-        heatHandleMap
+        ]
       })
     );
 
@@ -534,18 +801,22 @@ function parseGeometryXml(xmlText) {
     const upstreamId = attr(hslab, "uvar") === "pipe" ? `pipe:${ucomp}` : `node:${ucomp}`;
     const downstreamId = attr(hslab, "dvar") === "pipe" ? `pipe:${dcomp}` : `node:${dcomp}`;
 
-    pushEdge(hslabEdge(`${upstreamId}->${hslabId}`, upstreamId, hslabId));
-    pushEdge(hslabEdge(`${hslabId}->${downstreamId}`, hslabId, downstreamId));
+    const positionById = new Map(flowNodes.map((node) => [node.id, node.position]));
+
+    pushEdge(hslabEdge(`${upstreamId}->${hslabId}`, upstreamId, hslabId, positionById));
+    pushEdge(hslabEdge(`${hslabId}->${downstreamId}`, hslabId, downstreamId, positionById));
   });
 
-  return { nodes: flowNodes, edges: flowEdges, stats };
+  return { nodes: applyHeatHandleMap(flowNodes, buildHeatHandleMapFromEdges(flowEdges)), edges: flowEdges, stats };
 }
 
 export default function App() {
   const fileInput = useRef(null);
   const hdf5Input = useRef(null);
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, reactFlowOnNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, reactFlowOnEdgesChange] = useEdgesState(initialEdges);
+  const [defaultLayoutNodes, setDefaultLayoutNodes] = useState(initialNodes);
+  const [defaultLayoutEdges, setDefaultLayoutEdges] = useState(initialEdges);
   const [importStatus, setImportStatus] = useState("No geometry loaded");
   const [modelStats, setModelStats] = useState(null);
   const [activeWorkspace, setActiveWorkspace] = useState("model");
@@ -556,41 +827,155 @@ export default function App() {
   const [selectedVariable, setSelectedVariable] = useState("ttemp_gues");
   const [cpValue, setCpValue] = useState("1267");
   const [fitViewTrigger, setFitViewTrigger] = useState(0);
+  const [layoutKey, setLayoutKey] = useState(MANUAL_LAYOUT_KEY);
+  const [hasUnsavedLayout, setHasUnsavedLayout] = useState(false);
+  const [pendingComponentType, setPendingComponentType] = useState("");
+  const [undoStack, setUndoStack] = useState([]);
+
+  const pushUndoSnapshot = useCallback(() => {
+    setUndoStack((stack) => [...stack, cloneGraphState(nodes, edges)].slice(-MAX_UNDO_STEPS));
+  }, [edges, nodes]);
+
+  const undoLastAction = useCallback(() => {
+    setUndoStack((stack) => {
+      const previous = stack.at(-1);
+      if (!previous) return stack;
+
+      setNodes(previous.nodes);
+      setEdges(previous.edges);
+      setHasUnsavedLayout(true);
+      return stack.slice(0, -1);
+    });
+  }, [setEdges, setNodes]);
+
+  useEffect(() => {
+    const warnBeforeClose = (event) => {
+      if (!hasUnsavedLayout) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", warnBeforeClose);
+    return () => window.removeEventListener("beforeunload", warnBeforeClose);
+  }, [hasUnsavedLayout]);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "z") return;
+      event.preventDefault();
+      undoLastAction();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undoLastAction]);
+
+  const onNodesChange = useCallback(
+    (changes) => {
+      if (changes.some((change) => change.type === "position" && change.dragging === true)) {
+        pushUndoSnapshot();
+      }
+      reactFlowOnNodesChange(changes);
+      if (changes.some((change) => change.type === "position" || change.type === "dimensions")) {
+        setHasUnsavedLayout(true);
+      }
+    },
+    [pushUndoSnapshot, reactFlowOnNodesChange]
+  );
+
+  const onEdgesChange = useCallback(
+    (changes) => {
+      if (changes.some((change) => change.type === "remove")) {
+        pushUndoSnapshot();
+      }
+      reactFlowOnEdgesChange(changes);
+      setHasUnsavedLayout(true);
+    },
+    [pushUndoSnapshot, reactFlowOnEdgesChange]
+  );
+
+  const rotateNode = useCallback(
+    (nodeId) => {
+      pushUndoSnapshot();
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === nodeId
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  rotation: ((node.data.rotation ?? 0) + 90) % 360
+                }
+              }
+            : node
+        )
+      );
+      setHasUnsavedLayout(true);
+    },
+    [pushUndoSnapshot, setNodes]
+  );
+
+  const renderedEdges = useMemo(() => rerouteFlowEdges(nodes, rerouteHeatEdges(nodes, edges)), [edges, nodes]);
+
+  const renderedNodes = useMemo(() => {
+    const flowConnections = buildFlowConnectionMap(nodes, renderedEdges);
+    const heatHandleMap = buildHeatHandleMapFromEdges(renderedEdges);
+
+    return nodes.map((node) => ({
+      ...node,
+      data: {
+        ...node.data,
+        heat: heatFor(node.id, heatHandleMap),
+        flowConnections: flowConnections.get(node.id) ?? node.data.flowConnections ?? emptyFlowConnections(),
+        onRotate: rotateNode
+      }
+    }));
+  }, [nodes, renderedEdges, rotateNode]);
 
   const onConnect = useCallback(
-    (params) => setEdges((eds) => addEdge({ ...params, type: "smoothstep" }, eds)),
-    [setEdges]
+    (params) => {
+      pushUndoSnapshot();
+      setEdges((eds) => {
+        const edge = normalizedFlowConnection(params, nodes);
+        if (!edge) return eds;
+        return addEdge(edge, eds);
+      });
+      setHasUnsavedLayout(true);
+    },
+    [nodes, pushUndoSnapshot, setEdges]
   );
 
   const onDragStart = (event, nodeType) => {
+    setPendingComponentType(nodeType);
     event.dataTransfer.setData("application/reactflow", nodeType);
+    event.dataTransfer.setData("text/plain", nodeType);
     event.dataTransfer.effectAllowed = "move";
   };
 
   const onDrop = useCallback(
-    (event) => {
+    (event, position) => {
       event.preventDefault();
 
-      const type = event.dataTransfer.getData("application/reactflow");
+      const type = event.dataTransfer.getData("application/reactflow") || event.dataTransfer.getData("text/plain");
       if (!type) return;
 
-      const isPipe = type === "Pipe" || type === "Pump" || type === "Valve";
-      const newNode = isPipe
-        ? buildPipeNode({
-            id: getId(),
-            position: { x: event.clientX - 260, y: event.clientY - 60 },
-            identifier: type,
-            kind: "manual"
-          })
-        : buildFlowNode({
-            id: getId(),
-            position: { x: event.clientX - 260, y: event.clientY - 60 },
-            identifier: type
-          });
-
-      setNodes((nds) => nds.concat(newNode));
+      pushUndoSnapshot();
+      setNodes((nds) => nds.concat(buildManualComponent(type, position)));
+      setPendingComponentType("");
+      setHasUnsavedLayout(true);
     },
-    [setNodes]
+    [pushUndoSnapshot, setNodes]
+  );
+
+  const onPaneClick = useCallback(
+    (_event, position) => {
+      if (!pendingComponentType) return;
+      pushUndoSnapshot();
+      setNodes((nds) => nds.concat(buildManualComponent(pendingComponentType, position)));
+      setPendingComponentType("");
+      setHasUnsavedLayout(true);
+    },
+    [pendingComponentType, pushUndoSnapshot, setNodes]
   );
 
   const onDragOver = useCallback((event) => {
@@ -605,13 +990,20 @@ export default function App() {
       try {
         const xmlText = await file.text();
         const parsed = parseGeometryXml(xmlText);
+        const nextLayoutKey = layoutKeyForFile(file);
+        const storedLayout = readStoredLayout(nextLayoutKey);
 
-        setNodes(parsed.nodes);
+        setLayoutKey(nextLayoutKey);
+        setDefaultLayoutNodes(parsed.nodes);
+        setDefaultLayoutEdges(parsed.edges);
+        setNodes(applyStoredLayout(parsed.nodes, storedLayout));
         setEdges(parsed.edges);
         setModelStats(parsed.stats);
         setFitViewTrigger((count) => count + 1);
-        setImportStatus(`Loaded ${file.name}`);
+        setImportStatus(`Loaded ${file.name}${storedLayout ? " with saved layout" : ""}`);
         setActiveWorkspace("model");
+        setHasUnsavedLayout(false);
+        setUndoStack([]);
       } catch (error) {
         setImportStatus(error.message);
       }
@@ -656,6 +1048,35 @@ export default function App() {
     anchor.click();
 
     URL.revokeObjectURL(url);
+  };
+
+  const newCircuit = () => {
+    setLayoutKey(MANUAL_LAYOUT_KEY);
+    setDefaultLayoutNodes(initialNodes);
+    setDefaultLayoutEdges(initialEdges);
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+    setModelStats(null);
+    setImportStatus("Blank circuit workspace");
+    setActiveWorkspace("model");
+    setHasUnsavedLayout(false);
+    setUndoStack([]);
+  };
+
+  const saveLayout = () => {
+    saveStoredLayout(layoutKey, nodes);
+    setHasUnsavedLayout(false);
+    setImportStatus("Layout saved");
+  };
+
+  const restoreDefaultLayout = () => {
+    pushUndoSnapshot();
+    clearStoredLayout(layoutKey);
+    setNodes(defaultLayoutNodes);
+    setEdges(defaultLayoutEdges);
+    setFitViewTrigger((count) => count + 1);
+    setHasUnsavedLayout(true);
+    setImportStatus("Default layout restored. Save to keep it.");
   };
 
   const summaryItems = useMemo(() => {
@@ -731,6 +1152,27 @@ export default function App() {
           <div className="status-text">{importStatus}</div>
         </section>
 
+        <section className="panel">
+          <div className="panel-title">Circuit</div>
+          <button className="primary-button" onClick={newCircuit}>
+            New circuit
+          </button>
+          <button className="secondary-button secondary-button--inline" onClick={undoLastAction} disabled={!undoStack.length}>
+            Undo
+          </button>
+          <button className="secondary-button secondary-button--inline" onClick={saveLayout} disabled={!nodes.length}>
+            Save layout
+          </button>
+          <button
+            className="secondary-button secondary-button--inline"
+            onClick={restoreDefaultLayout}
+            disabled={!defaultLayoutNodes.length && !nodes.length}
+          >
+            Default layout
+          </button>
+          {hasUnsavedLayout && <div className="status-text status-text--warning">Unsaved layout changes</div>}
+        </section>
+
         {summaryItems.length > 0 && (
           <section className="panel metrics">
             {summaryItems.map(([label, value]) => (
@@ -746,16 +1188,29 @@ export default function App() {
           <div className="panel-title">Components</div>
           <div className="component-list">
             {componentTypes.map((component) => (
-              <button
+              <div
                 key={component}
-                className="component-chip"
+                className={`component-chip ${pendingComponentType === component ? "component-chip--active" : ""}`}
+                role="button"
+                tabIndex={0}
                 draggable
+                onClick={() => setPendingComponentType(component)}
                 onDragStart={(event) => onDragStart(event, component)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setPendingComponentType(component);
+                  }
+                }}
               >
-                {component}
-              </button>
+                <ComponentGlyph type={component} />
+                <span>{component}</span>
+              </div>
             ))}
           </div>
+          {pendingComponentType && (
+            <div className="status-text status-text--hint">Click the canvas to place {pendingComponentType}</div>
+          )}
         </section>
 
         <button className="secondary-button" onClick={exportJSON}>
@@ -781,13 +1236,14 @@ export default function App() {
 
         {activeWorkspace === "model" && (
           <ModelFlowCanvas
-            nodes={nodes}
-            edges={edges}
+            nodes={renderedNodes}
+            edges={renderedEdges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onDrop={onDrop}
             onDragOver={onDragOver}
+            onPaneClick={onPaneClick}
             fitViewTrigger={fitViewTrigger}
           />
         )}

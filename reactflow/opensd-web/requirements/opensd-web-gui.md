@@ -68,6 +68,36 @@ React Flow **Controls** and **MiniMap** shall remain available.
 
 ---
 
+### GUI-012 — Canvas undo (Must)
+
+The model canvas shall support undoing recent graph-edit actions with **Ctrl+Z**.
+
+**Acceptance:** Moving components, adding components, rotating components, connecting components, deleting components, and restoring default layout can be undone. A sidebar Undo button shall provide the same action.
+
+**Implementation:** Undo history in [src/App.jsx](../src/App.jsx).
+
+---
+
+### GUI-013 — Drag selection and delete (Must)
+
+The model canvas shall allow left-click drag selection of components and deletion of selected components.
+
+**Acceptance:** Dragging a selection rectangle selects multiple components; selected components can be moved together and deleted with Delete/Backspace.
+
+**Implementation:** React Flow selection settings in [src/ModelFlowCanvas.jsx](../src/ModelFlowCanvas.jsx).
+
+---
+
+### GUI-014 — Scrollable sidebar (Must)
+
+The left sidebar shall scroll vertically when controls exceed viewport height.
+
+**Acceptance:** Bottom controls remain reachable without browser zoom or refresh.
+
+**Implementation:** `.sidebar` in [src/App.css](../src/App.css).
+
+---
+
 ## 3. Layout
 
 ### GUI-020 — One horizontal row per circuit (Must)
@@ -120,6 +150,26 @@ Every pipe **upstream** and **downstream** fluid edge shall be drawn after all e
 
 ---
 
+### GUI-025 — Persistent component layout (Must)
+
+When users move components on the model canvas, the GUI shall preserve component positions for the same geometry file only after the user explicitly saves the layout.
+
+**Acceptance:** Re-importing the same XML file restores saved positions by stable component id after **Save layout**; unmatched new components fall back to automatic layout; refreshing or closing with unsaved layout changes raises a browser warning.
+
+**Implementation:** Local browser layout storage in [src/App.jsx](../src/App.jsx).
+
+---
+
+### GUI-026 — Circuit workspace controls (Must)
+
+The model workspace shall provide explicit controls to start a blank circuit and restore the imported/generated default layout.
+
+**Acceptance:** **New circuit** clears the model canvas without requiring browser refresh; **Default layout** restores the generated layout and clears the stored layout for the current geometry.
+
+**Implementation:** Circuit controls in [src/App.jsx](../src/App.jsx), fit behavior in [src/ModelFlowCanvas.jsx](../src/ModelFlowCanvas.jsx).
+
+---
+
 ## 4. Node appearance
 
 ### GUI-030 — Fluid nodes as circles (Must)
@@ -152,7 +202,9 @@ On-canvas text shall show **identifiers only** (truncated when long).
 
 **Acceptance:** No ncell, diameter, volume, etc. on the shape itself.
 
-**Implementation:** `shortLabel()` in [src/NodeTooltip.jsx](../src/NodeTooltip.jsx).
+**Acceptance:** Fluid node identifiers appear below the node circle so the node symbol can remain compact.
+
+**Implementation:** `shortLabel()` in [src/labelUtils.js](../src/labelUtils.js).
 
 ---
 
@@ -166,31 +218,53 @@ Full attributes shall appear in a **tooltip** on hover.
 
 ---
 
+### GUI-035 — Selected component rotation (Must)
+
+When a component is selected, the GUI shall show a nearby clockwise rotate-icon control that rotates the component in 90 degree steps.
+
+**Acceptance:** Selecting a pipe or other non-circular component reveals the rotate button; circular fluid nodes do not show rotation controls; pipe flow handles follow the pipe orientation.
+
+**Implementation:** Rotate controls in [src/PipeNode.jsx](../src/PipeNode.jsx), [src/BcNode.jsx](../src/BcNode.jsx); rotation state in [src/App.jsx](../src/App.jsx).
+
+---
+
+### GUI-036 — Component palette symbols (Must)
+
+The component palette shall show compact symbols that match the component shape used on the canvas.
+
+**Acceptance:** Fluid nodes use circle glyphs; pipes/pumps/valves/hslabs/BCs use rectangle glyphs matching their canvas styling.
+
+**Implementation:** Palette glyphs in [src/App.jsx](../src/App.jsx), styles in [src/App.css](../src/App.css).
+
+---
+
 ## 5. Fluid edges
 
-### GUI-040 — Left/right fluid handles (Must)
+### GUI-040 — Multi-pipe fluid node connectivity (Must)
 
-Fluid connections shall use **left** (in) and **right** (out) handles on nodes and pipes (short sides of pipe rectangles).
+Fluid nodes shall act as junctions and may connect to any number of pipes. Fluid nodes shall not display upstream/downstream arrow glyphs of their own.
 
-**Implementation:** `flow-in` / `flow-out` handles in [src/FlowNode.jsx](../src/FlowNode.jsx), [src/PipeNode.jsx](../src/PipeNode.jsx).
+**Acceptance:** Multiple pipes can connect to the same fluid node; fluid flow connections use unobtrusive handles rather than visible arrow glyphs.
+
+**Implementation:** Invisible `flow-in` / `flow-out` handles in [src/FlowNode.jsx](../src/FlowNode.jsx); pipe-side flow state in [src/App.jsx](../src/App.jsx).
 
 ---
 
 ### GUI-041 — Straight blue fluid edges (Must)
 
-Fluid edges shall be **straight**, solid **blue** lines.
+Fluid edges shall be **straight**, solid **blue** lines with direction arrowheads at the downstream end. They shall choose the nearest left/right handles from current component positions.
 
-**Implementation:** `flowEdge()`, [src/App.css](../src/App.css).
+**Implementation:** `flowEdge()` in [src/App.jsx](../src/App.jsx), `FLOW_MARKER` in [src/edgeUtils.js](../src/edgeUtils.js), [src/App.css](../src/App.css).
 
 ---
 
-### GUI-042 — Fluid direction arrows (Must)
+### GUI-042 — No pipe-attached fluid arrows (Must)
 
-Fluid edges shall show **direction** with small **open** (unfilled) arrowheads at the downstream end.
+Pipes shall not show extra attached upstream/downstream arrow glyphs on the component body.
 
-**Acceptance:** `MarkerType.Arrow`, reduced size (~10px).
+**Acceptance:** Pipe components expose only their normal short-edge flow handles; no dashed or solid arrow stubs are rendered on unconnected or connected pipes.
 
-**Implementation:** [src/edgeUtils.js](../src/edgeUtils.js) `FLOW_MARKER`.
+**Implementation:** [src/PipeNode.jsx](../src/PipeNode.jsx), flow handle styles in [src/App.css](../src/App.css).
 
 ---
 
@@ -236,9 +310,9 @@ Heat transfer connections involving hslabs shall use **solid orange** lines with
 
 ### GUI-061 — Pipe heat from long sides (Must)
 
-Heat connections to/from **pipes** shall attach to **top** and **bottom** handles (long sides of the rectangle). Fluid flow remains on left/right.
+Heat connections to/from **pipes** and hslabs shall attach to the nearest **top** or **bottom** handle based on their relative canvas positions. Heat edges shall be straight lines without enforced minimum bend length. Fluid flow remains on pipe short sides.
 
-**Implementation:** `ht-in` / `ht-out` on [src/PipeNode.jsx](../src/PipeNode.jsx); `resolveHeatHandles()` in [src/edgeUtils.js](../src/edgeUtils.js).
+**Implementation:** Dynamic heat handle selection in [src/App.jsx](../src/App.jsx); `ht-top-*` / `ht-bottom-*` handles on [src/PipeNode.jsx](../src/PipeNode.jsx) and [src/FlowNode.jsx](../src/FlowNode.jsx).
 
 ---
 
@@ -272,7 +346,19 @@ Layer information shall be listed in the **hslab hover tooltip** (count, layer n
 
 ---
 
-## 8. Postprocess view
+## 8. Requirements management
+
+### GUI-080 — Browser requirements management (Should)
+
+The GUI should provide a browser-based way to view and edit project requirements, so requirement updates are easier than direct Markdown file editing.
+
+**Acceptance:** Users can browse requirement IDs, edit requirement text, and save changes back to the canonical requirements document or an equivalent structured source.
+
+**Implementation:** Not implemented yet.
+
+---
+
+## 9. Postprocess view
 
 ### GUI-070 — Circuit and pipe selection (Must)
 
@@ -290,7 +376,7 @@ When enthalpy is available, GUI may plot **temperature from total enthalpy** usi
 
 ---
 
-## 9. Non-goals
+## 10. Non-goals
 
 ### GUI-090 — Not a solver (Must)
 
@@ -311,16 +397,25 @@ Internal hslab layer networks shall not be expanded on the main canvas (see GUI-
 | GUI-001 | Model + Postprocess tabs | `App.jsx` |
 | GUI-002 | XML import | `App.jsx` |
 | GUI-010 | Fit/zoom toolbar | `ModelFlowCanvas.jsx` |
+| GUI-012 | Canvas undo | `App.jsx` |
+| GUI-013 | Drag selection and delete | `ModelFlowCanvas.jsx` |
+| GUI-014 | Scrollable sidebar | `App.css` |
 | GUI-020 | Row per circuit | `circuitLayout.js` |
 | GUI-021 | Horizontal chain | `circuitLayout.js` |
 | GUI-024 | All pipe edges | `App.jsx` |
+| GUI-025 | Persistent layout | `App.jsx` |
+| GUI-026 | Circuit workspace controls | `App.jsx`, `ModelFlowCanvas.jsx` |
 | GUI-030 | Circle nodes | `FlowNode.jsx` |
 | GUI-031 | Rectangle pipes | `PipeNode.jsx` |
 | GUI-034 | Hover tooltips | `NodeTooltip.jsx` |
-| GUI-042 | Fluid arrows | `edgeUtils.js` |
+| GUI-035 | Rotate selected component | `PipeNode.jsx`, `BcNode.jsx`, `App.jsx` |
+| GUI-036 | Component palette symbols | `App.jsx`, `App.css` |
+| GUI-040 | Multi-pipe fluid nodes | `FlowNode.jsx`, `App.jsx` |
+| GUI-042 | No pipe-attached fluid arrows | `PipeNode.jsx`, `App.css` |
 | GUI-050 | Vertical BCs | `BcNode.jsx`, `App.jsx` |
 | GUI-060 | Solid orange heat | `edgeUtils.js`, `App.css` |
-| GUI-061 | Top/bottom heat on pipes | `PipeNode.jsx` |
+| GUI-061 | Dynamic top/bottom heat handles | `App.jsx`, `PipeNode.jsx`, `FlowNode.jsx` |
 | GUI-062 | Conditional heat handles | `edgeUtils.js` |
 | GUI-063 | No layer nodes | `App.jsx` |
 | GUI-064 | Layers in tooltip | `App.jsx` |
+| GUI-080 | Browser requirements management | Not implemented |
