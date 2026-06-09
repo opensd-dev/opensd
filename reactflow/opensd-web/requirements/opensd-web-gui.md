@@ -350,11 +350,11 @@ Layer information shall be listed in the **hslab hover tooltip** (count, layer n
 
 ### GUI-080 — Browser requirements management (Should)
 
-The GUI should provide a browser-based way to view and edit project requirements, so requirement updates are easier than direct Markdown file editing.
+The GUI should provide a browser-based way to view project requirements. Requirement edits shall be made in the native Markdown files.
 
-**Acceptance:** Users can browse requirement IDs, edit requirement text, and save changes back to the canonical requirements document or an equivalent structured source.
+**Acceptance:** Users can browse requirement IDs and read requirement text from the bundled canonical requirements document; no browser edit or save controls are provided.
 
-**Implementation:** Not implemented yet.
+**Implementation:** Requirements workspace in [src/App.jsx](../src/App.jsx), styles in [src/App.css](../src/App.css).
 
 ---
 
@@ -418,4 +418,4 @@ Internal hslab layer networks shall not be expanded on the main canvas (see GUI-
 | GUI-062 | Conditional heat handles | `edgeUtils.js` |
 | GUI-063 | No layer nodes | `App.jsx` |
 | GUI-064 | Layers in tooltip | `App.jsx` |
-| GUI-080 | Browser requirements management | Not implemented |
+| GUI-080 | Browser requirements management | `App.jsx`, `App.css` |

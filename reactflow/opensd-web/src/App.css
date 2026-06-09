@@ -455,6 +455,184 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+.requirements-view {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px;
+  background: #f4f7fb;
+  overflow: hidden;
+}
+
+.requirements-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #e1e6ef;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.requirements-shell {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid #e1e6ef;
+  border-radius: 7px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.requirements-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+  border-right: 1px solid #e1e6ef;
+  background: #fbfcfe;
+}
+
+.requirements-nav-section {
+  display: grid;
+  gap: 2px;
+  padding: 8px 0;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.requirements-nav-section h3 {
+  margin: 0;
+  padding: 6px 12px 5px;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.requirements-list button {
+  display: grid;
+  gap: 3px;
+  padding: 8px 12px 8px 22px;
+  border: 0;
+  color: #475467;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.requirements-list button:hover,
+.requirements-list button.active {
+  background: #eef5ff;
+}
+
+.requirements-list button.active {
+  color: #175cc7;
+  box-shadow: inset 3px 0 0 #1f6feb;
+}
+
+.requirements-list strong {
+  color: #101827;
+  font-size: 13px;
+}
+
+.requirements-list span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.requirements-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  padding: 16px;
+  overflow: auto;
+}
+
+.requirements-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+}
+
+.requirements-editor-header span {
+  display: block;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.requirements-editor-header em {
+  display: block;
+  margin-bottom: 4px;
+  color: #475467;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.requirements-editor-header h2 {
+  margin: 2px 0 0;
+  color: #101827;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.requirements-editor-header strong {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border: 1px solid #bdd7ff;
+  border-radius: 6px;
+  color: #175cc7;
+  background: #eef5ff;
+  font-size: 12px;
+}
+
+.requirements-body {
+  width: 100%;
+  border: 1px solid #cdd5df;
+  border-radius: 6px;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  background: #ffffff;
+  color: #202938;
+  font: inherit;
+  font-size: 13px;
+  min-height: 0;
+  margin: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  line-height: 1.5;
+}
+
+.requirements-body p {
+  margin: 0;
+}
+
+.requirements-body p + p {
+  margin-top: 12px;
+}
+
+.requirements-body code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: #eef2f7;
+  color: #344054;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+}
+
+.requirements-body a {
+  color: #1f6feb;
+  font-weight: 650;
+}
+
 .react-flow__pane {
   cursor: grab;
 }

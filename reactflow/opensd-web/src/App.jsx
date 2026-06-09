@@ -9,6 +9,7 @@ import {
 import "reactflow/dist/style.css";
 import "./App.css";
 import ModelFlowCanvas from "./ModelFlowCanvas.jsx";
+import guiRequirementsMarkdown from "../requirements/opensd-web-gui.md?raw";
 import {
   CIRCUIT_ROW_GAP,
   PIPE_STEP,
@@ -565,6 +566,144 @@ function LinePlot({ data, variableLabel }) {
   );
 }
 
+function parseRequirementSections(markdown) {
+  const sectionPattern = /^## (?!Appendix\b)(.+?)\s*$/gm;
+  const anySectionPattern = /^## .+?\s*$/gm;
+  const headingPattern = /^### (GUI-\d{3})\s+[—-]\s+(.+?)\s+\((Must|Should)\)\s*$/gm;
+  const sectionMatches = Array.from(markdown.matchAll(sectionPattern));
+  const anySectionMatches = Array.from(markdown.matchAll(anySectionPattern));
+  const matches = Array.from(markdown.matchAll(headingPattern));
+
+  return matches.map((match, index) => {
+    const nextMatch = matches[index + 1];
+    const parentSection = sectionMatches.findLast((sectionMatch) => sectionMatch.index < match.index);
+    const nextSection = anySectionMatches.find((sectionMatch) => sectionMatch.index > match.index);
+    const sectionStart = match.index;
+    const bodyStart = match.index + match[0].length;
+    const sectionEnd = Math.min(
+      ...[nextMatch?.index, nextSection?.index, markdown.length].filter((position) => position != null)
+    );
+    const body = markdown.slice(bodyStart, sectionEnd).replace(/^\r?\n/, "").replace(/\r?\n---\s*$/m, "").trim();
+
+    return {
+      id: match[1],
+      summary: match[2],
+      priority: match[3],
+      sectionTitle: parentSection?.[1] ?? "Requirements",
+      body,
+      sectionStart,
+      sectionEnd
+    };
+  });
+}
+
+function renderMarkdownInline(text) {
+  const parts = [];
+  const pattern = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
+  let cursor = 0;
+
+  for (const match of text.matchAll(pattern)) {
+    if (match.index > cursor) {
+      parts.push(text.slice(cursor, match.index));
+    }
+
+    const token = match[0];
+    const key = `${match.index}-${token}`;
+
+    if (token.startsWith("**")) {
+      parts.push(<strong key={key}>{token.slice(2, -2)}</strong>);
+    } else if (token.startsWith("`")) {
+      parts.push(<code key={key}>{token.slice(1, -1)}</code>);
+    } else {
+      const linkMatch = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      parts.push(
+        <a key={key} href={linkMatch[2]}>
+          {linkMatch[1]}
+        </a>
+      );
+    }
+
+    cursor = match.index + token.length;
+  }
+
+  if (cursor < text.length) {
+    parts.push(text.slice(cursor));
+  }
+
+  return parts;
+}
+
+function MarkdownViewer({ text }) {
+  return (
+    <div className="requirements-body">
+      {text.split(/\r?\n+/).filter(Boolean).map((block, index) => (
+        <p key={`${index}-${block.slice(0, 16)}`}>{renderMarkdownInline(block)}</p>
+      ))}
+    </div>
+  );
+}
+
+function RequirementManager({ requirements, selectedId, onSelect }) {
+  const selectedRequirement = requirements.find((requirement) => requirement.id === selectedId);
+  const sections = requirements.reduce((groups, requirement) => {
+    const section = groups.find((group) => group.title === requirement.sectionTitle);
+    if (section) {
+      section.requirements.push(requirement);
+    } else {
+      groups.push({ title: requirement.sectionTitle, requirements: [requirement] });
+    }
+    return groups;
+  }, []);
+
+  return (
+    <section className="workspace-pane requirements-view">
+      <div className="requirements-toolbar">
+        <div className="panel-title">Project Requirements</div>
+        <div className="status-strip">Read-only view of bundled GUI requirements</div>
+      </div>
+
+      <div className="requirements-shell">
+        <nav className="requirements-list" aria-label="Requirements">
+          {sections.map((section) => (
+            <div key={section.title} className="requirements-nav-section">
+              <h3>{section.title}</h3>
+              {section.requirements.map((requirement) => (
+                <button
+                  key={requirement.id}
+                  className={requirement.id === selectedId ? "active" : ""}
+                  onClick={() => onSelect(requirement.id)}
+                >
+                  <strong>{requirement.id}</strong>
+                  <span>{requirement.summary}</span>
+                </button>
+              ))}
+            </div>
+          ))}
+        </nav>
+
+        <div className="requirements-editor">
+          {selectedRequirement ? (
+            <>
+              <div className="requirements-editor-header">
+                <div>
+                  <em>{selectedRequirement.sectionTitle}</em>
+                  <span>{selectedRequirement.id}</span>
+                  <h2>{selectedRequirement.summary}</h2>
+                </div>
+                <strong>{selectedRequirement.priority}</strong>
+              </div>
+
+              <MarkdownViewer text={selectedRequirement.body} />
+            </>
+          ) : (
+            <div className="empty-plot">No requirements found in this Markdown document.</div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ComponentGlyph({ type }) {
   const kind = componentKindForType(type);
 
@@ -831,6 +970,23 @@ export default function App() {
   const [hasUnsavedLayout, setHasUnsavedLayout] = useState(false);
   const [pendingComponentType, setPendingComponentType] = useState("");
   const [undoStack, setUndoStack] = useState([]);
+  const [selectedRequirementId, setSelectedRequirementId] = useState("GUI-080");
+
+  const parsedRequirements = useMemo(() => parseRequirementSections(guiRequirementsMarkdown), []);
+
+  const selectedRequirement = useMemo(() => {
+    return parsedRequirements.find((requirement) => requirement.id === selectedRequirementId) ?? parsedRequirements[0] ?? null;
+  }, [parsedRequirements, selectedRequirementId]);
+
+  const selectRequirement = useCallback(
+    (requirementId) => {
+      const nextRequirement = parsedRequirements.find((requirement) => requirement.id === requirementId);
+      if (!nextRequirement) return;
+
+      setSelectedRequirementId(nextRequirement.id);
+    },
+    [parsedRequirements]
+  );
 
   const pushUndoSnapshot = useCallback(() => {
     setUndoStack((stack) => [...stack, cloneGraphState(nodes, edges)].slice(-MAX_UNDO_STEPS));
@@ -1232,6 +1388,12 @@ export default function App() {
           >
             Postprocess
           </button>
+          <button
+            className={activeWorkspace === "requirements" ? "active" : ""}
+            onClick={() => setActiveWorkspace("requirements")}
+          >
+            Requirements
+          </button>
         </div>
 
         {activeWorkspace === "model" && (
@@ -1333,6 +1495,14 @@ export default function App() {
               )}
             </div>
           </section>
+        )}
+
+        {activeWorkspace === "requirements" && (
+          <RequirementManager
+            requirements={parsedRequirements}
+            selectedId={selectedRequirement?.id ?? ""}
+            onSelect={selectRequirement}
+          />
         )}
       </main>
     </div>
