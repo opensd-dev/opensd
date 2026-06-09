@@ -179,6 +179,14 @@ function markHeatEndpoint(flags, nodeId, handleId) {
   if (!flags.has(nodeId)) flags.set(nodeId, emptyHeat());
   const entry = flags.get(nodeId);
 
+  if (handleId.startsWith("ht-top-") || handleId.startsWith("ht-bottom-")) {
+    entry.htTopIn = true;
+    entry.htTopOut = true;
+    entry.htBottomIn = true;
+    entry.htBottomOut = true;
+    return;
+  }
+
   if (handleId === "ht-top-in") entry.htTopIn = true;
   if (handleId === "ht-top-out") entry.htTopOut = true;
   if (handleId === "ht-bottom-in") entry.htBottomIn = true;
