@@ -154,9 +154,9 @@ Every pipe **upstream** and **downstream** fluid edge shall be drawn after all e
 
 When users move components on the model canvas, the GUI shall preserve component positions for the same geometry file only after the user explicitly saves the layout.
 
-**Acceptance:** Re-importing the same XML file restores saved positions by stable component id after **Save layout**; unmatched new components fall back to automatic layout; refreshing or closing with unsaved layout changes raises a browser warning.
+**Acceptance:** Re-importing the same XML file restores locally saved positions by stable component id after **Save layout**; users can export/import a `.layout.json` sidecar to share positions across computers; unmatched new components fall back to automatic layout; refreshing or closing with unsaved layout changes raises a browser warning.
 
-**Implementation:** Local browser layout storage in [src/App.jsx](../src/App.jsx).
+**Implementation:** Local browser layout storage plus JSON sidecar import/export in [src/App.jsx](../src/App.jsx).
 
 ---
 

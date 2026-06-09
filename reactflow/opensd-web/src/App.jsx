@@ -262,6 +262,11 @@ function layoutKeyForFile(file) {
   return file?.name ? `geometry:${file.name}` : MANUAL_LAYOUT_KEY;
 }
 
+function layoutFilename(layoutKey) {
+  const baseName = layoutKey.startsWith("geometry:") ? layoutKey.slice("geometry:".length) : "opensd_geometry";
+  return `${baseName.replace(/\.[^.]+$/, "").replace(/[^a-z0-9._-]+/gi, "_")}.layout.json`;
+}
+
 function readStoredLayouts() {
   try {
     const stored = window.localStorage.getItem(LAYOUT_STORAGE_KEY);
@@ -278,6 +283,18 @@ function readStoredLayout(layoutKey) {
 function saveStoredLayout(layoutKey, nodes) {
   if (!layoutKey || !nodes.length) return;
 
+  const layout = serializeLayout(nodes);
+  const layouts = readStoredLayouts();
+  layouts[layoutKey] = layout;
+
+  try {
+    window.localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layouts));
+  } catch {
+    // Layout persistence is helpful, but storage limits should not block graph editing.
+  }
+}
+
+function serializeLayout(nodes, source = "opensd-web") {
   const layout = {};
   for (const node of nodes) {
     layout[node.id] = {
@@ -286,17 +303,12 @@ function saveStoredLayout(layoutKey, nodes) {
     };
   }
 
-  const layouts = readStoredLayouts();
-  layouts[layoutKey] = {
+  return {
+    schema: "opensd-web-layout/v1",
+    source,
     savedAt: new Date().toISOString(),
     nodes: layout
   };
-
-  try {
-    window.localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layouts));
-  } catch {
-    // Layout persistence is helpful, but storage limits should not block graph editing.
-  }
 }
 
 function applyStoredLayout(nodes, storedLayout) {
@@ -960,6 +972,7 @@ function parseGeometryXml(xmlText) {
 export default function App() {
   const fileInput = useRef(null);
   const hdf5Input = useRef(null);
+  const layoutInput = useRef(null);
   const [nodes, setNodes, reactFlowOnNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, reactFlowOnEdgesChange] = useEdgesState(initialEdges);
   const [defaultLayoutNodes, setDefaultLayoutNodes] = useState(initialNodes);
@@ -1233,6 +1246,48 @@ export default function App() {
     setImportStatus("Layout saved");
   };
 
+  const exportLayout = () => {
+    if (!nodes.length) return;
+
+    const blob = new Blob([JSON.stringify(serializeLayout(nodes, layoutKey), null, 2)], {
+      type: "application/json"
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+
+    anchor.href = url;
+    anchor.download = layoutFilename(layoutKey);
+    anchor.click();
+
+    URL.revokeObjectURL(url);
+    setImportStatus("Layout sidecar exported");
+  };
+
+  const importLayout = async (file) => {
+    if (!file) return;
+
+    try {
+      const layout = JSON.parse(await file.text());
+      if (!layout?.nodes || typeof layout.nodes !== "object") {
+        throw new Error("Layout file does not contain node positions.");
+      }
+
+      pushUndoSnapshot();
+      const nextNodes = applyStoredLayout(nodes, layout);
+      setNodes(nextNodes);
+      saveStoredLayout(layoutKey, nextNodes);
+      setHasUnsavedLayout(false);
+      setImportStatus(`Imported layout ${file.name}`);
+      setFitViewTrigger((count) => count + 1);
+    } catch (error) {
+      setImportStatus(error.message);
+    } finally {
+      if (layoutInput.current) {
+        layoutInput.current.value = "";
+      }
+    }
+  };
+
   const restoreDefaultLayout = () => {
     pushUndoSnapshot();
     clearStoredLayout(layoutKey);
@@ -1310,6 +1365,13 @@ export default function App() {
             accept=".xml,text/xml,application/xml"
             onChange={(event) => importGeometry(event.target.files?.[0])}
           />
+          <input
+            ref={layoutInput}
+            className="file-input"
+            type="file"
+            accept=".json,application/json"
+            onChange={(event) => importLayout(event.target.files?.[0])}
+          />
           <button className="primary-button" onClick={() => fileInput.current?.click()}>
             Import XML
           </button>
@@ -1326,6 +1388,12 @@ export default function App() {
           </button>
           <button className="secondary-button secondary-button--inline" onClick={saveLayout} disabled={!nodes.length}>
             Save layout
+          </button>
+          <button className="secondary-button secondary-button--inline" onClick={exportLayout} disabled={!nodes.length}>
+            Export layout
+          </button>
+          <button className="secondary-button secondary-button--inline" onClick={() => layoutInput.current?.click()} disabled={!nodes.length}>
+            Import layout
           </button>
           <button
             className="secondary-button secondary-button--inline"
