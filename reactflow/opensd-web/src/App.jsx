@@ -231,25 +231,33 @@ function rerouteHeatEdges(nodes, edges) {
   });
 }
 
-function flowHandlesFromPositions(source, target, positionById) {
+function flowHandlesFromPositions(source, target, positionById, nodeTypeById) {
   const sourceX = positionById.get(source)?.x ?? 0;
   const targetX = positionById.get(target)?.x ?? sourceX;
   const targetIsRight = targetX >= sourceX;
+  const sourceIsPipe = nodeTypeById.get(source) === "pipe";
+  const targetIsPipe = nodeTypeById.get(target) === "pipe";
 
-  return targetIsRight
+  const positionHandles = targetIsRight
     ? { sourceHandle: "flow-out", targetHandle: "flow-in" }
     : { sourceHandle: "flow-in", targetHandle: "flow-out" };
+
+  return {
+    sourceHandle: sourceIsPipe ? "flow-out" : positionHandles.sourceHandle,
+    targetHandle: targetIsPipe ? "flow-in" : positionHandles.targetHandle
+  };
 }
 
 function rerouteFlowEdges(nodes, edges) {
   const positionById = new Map(nodes.map((node) => [node.id, node.position]));
+  const nodeTypeById = new Map(nodes.map((node) => [node.id, node.type]));
 
   return edges.map((edge) => {
     if (edge.className !== "flow-edge") return edge;
 
     return {
       ...edge,
-      ...flowHandlesFromPositions(edge.source, edge.target, positionById)
+      ...flowHandlesFromPositions(edge.source, edge.target, positionById, nodeTypeById)
     };
   });
 }
