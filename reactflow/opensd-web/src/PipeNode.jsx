@@ -11,6 +11,13 @@ const flowPositions = {
   270: { in: Position.Bottom, out: Position.Top }
 };
 
+const heatLongSidePositions = {
+  0: { top: Position.Top, bottom: Position.Bottom },
+  90: { top: Position.Left, bottom: Position.Right },
+  180: { top: Position.Bottom, bottom: Position.Top },
+  270: { top: Position.Right, bottom: Position.Left }
+};
+
 function RotateButton({ id, data, selected }) {
   if (!selected || !data.onRotate) return null;
 
@@ -37,6 +44,7 @@ function PipeNode({ id, data, selected }) {
   const rotation = ((data.rotation ?? 0) % 360 + 360) % 360;
   const orientation = flowPositions[rotation] ? rotation : 0;
   const handles = flowPositions[orientation];
+  const heatHandles = heatLongSidePositions[orientation];
   const showFlowHandles = !["hslab", "layer"].includes(kind);
 
   return (
@@ -55,22 +63,22 @@ function PipeNode({ id, data, selected }) {
         </>
       )}
       {heat.htIn && (
-        <Handle type="target" id="ht-in" position={Position.Top} className="handle-heat" />
+        <Handle type="target" id="ht-in" position={heatHandles.top} className="handle-heat" />
       )}
       {heat.htOut && (
-        <Handle type="source" id="ht-out" position={Position.Bottom} className="handle-heat" />
+        <Handle type="source" id="ht-out" position={heatHandles.bottom} className="handle-heat" />
       )}
       {heat.htTopIn && (
-        <Handle type="target" id="ht-top-in" position={Position.Top} className="handle-heat" />
+        <Handle type="target" id="ht-top-in" position={heatHandles.top} className="handle-heat" />
       )}
       {heat.htTopOut && (
-        <Handle type="source" id="ht-top-out" position={Position.Top} className="handle-heat" />
+        <Handle type="source" id="ht-top-out" position={heatHandles.top} className="handle-heat" />
       )}
       {heat.htBottomIn && (
-        <Handle type="target" id="ht-bottom-in" position={Position.Bottom} className="handle-heat" />
+        <Handle type="target" id="ht-bottom-in" position={heatHandles.bottom} className="handle-heat" />
       )}
       {heat.htBottomOut && (
-        <Handle type="source" id="ht-bottom-out" position={Position.Bottom} className="handle-heat" />
+        <Handle type="source" id="ht-bottom-out" position={heatHandles.bottom} className="handle-heat" />
       )}
       {heat.htSideOut && (
         <Handle
