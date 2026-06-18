@@ -38,13 +38,13 @@ Users shall import **HDF5** result files for postprocessing.
 
 ---
 
-### GUI-004 — Export graph JSON (Should)
+### GUI-004 — Export OpenSD geometry XML (Should)
 
-Users may export the current React Flow node/edge list as JSON.
+Users may export the current model as OpenSD `geometry.xml`, including edited component attributes and live connectivity.
 
-**Acceptance:** Download `opensd_flow.json` from sidebar control.
+**Acceptance:** Export the model as an XML browser download. The browser controls the destination and duplicate-file naming. An unchanged import/export preserves the original XML bytes.
 
-**Implementation:** [src/App.jsx](../src/App.jsx) `exportJSON`.
+**Implementation:** [src/App.jsx](../src/App.jsx) `exportGeometry`, matching the serialization model in `opensd/geometry.py` and component `to_xml_element()` methods.
 
 ---
 
@@ -68,13 +68,13 @@ React Flow **Controls** and **MiniMap** shall remain available.
 
 ---
 
-### GUI-012 — Canvas undo (Must)
+### GUI-012 — Canvas undo/redo (Must)
 
-The model canvas shall support undoing recent graph-edit actions with **Ctrl+Z**.
+The model canvas shall support undoing recent graph-edit actions with **Ctrl+Z** and redoing them with **Ctrl+Y** or **Ctrl+Shift+Z**.
 
-**Acceptance:** Moving components, adding components, rotating components, connecting components, deleting components, and restoring default layout can be undone. A sidebar Undo button shall provide the same action.
+**Acceptance:** Moving components, adding components, rotating components, connecting components, deleting components, and restoring default layout can be undone and redone. Sidebar Undo and Redo buttons shall provide the same actions.
 
-**Implementation:** Undo history in [src/App.jsx](../src/App.jsx).
+**Implementation:** Undo/redo history in [src/App.jsx](../src/App.jsx).
 
 ---
 
@@ -170,6 +170,36 @@ The model workspace shall provide explicit controls to start a blank circuit and
 
 ---
 
+### GUI-027 — Copy/export selected figure (Should)
+
+The model workspace should allow selected components to be copied or exported as a figure for use in external applications such as PowerPoint, Word, and Paint.
+
+**Acceptance:** Selecting one or more components and pressing **Ctrl+C**, or choosing **Copy figure**, places a PNG image of the selected canvas region on the system clipboard where supported. Choosing **Export PNG**, or right-clicking the selected components and choosing export, downloads a PNG. Connections between selected components are included where available.
+
+**Implementation:** Clipboard image export in [src/App.jsx](../src/App.jsx).
+
+---
+
+### GUI-029 — Duplicate selected components (Should)
+
+The model workspace should allow selected components to be copied and pasted within the same canvas.
+
+**Acceptance:** Selecting components and pressing **Ctrl+C** stores an internal graph copy. Pressing **Ctrl+V** creates new copied components with preserved internal connections and a slight positional offset. The duplicated components become selected and the action participates in undo/redo.
+
+**Implementation:** Internal graph clipboard in [src/App.jsx](../src/App.jsx).
+
+---
+
+### GUI-028 — Component alignment tools (Should)
+
+The model workspace should provide diagramming alignment controls similar to PowerPoint or Flownex.
+
+**Acceptance:** Selected components can be aligned left/right/center/top/bottom/middle. Three or more selected components can be distributed horizontally or vertically. Alignment actions participate in undo/redo.
+
+**Implementation:** Selection layout tools in [src/App.jsx](../src/App.jsx), controls styled in [src/App.css](../src/App.css).
+
+---
+
 ## 4. Node appearance
 
 ### GUI-030 — Fluid nodes as circles (Must)
@@ -242,17 +272,17 @@ The component palette shall show compact symbols that match the component shape 
 
 ### GUI-040 — Multi-pipe fluid node connectivity (Must)
 
-Fluid nodes shall act as junctions and may connect to any number of pipes. Fluid nodes shall not display upstream/downstream arrow glyphs of their own.
+Fluid nodes shall act as junctions and may connect to any number of pipes. Fluid nodes shall not display upstream/downstream arrow glyphs of their own. A fluid edge shall not connect a node to itself.
 
-**Acceptance:** Multiple pipes can connect to the same fluid node; fluid flow connections use unobtrusive handles rather than visible arrow glyphs.
+**Acceptance:** Multiple pipes can connect to the same fluid node; fluid flow connections use unobtrusive handles rather than visible arrow glyphs; attempts to connect from and to the same node are rejected.
 
-**Implementation:** Invisible `flow-in` / `flow-out` handles in [src/FlowNode.jsx](../src/FlowNode.jsx); pipe-side flow state in [src/App.jsx](../src/App.jsx).
+**Implementation:** Invisible four-sided `flow-*` handles in [src/FlowNode.jsx](../src/FlowNode.jsx); pipe-side flow state in [src/App.jsx](../src/App.jsx).
 
 ---
 
 ### GUI-041 — Straight blue fluid edges (Must)
 
-Fluid edges shall be **straight**, solid **blue** lines with direction arrowheads at the downstream end. They shall choose the nearest left/right handles from current component positions.
+Fluid edges shall be **straight**, solid **blue** lines with direction arrowheads at the downstream end. They shall choose the nearest top/bottom/left/right fluid-node handles from current component positions. Pipe endpoints meaningfully offset left/right from a fluid node shall keep left/right handles even when vertical offset is larger; pipe endpoints nearly centered above/below the node shall use top/bottom. When exactly two fluid edges prefer the same node-side handle, they shall use different sides where possible. With three or more fluid edges, each edge shall keep its natural side, using offset handle positions on the same side when helpful.
 
 **Implementation:** `flowEdge()` in [src/App.jsx](../src/App.jsx), `FLOW_MARKER` in [src/edgeUtils.js](../src/edgeUtils.js), [src/App.css](../src/App.css).
 
@@ -397,7 +427,7 @@ Internal hslab layer networks shall not be expanded on the main canvas (see GUI-
 | GUI-001 | Model + Postprocess tabs | `App.jsx` |
 | GUI-002 | XML import | `App.jsx` |
 | GUI-010 | Fit/zoom toolbar | `ModelFlowCanvas.jsx` |
-| GUI-012 | Canvas undo | `App.jsx` |
+| GUI-012 | Canvas undo/redo | `App.jsx` |
 | GUI-013 | Drag selection and delete | `ModelFlowCanvas.jsx` |
 | GUI-014 | Scrollable sidebar | `App.css` |
 | GUI-020 | Row per circuit | `circuitLayout.js` |
@@ -405,6 +435,9 @@ Internal hslab layer networks shall not be expanded on the main canvas (see GUI-
 | GUI-024 | All pipe edges | `App.jsx` |
 | GUI-025 | Persistent layout | `App.jsx` |
 | GUI-026 | Circuit workspace controls | `App.jsx`, `ModelFlowCanvas.jsx` |
+| GUI-027 | Copy/export selected figure | `App.jsx` |
+| GUI-028 | Alignment tools | `App.jsx`, `App.css` |
+| GUI-029 | Duplicate selected components | `App.jsx` |
 | GUI-030 | Circle nodes | `FlowNode.jsx` |
 | GUI-031 | Rectangle pipes | `PipeNode.jsx` |
 | GUI-034 | Hover tooltips | `NodeTooltip.jsx` |

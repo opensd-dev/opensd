@@ -20,9 +20,13 @@ function ModelFlowInner({
   onNodesChange,
   onEdgesChange,
   onConnect,
+  isValidConnection,
   onDrop,
   onDragOver,
   onPaneClick,
+  onCanvasContextMenu,
+  onNodeContextMenu,
+  onNodeDoubleClick,
   fitViewTrigger
 }) {
   const { fitView, screenToFlowPosition, zoomIn, zoomOut } = useReactFlow();
@@ -83,9 +87,13 @@ function ModelFlowInner({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        isValidConnection={isValidConnection}
         onDrop={handleDrop}
         onDragOver={onDragOver}
         onPaneClick={handlePaneClick}
+        onPaneContextMenu={onCanvasContextMenu}
+        onNodeContextMenu={onNodeContextMenu}
+        onNodeDoubleClick={onNodeDoubleClick}
         connectionMode={ConnectionMode.Loose}
         deleteKeyCode={["Backspace", "Delete"]}
         multiSelectionKeyCode={null}
@@ -105,7 +113,13 @@ function ModelFlowInner({
 
 export default function ModelFlowCanvas(props) {
   return (
-    <section className="workspace-pane canvas-wrap">
+    <section
+      className="workspace-pane canvas-wrap"
+      onContextMenu={(event) => {
+        if (event.defaultPrevented) return;
+        props.onCanvasContextMenu?.(event);
+      }}
+    >
       <ReactFlowProvider>
         <ModelFlowInner {...props} />
       </ReactFlowProvider>

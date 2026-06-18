@@ -24,6 +24,13 @@ const initialEdges = [];
 const LAYOUT_STORAGE_KEY = "opensd-web:component-layouts:v1";
 const MANUAL_LAYOUT_KEY = "manual";
 const MAX_UNDO_STEPS = 80;
+const FLOW_NODE_SIZE = { width: 22, height: 22 };
+const PIPE_NODE_SIZE = { width: 64, height: 28 };
+const PIPE_NODE_VERTICAL_SIZE = { width: 28, height: 64 };
+const FLOW_SIDES = ["left", "right", "top", "bottom"];
+const FLOW_HORIZONTAL_LOCK_THRESHOLD = 32;
+const COPY_PADDING = 28;
+const COPY_SCALE = 2;
 const nodeVariables = [
   { value: "temperature_from_tenth", label: "Temperature from total enthalpy" },
   { value: "ttemp_gues", label: "Total temperature" },
@@ -66,43 +73,52 @@ function heatFor(id, heatHandleMap) {
   return heatHandleMap?.get(id) ?? emptyHeat();
 }
 
-function buildFlowNode({ id, position, identifier, details = [], heatHandleMap }) {
+function attributesOf(element) {
+  return Object.fromEntries(Array.from(element?.attributes ?? []).map((attribute) => [attribute.name, attribute.value]));
+}
+
+function buildFlowNode({ id, position, identifier, details = [], heatHandleMap, circuitId = "", xmlAttributes = {}, sourceIdentifier = identifier }) {
   return {
     id,
     type: "flow",
     position,
-    data: { ...nodeData(identifier, details), heat: heatFor(id, heatHandleMap), rotation: 0 }
+    data: { ...nodeData(identifier, details), heat: heatFor(id, heatHandleMap), rotation: 0, circuitId, xmlAttributes, sourceIdentifier }
   };
 }
 
 function buildManualComponent(type, position) {
   const componentKind = componentKindForType(type);
+  const componentId = getId();
+  const suffix = componentId.replace(/^manual_/, "");
+  const identifier = `${componentKind === "flow" ? "node" : componentKind}_${suffix}`;
+  const common = { id: componentId, position, identifier, xmlAttributes: mandatoryAttributes(type, identifier) };
 
   if (componentKind === "flow") {
-    return buildFlowNode({
-      id: getId(),
-      position,
-      identifier: type
-    });
+    return buildFlowNode(common);
   }
 
   if (componentKind === "bc") {
-    return buildBcNode({
-      id: getId(),
-      position,
-      identifier: type
-    });
+    return buildBcNode(common);
   }
 
   return buildPipeNode({
-    id: getId(),
-    position,
-    identifier: type,
+    ...common,
     kind: componentKind
   });
 }
 
-function buildPipeNode({ id, position, identifier, details = [], kind = "pipe", heatHandleMap }) {
+function mandatoryAttributes(type, identifier) {
+  if (type === "Node") {
+    return { identifier, elevation: "0.0", tpres_old: "0.0", ttemp_old: "0.0", tenth_old: "0.0", msource: "0.0", volume: "0.0", heat_input: "0.0", fixed_var: "" };
+  }
+  if (type === "BC") return { identifier, node: "", var: "tpres", val: "0.0" };
+  if (type === "HSlab") {
+    return { identifier, ucomp: "", uvar: "node", uval: "0.0", utype: "fixed", dcomp: "", dvar: "node", dval: "0.0", dtype: "fixed", uarea: "1.0", ninc: "1" };
+  }
+  return { identifier, diameter: "1.0", length: "1.0", ncell: "1", unode: "", dnode: "", roughness: "0.0", cfarea: "1.0", heat_input: "0.0" };
+}
+
+function buildPipeNode({ id, position, identifier, details = [], kind = "pipe", heatHandleMap, circuitId = "", xmlAttributes = {}, sourceIdentifier = identifier }) {
   return {
     id,
     type: "pipe",
@@ -112,17 +128,20 @@ function buildPipeNode({ id, position, identifier, details = [], kind = "pipe", 
       kind,
       heat: heatFor(id, heatHandleMap),
       flowConnections: emptyFlowConnections(),
-      rotation: 0
+      rotation: 0,
+      circuitId,
+      xmlAttributes,
+      sourceIdentifier
     }
   };
 }
 
-function buildBcNode({ id, position, identifier, details = [] }) {
+function buildBcNode({ id, position, identifier, details = [], circuitId = "", xmlAttributes = {}, sourceIdentifier = identifier }) {
   return {
     id,
     type: "bc",
     position,
-    data: { ...nodeData(identifier, details), rotation: 0 }
+    data: { ...nodeData(identifier, details), rotation: 0, circuitId, xmlAttributes, sourceIdentifier }
   };
 }
 
@@ -231,33 +250,177 @@ function rerouteHeatEdges(nodes, edges) {
   });
 }
 
-function flowHandlesFromPositions(source, target, positionById, nodeTypeById) {
-  const sourceX = positionById.get(source)?.x ?? 0;
-  const targetX = positionById.get(target)?.x ?? sourceX;
-  const targetIsRight = targetX >= sourceX;
+function nodeSize(node) {
+  const measured = node.measured ?? {};
+  if (node.width || node.height || measured.width || measured.height) {
+    return {
+      width: node.width ?? measured.width ?? FLOW_NODE_SIZE.width,
+      height: node.height ?? measured.height ?? FLOW_NODE_SIZE.height
+    };
+  }
+
+  if (node.type === "pipe") {
+    const rotation = ((node.data?.rotation ?? 0) % 360 + 360) % 360;
+    return rotation === 90 || rotation === 270 ? PIPE_NODE_VERTICAL_SIZE : PIPE_NODE_SIZE;
+  }
+
+  return FLOW_NODE_SIZE;
+}
+
+function nodeCenter(node) {
+  const size = nodeSize(node);
+  return {
+    x: (node.position?.x ?? 0) + size.width / 2,
+    y: (node.position?.y ?? 0) + size.height / 2
+  };
+}
+
+function preferredSourceSide(sourceNode, targetNode, lockHorizontal = false) {
+  const sourceCenter = nodeCenter(sourceNode);
+  const targetCenter = nodeCenter(targetNode);
+  const dx = targetCenter.x - sourceCenter.x;
+  const dy = targetCenter.y - sourceCenter.y;
+
+  if (lockHorizontal && Math.abs(dx) >= FLOW_HORIZONTAL_LOCK_THRESHOLD) return dx >= 0 ? "right" : "left";
+  if (Math.abs(dx) * 1.15 >= Math.abs(dy)) return dx >= 0 ? "right" : "left";
+  return dy >= 0 ? "bottom" : "top";
+}
+
+function oppositeSide(side) {
+  return {
+    left: "right",
+    right: "left",
+    top: "bottom",
+    bottom: "top"
+  }[side];
+}
+
+function rankedFlowSides(preferredSide) {
+  const opposite = oppositeSide(preferredSide);
+  const perpendicular = FLOW_SIDES.filter((side) => side !== preferredSide && side !== opposite);
+  return [preferredSide, opposite, ...perpendicular];
+}
+
+function spreadFlowSide(nodeId, preferredSide, sideUseByNode) {
+  if (!sideUseByNode.has(nodeId)) sideUseByNode.set(nodeId, new Map());
+
+  const sideUse = sideUseByNode.get(nodeId);
+  const ranked = rankedFlowSides(preferredSide);
+  const side =
+    (sideUse.get(preferredSide) ?? 0) === 0
+      ? preferredSide
+      : ranked.find((candidate) => (sideUse.get(candidate) ?? 0) === 0) ??
+        ranked.reduce((best, candidate) => {
+          const bestCount = sideUse.get(best) ?? 0;
+          const candidateCount = sideUse.get(candidate) ?? 0;
+          return candidateCount < bestCount ? candidate : best;
+        }, ranked[0]);
+
+  sideUse.set(side, (sideUse.get(side) ?? 0) + 1);
+  return side;
+}
+
+function incrementMapCount(map, key) {
+  map.set(key, (map.get(key) ?? 0) + 1);
+}
+
+function flowHandleForSide(side, direction, slot = null) {
+  return slot ? `flow-${side}-${slot}-${direction}` : `flow-${side}-${direction}`;
+}
+
+function flowEndpointPreferences(edge, nodeById, nodeTypeById) {
+  const source = edge.source;
+  const target = edge.target;
+  const sourceNode = nodeById.get(source);
+  const targetNode = nodeById.get(target);
+  if (!sourceNode || !targetNode) return null;
+
   const sourceIsPipe = nodeTypeById.get(source) === "pipe";
   const targetIsPipe = nodeTypeById.get(target) === "pipe";
-
-  const positionHandles = targetIsRight
-    ? { sourceHandle: "flow-out", targetHandle: "flow-in" }
-    : { sourceHandle: "flow-in", targetHandle: "flow-out" };
+  const pipeToFluid = sourceIsPipe !== targetIsPipe;
+  const sourcePreferredSide = preferredSourceSide(sourceNode, targetNode, pipeToFluid);
+  const targetPreferredSide = oppositeSide(sourcePreferredSide);
 
   return {
-    sourceHandle: sourceIsPipe ? "flow-out" : positionHandles.sourceHandle,
-    targetHandle: targetIsPipe ? "flow-in" : positionHandles.targetHandle
+    sourceIsPipe,
+    targetIsPipe,
+    sourcePreferredSide,
+    targetPreferredSide
   };
 }
 
 function rerouteFlowEdges(nodes, edges) {
-  const positionById = new Map(nodes.map((node) => [node.id, node.position]));
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const nodeTypeById = new Map(nodes.map((node) => [node.id, node.type]));
+  const preferencesByEdgeId = new Map();
+  const endpointStatsByNode = new Map();
+  const sideUseByNode = new Map();
+  const finalSideUseByNode = new Map();
+  const finalSideCountsByNode = new Map();
+  const routedFlowEdges = edges.filter((edge) => edge.className === "flow-edge");
+
+  for (const edge of routedFlowEdges) {
+    const preferences = flowEndpointPreferences(edge, nodeById, nodeTypeById);
+    if (!preferences) continue;
+
+    preferencesByEdgeId.set(edge.id, preferences);
+
+    for (const endpoint of [
+      { nodeId: edge.source, isPipe: preferences.sourceIsPipe, side: preferences.sourcePreferredSide },
+      { nodeId: edge.target, isPipe: preferences.targetIsPipe, side: preferences.targetPreferredSide }
+    ]) {
+      if (endpoint.isPipe) continue;
+      if (!endpointStatsByNode.has(endpoint.nodeId)) {
+        endpointStatsByNode.set(endpoint.nodeId, { total: 0, sides: new Map() });
+      }
+
+      const stats = endpointStatsByNode.get(endpoint.nodeId);
+      stats.total += 1;
+      incrementMapCount(stats.sides, endpoint.side);
+    }
+  }
+
+  const assignSide = (nodeId, preferredSide) => {
+    const stats = endpointStatsByNode.get(nodeId);
+    const shouldSpreadTwoDuplicates = stats?.total === 2 && (stats.sides.get(preferredSide) ?? 0) === 2;
+    const side = shouldSpreadTwoDuplicates ? spreadFlowSide(nodeId, preferredSide, sideUseByNode) : preferredSide;
+
+    if (!finalSideCountsByNode.has(nodeId)) finalSideCountsByNode.set(nodeId, new Map());
+    incrementMapCount(finalSideCountsByNode.get(nodeId), side);
+
+    return side;
+  };
+
+  const sideByEndpointKey = new Map();
+  for (const edge of routedFlowEdges) {
+    const preferences = preferencesByEdgeId.get(edge.id);
+    if (!preferences) continue;
+
+    if (!preferences.sourceIsPipe) sideByEndpointKey.set(`${edge.id}:source`, assignSide(edge.source, preferences.sourcePreferredSide));
+    if (!preferences.targetIsPipe) sideByEndpointKey.set(`${edge.id}:target`, assignSide(edge.target, preferences.targetPreferredSide));
+  }
+
+  const slotForSide = (nodeId, side) => {
+    const sideCount = finalSideCountsByNode.get(nodeId)?.get(side) ?? 0;
+    if (sideCount <= 1) return null;
+
+    const key = `${nodeId}:${side}`;
+    const index = finalSideUseByNode.get(key) ?? 0;
+    finalSideUseByNode.set(key, index + 1);
+    return index % 2 === 0 ? "a" : "b";
+  };
 
   return edges.map((edge) => {
     if (edge.className !== "flow-edge") return edge;
+    const preferences = preferencesByEdgeId.get(edge.id);
+    if (!preferences) return edge;
+    const sourceSide = sideByEndpointKey.get(`${edge.id}:source`);
+    const targetSide = sideByEndpointKey.get(`${edge.id}:target`);
 
     return {
       ...edge,
-      ...flowHandlesFromPositions(edge.source, edge.target, positionById, nodeTypeById)
+      sourceHandle: preferences.sourceIsPipe ? "flow-out" : flowHandleForSide(sourceSide, "out", slotForSide(edge.source, sourceSide)),
+      targetHandle: preferences.targetIsPipe ? "flow-in" : flowHandleForSide(targetSide, "in", slotForSide(edge.target, targetSide))
     };
   });
 }
@@ -352,6 +515,14 @@ function isFlowNodeId(nodeId) {
   return nodeId?.startsWith("node:");
 }
 
+function isFlowInHandle(handleId) {
+  return handleId === "flow-in" || /^flow-(left|right|top|bottom)(-[ab])?-in$/.test(handleId ?? "");
+}
+
+function isFlowOutHandle(handleId) {
+  return handleId === "flow-out" || /^flow-(left|right|top|bottom)(-[ab])?-out$/.test(handleId ?? "");
+}
+
 function buildFlowConnectionMap(nodes, edges) {
   const nodeTypeById = new Map(nodes.map((node) => [node.id, node.type]));
   const connections = new Map();
@@ -364,11 +535,11 @@ function buildFlowConnectionMap(nodes, edges) {
     const sourceIsFluidNode = nodeTypeById.get(edge.source) === "flow" || isFlowNodeId(edge.source);
     const targetIsFluidNode = nodeTypeById.get(edge.target) === "flow" || isFlowNodeId(edge.target);
 
-    if (connections.has(edge.target) && edge.targetHandle === "flow-in" && sourceIsFluidNode) {
+    if (connections.has(edge.target) && isFlowInHandle(edge.targetHandle) && sourceIsFluidNode) {
       connections.get(edge.target).upstream = true;
     }
 
-    if (connections.has(edge.source) && edge.sourceHandle === "flow-out" && targetIsFluidNode) {
+    if (connections.has(edge.source) && isFlowOutHandle(edge.sourceHandle) && targetIsFluidNode) {
       connections.get(edge.source).downstream = true;
     }
   }
@@ -377,14 +548,30 @@ function buildFlowConnectionMap(nodes, edges) {
 }
 
 function normalizedFlowConnection(params, nodes) {
+  if (!params.source || !params.target || params.source === params.target) return null;
+
   const nodeTypeById = new Map(nodes.map((node) => [node.id, node.type]));
-  const sourceIsPipe = nodeTypeById.get(params.source) === "pipe";
-  const targetIsPipe = nodeTypeById.get(params.target) === "pipe";
+  let source = params.source;
+  let target = params.target;
+  let sourceHandle = params.sourceHandle;
+  let targetHandle = params.targetHandle;
+  const sourceIsPipe = nodeTypeById.get(source) === "pipe";
+  const targetIsPipe = nodeTypeById.get(target) === "pipe";
+
+  if ((sourceIsPipe && isFlowInHandle(sourceHandle)) || (targetIsPipe && isFlowOutHandle(targetHandle))) {
+    [source, target] = [target, source];
+    [sourceHandle, targetHandle] = [targetHandle, sourceHandle];
+  }
+
+  const canonicalSourceIsPipe = nodeTypeById.get(source) === "pipe";
+  const canonicalTargetIsPipe = nodeTypeById.get(target) === "pipe";
 
   return {
     ...params,
-    sourceHandle: sourceIsPipe ? "flow-out" : params.sourceHandle,
-    targetHandle: targetIsPipe ? "flow-in" : params.targetHandle,
+    source,
+    target,
+    sourceHandle: canonicalSourceIsPipe ? "flow-out" : sourceHandle,
+    targetHandle: canonicalTargetIsPipe ? "flow-in" : targetHandle,
     type: "straight",
     className: "flow-edge",
     markerEnd: FLOW_MARKER
@@ -396,10 +583,342 @@ function cloneGraphState(nodes, edges) {
     nodes: nodes.map((node) => ({
       ...node,
       position: { ...node.position },
-      data: { ...node.data }
+      data: { ...node.data, xmlAttributes: { ...node.data.xmlAttributes } }
     })),
     edges: edges.map((edge) => ({ ...edge }))
   };
+}
+
+function geometryFingerprint(nodes, edges) {
+  return JSON.stringify({
+    nodes: nodes.map((node) => ({
+      id: node.id,
+      type: node.type,
+      kind: node.data.kind ?? "",
+      identifier: node.data.identifier,
+      circuitId: node.data.circuitId ?? "",
+      attributes: node.data.xmlAttributes ?? {}
+    })),
+    edges: edges.map(({ source, target, className }) => ({ source, target, className }))
+  });
+}
+
+function attributesWithConnectivity(node, nodes, edges) {
+  const attributes = { ...(node.data.xmlAttributes ?? {}) };
+  const nodeById = new Map(nodes.map((item) => [item.id, item]));
+  const identifierFor = (nodeId) => nodeById.get(nodeId)?.data.identifier ?? "";
+  const incoming = edges.find((edge) => edge.target === node.id && nodeById.get(edge.source)?.type === "flow");
+  const outgoing = edges.find((edge) => edge.source === node.id && nodeById.get(edge.target)?.type === "flow");
+
+  if (node.type === "pipe" && !["circuit", "hslab"].includes(node.data.kind)) {
+    attributes.unode = incoming ? identifierFor(incoming.source) : "";
+    attributes.dnode = outgoing ? identifierFor(outgoing.target) : "";
+  } else if (node.type === "bc") {
+    const edge = edges.find((item) => item.source === node.id && nodeById.get(item.target)?.type === "flow")
+      ?? edges.find((item) => item.target === node.id && nodeById.get(item.source)?.type === "flow");
+    attributes.node = edge ? identifierFor(edge.source === node.id ? edge.target : edge.source) : "";
+  } else if (node.data.kind === "hslab") {
+    const upstream = edges.find((edge) => edge.target === node.id && edge.className === "hslab-edge");
+    const downstream = edges.find((edge) => edge.source === node.id && edge.className === "hslab-edge");
+    const setHeatEndpoint = (prefix, edge, endpoint) => {
+      const component = edge ? nodeById.get(edge[endpoint]) : null;
+      attributes[`${prefix}comp`] = component?.data.identifier ?? "";
+      if (component) attributes[`${prefix}var`] = component.type === "pipe" ? "pipe" : "node";
+    };
+    setHeatEndpoint("u", upstream, "source");
+    setHeatEndpoint("d", downstream, "target");
+  }
+
+  return attributes;
+}
+
+function isEditableTarget(target) {
+  if (!(target instanceof HTMLElement)) return false;
+  const tagName = target.tagName.toLowerCase();
+  return target.isContentEditable || ["input", "textarea", "select"].includes(tagName);
+}
+
+function selectedNodes(nodes) {
+  return nodes.filter((node) => node.selected);
+}
+
+function selectedNodeBounds(nodes) {
+  return nodes.map((node) => {
+    const size = nodeSize(node);
+    return {
+      node,
+      width: size.width,
+      height: size.height,
+      left: node.position.x,
+      top: node.position.y,
+      right: node.position.x + size.width,
+      bottom: node.position.y + size.height,
+      centerX: node.position.x + size.width / 2,
+      centerY: node.position.y + size.height / 2
+    };
+  });
+}
+
+function alignNodes(nodes, mode) {
+  const bounds = selectedNodeBounds(selectedNodes(nodes));
+  if (bounds.length < 2) return nodes;
+
+  const group = {
+    left: Math.min(...bounds.map((bound) => bound.left)),
+    right: Math.max(...bounds.map((bound) => bound.right)),
+    top: Math.min(...bounds.map((bound) => bound.top)),
+    bottom: Math.max(...bounds.map((bound) => bound.bottom))
+  };
+  const groupCenterX = (group.left + group.right) / 2;
+  const groupCenterY = (group.top + group.bottom) / 2;
+  const nextPositionById = new Map();
+
+  for (const bound of bounds) {
+    const position = { ...bound.node.position };
+
+    if (mode === "left") position.x = group.left;
+    if (mode === "right") position.x = group.right - bound.width;
+    if (mode === "center") position.x = groupCenterX - bound.width / 2;
+    if (mode === "top") position.y = group.top;
+    if (mode === "bottom") position.y = group.bottom - bound.height;
+    if (mode === "middle") position.y = groupCenterY - bound.height / 2;
+
+    nextPositionById.set(bound.node.id, position);
+  }
+
+  return nodes.map((node) => (nextPositionById.has(node.id) ? { ...node, position: nextPositionById.get(node.id) } : node));
+}
+
+function distributeNodes(nodes, axis) {
+  const bounds = selectedNodeBounds(selectedNodes(nodes));
+  if (bounds.length < 3) return nodes;
+
+  const centerKey = axis === "horizontal" ? "centerX" : "centerY";
+  const sizeKey = axis === "horizontal" ? "width" : "height";
+  const positionKey = axis === "horizontal" ? "x" : "y";
+  const sorted = [...bounds].sort((a, b) => a[centerKey] - b[centerKey]);
+  const first = sorted[0][centerKey];
+  const last = sorted.at(-1)[centerKey];
+  const step = (last - first) / (sorted.length - 1);
+  const nextPositionById = new Map();
+
+  sorted.forEach((bound, index) => {
+    if (index === 0 || index === sorted.length - 1) return;
+    nextPositionById.set(bound.node.id, {
+      ...bound.node.position,
+      [positionKey]: first + step * index - bound[sizeKey] / 2
+    });
+  });
+
+  return nodes.map((node) => (nextPositionById.has(node.id) ? { ...node, position: nextPositionById.get(node.id) } : node));
+}
+
+function graphClipboardFromSelection(nodes, edges) {
+  const pickedNodes = selectedNodes(nodes);
+  if (!pickedNodes.length) return null;
+
+  const selectedIds = new Set(pickedNodes.map((node) => node.id));
+  return {
+    nodes: pickedNodes.map((node) => ({
+      ...node,
+      position: { ...node.position },
+      data: { ...node.data },
+      selected: true
+    })),
+    edges: edges.filter((edge) => selectedIds.has(edge.source) && selectedIds.has(edge.target)).map((edge) => ({ ...edge }))
+  };
+}
+
+function pasteGraphClipboard(nodes, edges, clipboard, offset = 36) {
+  if (!clipboard?.nodes?.length) return { nodes, edges };
+
+  const idByOriginal = new Map();
+  const clonedNodes = clipboard.nodes.map((node) => {
+    const nextId = `${node.id}:copy:${getId()}`;
+    idByOriginal.set(node.id, nextId);
+
+    return {
+      ...node,
+      id: nextId,
+      position: {
+        x: (node.position?.x ?? 0) + offset,
+        y: (node.position?.y ?? 0) + offset
+      },
+      data: {
+        ...node.data,
+        identifier: `${node.data?.identifier ?? node.id} copy`
+      },
+      selected: true
+    };
+  });
+
+  const clonedEdges = clipboard.edges
+    .filter((edge) => idByOriginal.has(edge.source) && idByOriginal.has(edge.target))
+    .map((edge) => {
+      const source = idByOriginal.get(edge.source);
+      const target = idByOriginal.get(edge.target);
+
+      return {
+        ...edge,
+        id: `${source}->${target}:${getId()}`,
+        source,
+        target,
+        selected: false
+      };
+    });
+
+  return {
+    nodes: [...nodes.map((node) => ({ ...node, selected: false })), ...clonedNodes],
+    edges: [...edges.map((edge) => ({ ...edge, selected: false })), ...clonedEdges]
+  };
+}
+
+function inlineComputedStyles(source, clone) {
+  if (!(source instanceof Element) || !(clone instanceof Element)) return;
+
+  const computed = window.getComputedStyle(source);
+  clone.setAttribute(
+    "style",
+    Array.from(computed)
+      .map((property) => `${property}:${computed.getPropertyValue(property)};`)
+      .join("")
+  );
+
+  const sourceChildren = Array.from(source.children);
+  const cloneChildren = Array.from(clone.children);
+  sourceChildren.forEach((child, index) => inlineComputedStyles(child, cloneChildren[index]));
+}
+
+function elementId(element) {
+  return element.getAttribute("data-id") ?? element.getAttribute("data-nodeid") ?? "";
+}
+
+function copiedEdgeIds(edges, selectedIds) {
+  return new Set(
+    edges
+      .filter((edge) => selectedIds.has(edge.source) && selectedIds.has(edge.target))
+      .map((edge) => edge.id)
+  );
+}
+
+function hideUnselectedGraphParts(sourceRenderer, cloneRenderer, selectedIds, selectedEdgeIds) {
+  const sourceNodes = Array.from(sourceRenderer.querySelectorAll(".react-flow__node"));
+  const cloneNodes = Array.from(cloneRenderer.querySelectorAll(".react-flow__node"));
+  sourceNodes.forEach((node, index) => {
+    if (!selectedIds.has(elementId(node))) cloneNodes[index]?.setAttribute("style", `${cloneNodes[index]?.getAttribute("style") ?? ""};display:none;`);
+  });
+
+  const sourceEdges = Array.from(sourceRenderer.querySelectorAll(".react-flow__edge"));
+  const cloneEdges = Array.from(cloneRenderer.querySelectorAll(".react-flow__edge"));
+  sourceEdges.forEach((edge, index) => {
+    const id = elementId(edge);
+    if (!id || !selectedEdgeIds.has(id)) cloneEdges[index]?.setAttribute("style", `${cloneEdges[index]?.getAttribute("style") ?? ""};display:none;`);
+  });
+}
+
+function blobFromCanvas(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        reject(new Error("Unable to create clipboard image."));
+      }
+    }, "image/png");
+  });
+}
+
+async function selectedGraphImageBlob(edges) {
+  const sourceRenderer = document.querySelector(".canvas-wrap .react-flow__renderer");
+  if (!sourceRenderer) throw new Error("Canvas is not ready.");
+
+  const selectedElements = Array.from(sourceRenderer.querySelectorAll(".react-flow__node.selected"));
+  if (!selectedElements.length) throw new Error("Select one or more components before copying.");
+
+  const selectedIds = new Set(selectedElements.map(elementId).filter(Boolean));
+  const selectedEdgeIds = copiedEdgeIds(edges, selectedIds);
+  const sourceRect = sourceRenderer.getBoundingClientRect();
+  const selectedRects = [
+    ...selectedElements,
+    ...Array.from(sourceRenderer.querySelectorAll(".react-flow__edge")).filter((edge) => selectedEdgeIds.has(elementId(edge)))
+  ].map((element) => element.getBoundingClientRect());
+  const crop = {
+    left: Math.min(...selectedRects.map((rect) => rect.left)),
+    right: Math.max(...selectedRects.map((rect) => rect.right)),
+    top: Math.min(...selectedRects.map((rect) => rect.top)),
+    bottom: Math.max(...selectedRects.map((rect) => rect.bottom))
+  };
+  const width = Math.ceil(crop.right - crop.left + COPY_PADDING * 2);
+  const height = Math.ceil(crop.bottom - crop.top + COPY_PADDING * 2);
+  const cloneRenderer = sourceRenderer.cloneNode(true);
+
+  inlineComputedStyles(sourceRenderer, cloneRenderer);
+  hideUnselectedGraphParts(sourceRenderer, cloneRenderer, selectedIds, selectedEdgeIds);
+
+  const wrapper = document.createElement("div");
+  wrapper.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+  wrapper.style.position = "relative";
+  wrapper.style.width = `${width}px`;
+  wrapper.style.height = `${height}px`;
+  wrapper.style.overflow = "hidden";
+  wrapper.style.background = "transparent";
+
+  const shifted = document.createElement("div");
+  shifted.style.position = "absolute";
+  shifted.style.left = `${COPY_PADDING - (crop.left - sourceRect.left)}px`;
+  shifted.style.top = `${COPY_PADDING - (crop.top - sourceRect.top)}px`;
+  shifted.style.width = `${sourceRect.width}px`;
+  shifted.style.height = `${sourceRect.height}px`;
+  shifted.appendChild(cloneRenderer);
+  wrapper.appendChild(shifted);
+
+  const serialized = new XMLSerializer().serializeToString(wrapper);
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
+    `<foreignObject width="100%" height="100%">${serialized}</foreignObject>`,
+    "</svg>"
+  ].join("");
+  const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+
+  try {
+    const image = new Image();
+    image.decoding = "async";
+    image.src = url;
+    await image.decode();
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width * COPY_SCALE;
+    canvas.height = height * COPY_SCALE;
+    const context = canvas.getContext("2d");
+    context.scale(COPY_SCALE, COPY_SCALE);
+    context.drawImage(image, 0, 0);
+
+    const blob = await blobFromCanvas(canvas);
+    return { blob, count: selectedIds.size };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function copySelectedGraphImage(edges) {
+  if (!navigator.clipboard || typeof ClipboardItem === "undefined") {
+    throw new Error("Image clipboard is not available in this browser.");
+  }
+
+  const { blob, count } = await selectedGraphImageBlob(edges);
+  await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+  return count;
+}
+
+async function exportSelectedGraphPng(edges) {
+  const { blob, count } = await selectedGraphImageBlob(edges);
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `opensd-selection-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+  return count;
 }
 
 function layerTooltipLines(layers) {
@@ -842,6 +1361,8 @@ function parseGeometryXml(xmlText) {
         position: positions.get(circuitNodeId),
         identifier: circuitId,
         kind: "circuit",
+        circuitId,
+        xmlAttributes: attributesOf(circuit),
         details: [attr(circuit, "solveSS") && `solveSS ${attr(circuit, "solveSS")}`],
       })
     );
@@ -856,6 +1377,8 @@ function parseGeometryXml(xmlText) {
             id: `node:${item.name}`,
             position: positions.get(`node:${item.name}`),
             identifier: item.name,
+            circuitId,
+            xmlAttributes: attributesOf(nodeEl),
             details: [
               attr(nodeEl, "fixed_var") && `fixed ${attr(nodeEl, "fixed_var")}`,
               attr(nodeEl, "volume") && `vol ${Number(attr(nodeEl, "volume")).toExponential(2)}`
@@ -871,6 +1394,8 @@ function parseGeometryXml(xmlText) {
           id: `pipe:${item.name}`,
           position: positions.get(`pipe:${item.name}`),
           identifier: item.name,
+          circuitId,
+          xmlAttributes: attributesOf(pipe.element),
           details: [
             attr(pipe.element, "ncell") && `${attr(pipe.element, "ncell")} cells`,
             attr(pipe.element, "diameter") && `D ${attr(pipe.element, "diameter")} m`,
@@ -893,6 +1418,8 @@ function parseGeometryXml(xmlText) {
             id: nodeId,
             position: positions.get(nodeId) ?? { x: fallbackX, y: positions.get(circuitNodeId)?.y ?? 50 },
             identifier: nodeName,
+            circuitId,
+            xmlAttributes: attributesOf(nodeEl),
             details: [
               attr(nodeEl, "fixed_var") && `fixed ${attr(nodeEl, "fixed_var")}`,
               attr(nodeEl, "volume") && `vol ${Number(attr(nodeEl, "volume")).toExponential(2)}`
@@ -912,6 +1439,8 @@ function parseGeometryXml(xmlText) {
           id: bc.id,
           position: bcPosition,
           identifier: bc.name,
+          circuitId,
+          xmlAttributes: attributesOf(bcEl),
           details: [
             attr(bcEl, "var") && `${attr(bcEl, "var")} = ${attr(bcEl, "val")}`,
             bc.targetNode && `node ${bc.targetNode}`
@@ -955,6 +1484,7 @@ function parseGeometryXml(xmlText) {
         position: { x: 220 + hslabOffset, y: hslabBaseY },
         identifier: hslabName,
         kind: "hslab",
+        xmlAttributes: attributesOf(hslab),
         details: [
           attr(hslab, "uvar") && `u ${attr(hslab, "uvar")}`,
           attr(hslab, "dvar") && `d ${attr(hslab, "dvar")}`,
@@ -974,18 +1504,237 @@ function parseGeometryXml(xmlText) {
     pushEdge(hslabEdge(`${hslabId}->${downstreamId}`, hslabId, downstreamId, positionById));
   });
 
-  return { nodes: applyHeatHandleMap(flowNodes, buildHeatHandleMapFromEdges(flowEdges)), edges: flowEdges, stats };
+  return {
+    nodes: applyHeatHandleMap(flowNodes, buildHeatHandleMapFromEdges(flowEdges)),
+    edges: flowEdges,
+    stats,
+    templateXml: xmlText
+  };
+}
+
+function xmlIdentifier(value, fallback) {
+  const cleaned = String(value ?? "").trim().replace(/[^A-Za-z0-9_.-]+/g, "_");
+  return cleaned || fallback;
+}
+
+function uniqueIdentifier(preferred, fallback, used) {
+  const base = xmlIdentifier(preferred, fallback);
+  let value = base;
+  let suffix = 2;
+  while (used.has(value)) value = `${base}_${suffix++}`;
+  used.add(value);
+  return value;
+}
+
+function directChildren(element, tagName) {
+  return Array.from(element.children).filter((child) => child.tagName === tagName);
+}
+
+function formatGeometryXml(geometry) {
+  const indent = (element, depth = 0) => {
+    const children = Array.from(element.children);
+    if (!children.length) return;
+
+    for (const node of Array.from(element.childNodes)) {
+      if (node.nodeType === Node.TEXT_NODE && !node.nodeValue.trim()) node.remove();
+    }
+    children.forEach((child) => {
+      element.insertBefore(element.ownerDocument.createTextNode(`\n${"  ".repeat(depth + 1)}`), child);
+      indent(child, depth + 1);
+    });
+    element.append(element.ownerDocument.createTextNode(`\n${"  ".repeat(depth)}`));
+  };
+
+  indent(geometry);
+  return `<?xml version='1.0' encoding='utf-8'?>\n${new XMLSerializer().serializeToString(geometry)}\n`;
+}
+
+function serializeOpenSdGeometry(templateXml, nodes, edges) {
+  const document = new DOMParser().parseFromString(templateXml || "<geometry/>", "application/xml");
+  const geometry = document.querySelector("geometry");
+  if (!geometry || document.querySelector("parsererror")) throw new Error("Cannot create geometry XML.");
+
+  const graphById = new Map(nodes.map((node) => [node.id, node]));
+  const circuits = nodes.filter((node) => node.data.kind === "circuit");
+  const originalCircuitElements = new Map(directChildren(geometry, "circuit").map((element) => [element.getAttribute("identifier"), element]));
+  const circuitElements = new Map();
+  const circuitIds = new Set();
+
+  for (const circuit of circuits) {
+    const identifier = uniqueIdentifier(circuit.data.identifier, "circuit", circuitIds);
+    const element = originalCircuitElements.get(circuit.data.sourceIdentifier) ?? document.createElement("circuit");
+    for (const attribute of Array.from(element.attributes)) element.removeAttribute(attribute.name);
+    for (const [name, value] of Object.entries(circuit.data.xmlAttributes ?? {})) element.setAttribute(name, value);
+    element.setAttribute("identifier", identifier);
+    if (!element.parentElement) geometry.append(element);
+    circuitElements.set(identifier, element);
+  }
+
+  if (!circuitElements.size) {
+    const element = document.createElement("circuit");
+    element.setAttribute("identifier", "circuit_1");
+    geometry.prepend(element);
+    circuitElements.set("circuit_1", element);
+  }
+
+  if (circuits.length) {
+    for (const element of originalCircuitElements.values()) if (![...circuitElements.values()].includes(element)) element.remove();
+  }
+
+  const firstCircuitId = circuitElements.keys().next().value;
+  const renamedCircuitIds = new Map(circuits.map((node) => [node.data.sourceIdentifier, xmlIdentifier(node.data.identifier, "circuit")]));
+  const componentCircuit = (node) => {
+    const circuitId = renamedCircuitIds.get(node.data.circuitId) ?? node.data.circuitId;
+    return circuitElements.has(circuitId) ? circuitId : firstCircuitId;
+  };
+  const usedByKind = { node: new Set(), pipe: new Set(), bc: new Set(), hslab: new Set() };
+  const identifierById = new Map();
+
+  for (const node of nodes) {
+    let kind = node.type;
+    if (node.data.kind === "circuit") continue;
+    if (node.data.kind === "hslab") kind = "hslab";
+    else if (node.type === "flow") kind = "node";
+    else if (node.type === "pipe") kind = "pipe";
+    const preferred = node.data.identifier;
+    identifierById.set(node.id, uniqueIdentifier(preferred, `${kind}_${usedByKind[kind].size + 1}`, usedByKind[kind]));
+  }
+
+  const existing = new Map();
+  for (const circuit of circuitElements.values()) {
+    for (const tag of ["node", "pipe", "bc"]) {
+      for (const element of directChildren(circuit, tag)) existing.set(`${tag}:${element.getAttribute("identifier")}`, element);
+    }
+  }
+  for (const element of directChildren(geometry, "hslab")) existing.set(`hslab:${element.getAttribute("identifier")}`, element);
+
+  const liveElements = new Set();
+  const warnings = [];
+  const ensureElement = (tag, node) => {
+    const identifier = identifierById.get(node.id);
+    let element = existing.get(`${tag}:${node.data.sourceIdentifier}`) ?? existing.get(`${tag}:${identifier}`);
+    if (!element) {
+      element = document.createElement(tag);
+      if (tag === "hslab") geometry.append(element);
+      else circuitElements.get(componentCircuit(node)).append(element);
+    }
+    for (const attribute of Array.from(element.attributes)) element.removeAttribute(attribute.name);
+    for (const [name, value] of Object.entries(node.data.xmlAttributes ?? {})) element.setAttribute(name, value);
+    element.setAttribute("identifier", identifier);
+    liveElements.add(element);
+    return element;
+  };
+
+  const connectionTo = (componentId, direction, predicate) => {
+    const edge = edges.find((item) => direction === "in"
+      ? item.target === componentId && predicate(graphById.get(item.source))
+      : item.source === componentId && predicate(graphById.get(item.target)));
+    return edge ? graphById.get(direction === "in" ? edge.source : edge.target) : null;
+  };
+  const isFluidNode = (node) => node?.type === "flow";
+  const isThermalComponent = (node) => node?.type === "flow" || (node?.type === "pipe" && node.data.kind !== "circuit" && node.data.kind !== "hslab");
+
+  for (const node of nodes) {
+    if (node.data.kind === "circuit") continue;
+    if (node.type === "flow") {
+      const element = ensureElement("node", node);
+      if (!element.hasAttribute("elevation")) element.setAttribute("elevation", "0.0");
+      if (!element.hasAttribute("volume")) element.setAttribute("volume", "0.0");
+    } else if (node.type === "bc") {
+      const element = ensureElement("bc", node);
+      const target = connectionTo(node.id, "out", isFluidNode) || connectionTo(node.id, "in", isFluidNode);
+      if (target) element.setAttribute("node", identifierById.get(target.id));
+      else { element.removeAttribute("node"); warnings.push(`${identifierById.get(node.id)} has no node connection`); }
+      if (!element.hasAttribute("var")) element.setAttribute("var", "tpres");
+      if (!element.hasAttribute("val")) element.setAttribute("val", "0.0");
+    } else if (node.data.kind === "hslab") {
+      const element = ensureElement("hslab", node);
+      const upstream = connectionTo(node.id, "in", isThermalComponent);
+      const downstream = connectionTo(node.id, "out", isThermalComponent);
+      for (const [prefix, component] of [["u", upstream], ["d", downstream]]) {
+        if (component) {
+          element.setAttribute(`${prefix}comp`, identifierById.get(component.id));
+          element.setAttribute(`${prefix}var`, component.type === "pipe" ? "pipe" : "node");
+        } else {
+          element.removeAttribute(`${prefix}comp`);
+          element.removeAttribute(`${prefix}var`);
+          warnings.push(`${identifierById.get(node.id)} has no ${prefix === "u" ? "upstream" : "downstream"} heat connection`);
+        }
+      }
+    } else if (node.type === "pipe") {
+      const element = ensureElement("pipe", node);
+      const upstream = connectionTo(node.id, "in", isFluidNode);
+      const downstream = connectionTo(node.id, "out", isFluidNode);
+      if (upstream) element.setAttribute("unode", identifierById.get(upstream.id));
+      else { element.removeAttribute("unode"); warnings.push(`${identifierById.get(node.id)} has no upstream node`); }
+      if (downstream) element.setAttribute("dnode", identifierById.get(downstream.id));
+      else { element.removeAttribute("dnode"); warnings.push(`${identifierById.get(node.id)} has no downstream node`); }
+      if (!element.hasAttribute("diameter")) element.setAttribute("diameter", "1.0");
+      if (!element.hasAttribute("length")) element.setAttribute("length", "1.0");
+      if (!element.hasAttribute("ncell")) element.setAttribute("ncell", "1");
+    }
+  }
+
+  for (const element of existing.values()) if (!liveElements.has(element)) element.remove();
+  return { xml: formatGeometryXml(geometry), warnings };
+}
+
+function AttributeEditor({ node, onCancel, onSave }) {
+  const initialAttributes = { ...(node.data.xmlAttributes ?? {}), identifier: node.data.identifier ?? node.data.xmlAttributes?.identifier ?? "component" };
+  const [rows, setRows] = useState(() => Object.entries(initialAttributes).map(([name, value]) => ({ name, value: String(value ?? "") })));
+  const updateRow = (index, field, value) => setRows((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: value } : row));
+  const attributeName = (row) => String(row?.name ?? "").trim();
+  const identifier = String(rows.find((row) => attributeName(row) === "identifier")?.value ?? "").trim();
+
+  return (
+    <div className="attribute-modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onCancel()}>
+      <section className="attribute-modal" role="dialog" aria-modal="true" aria-labelledby="attribute-modal-title">
+        <div className="attribute-modal-header">
+          <div>
+            <span>OpenSD component</span>
+            <h2 id="attribute-modal-title">{node.data.identifier} attributes</h2>
+          </div>
+          <button type="button" className="attribute-close" aria-label="Close" onClick={onCancel}>×</button>
+        </div>
+        <div className="attribute-grid">
+          <strong>Attribute</strong><strong>Value</strong><span />
+          {rows.map((row, index) => (
+            <div className="attribute-row" key={`${index}-${row.name}`}>
+              <input value={row.name} disabled={row.name === "identifier"} onChange={(event) => updateRow(index, "name", event.target.value)} aria-label={`Attribute ${index + 1} name`} />
+              <input value={row.value} onChange={(event) => updateRow(index, "value", event.target.value)} aria-label={`${row.name || `Attribute ${index + 1}`} value`} autoFocus={row.name === "identifier"} />
+              <button type="button" onClick={() => setRows((current) => current.filter((_, rowIndex) => rowIndex !== index))} disabled={row.name === "identifier"} aria-label={`Remove ${row.name}`}>−</button>
+            </div>
+          ))}
+        </div>
+        <button type="button" className="secondary-button" onClick={() => setRows((current) => [...current, { name: "", value: "" }])}>Add attribute</button>
+        <div className="attribute-modal-actions">
+          <button type="button" className="secondary-button" onClick={onCancel}>Cancel</button>
+          <button
+            type="button"
+            className="primary-button"
+            disabled={!identifier || rows.some((row) => !attributeName(row)) || new Set(rows.map(attributeName)).size !== rows.length}
+            onClick={() => onSave(Object.fromEntries(rows.map((row) => [attributeName(row), row.value])))}
+          >
+            Apply
+          </button>
+        </div>
+      </section>
+    </div>
+  );
 }
 
 export default function App() {
   const fileInput = useRef(null);
   const hdf5Input = useRef(null);
   const layoutInput = useRef(null);
+  const graphClipboard = useRef(null);
   const [nodes, setNodes, reactFlowOnNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, reactFlowOnEdgesChange] = useEdgesState(initialEdges);
   const [defaultLayoutNodes, setDefaultLayoutNodes] = useState(initialNodes);
   const [defaultLayoutEdges, setDefaultLayoutEdges] = useState(initialEdges);
   const [importStatus, setImportStatus] = useState("No geometry loaded");
+  const [geometryTemplate, setGeometryTemplate] = useState("<geometry/>");
+  const [geometryFilename, setGeometryFilename] = useState("geometry.xml");
   const [modelStats, setModelStats] = useState(null);
   const [activeWorkspace, setActiveWorkspace] = useState("model");
   const [resultsStatus, setResultsStatus] = useState("No results loaded");
@@ -999,13 +1748,27 @@ export default function App() {
   const [hasUnsavedLayout, setHasUnsavedLayout] = useState(false);
   const [pendingComponentType, setPendingComponentType] = useState("");
   const [undoStack, setUndoStack] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
   const [selectedRequirementId, setSelectedRequirementId] = useState("GUI-080");
+  const [copyStatus, setCopyStatus] = useState("");
+  const [contextMenu, setContextMenu] = useState(null);
+  const [attributeEditorNodeId, setAttributeEditorNodeId] = useState(null);
+  const [originalGeometryFingerprint, setOriginalGeometryFingerprint] = useState("");
 
   const parsedRequirements = useMemo(() => parseRequirementSections(guiRequirementsMarkdown), []);
 
   const selectedRequirement = useMemo(() => {
     return parsedRequirements.find((requirement) => requirement.id === selectedRequirementId) ?? parsedRequirements[0] ?? null;
   }, [parsedRequirements, selectedRequirementId]);
+
+  const attributeEditorNode = useMemo(
+    () => {
+      const node = nodes.find((item) => item.id === attributeEditorNodeId);
+      return node ? { ...node, data: { ...node.data, xmlAttributes: attributesWithConnectivity(node, nodes, edges) } } : null;
+    },
+    [attributeEditorNodeId, edges, nodes]
+  );
+
 
   const selectRequirement = useCallback(
     (requirementId) => {
@@ -1019,6 +1782,7 @@ export default function App() {
 
   const pushUndoSnapshot = useCallback(() => {
     setUndoStack((stack) => [...stack, cloneGraphState(nodes, edges)].slice(-MAX_UNDO_STEPS));
+    setRedoStack([]);
   }, [edges, nodes]);
 
   const undoLastAction = useCallback(() => {
@@ -1026,12 +1790,68 @@ export default function App() {
       const previous = stack.at(-1);
       if (!previous) return stack;
 
+      setRedoStack((redos) => [...redos, cloneGraphState(nodes, edges)].slice(-MAX_UNDO_STEPS));
       setNodes(previous.nodes);
       setEdges(previous.edges);
       setHasUnsavedLayout(true);
       return stack.slice(0, -1);
     });
-  }, [setEdges, setNodes]);
+  }, [edges, nodes, setEdges, setNodes]);
+
+  const redoLastAction = useCallback(() => {
+    setRedoStack((stack) => {
+      const next = stack.at(-1);
+      if (!next) return stack;
+
+      setUndoStack((undos) => [...undos, cloneGraphState(nodes, edges)].slice(-MAX_UNDO_STEPS));
+      setNodes(next.nodes);
+      setEdges(next.edges);
+      setHasUnsavedLayout(true);
+      return stack.slice(0, -1);
+    });
+  }, [edges, nodes, setEdges, setNodes]);
+
+  const copySelectionForCanvas = useCallback(() => {
+    const selection = graphClipboardFromSelection(nodes, edges);
+    if (!selection) return false;
+
+    graphClipboard.current = selection;
+    return true;
+  }, [edges, nodes]);
+
+  const pasteCanvasSelection = useCallback(() => {
+    if (!graphClipboard.current?.nodes?.length) return;
+
+    pushUndoSnapshot();
+    const pasted = pasteGraphClipboard(nodes, edges, graphClipboard.current);
+    setNodes(pasted.nodes);
+    setEdges(pasted.edges);
+    graphClipboard.current = graphClipboardFromSelection(pasted.nodes, pasted.edges);
+    setHasUnsavedLayout(true);
+    setCopyStatus(`Pasted ${pasted.nodes.filter((node) => node.selected).length} component(s)`);
+  }, [edges, nodes, pushUndoSnapshot, setEdges, setNodes]);
+
+  const alignSelectedComponents = useCallback(
+    (mode) => {
+      if (selectedNodes(nodes).length < 2) return;
+
+      pushUndoSnapshot();
+      setNodes((nds) => alignNodes(nds, mode));
+      setHasUnsavedLayout(true);
+    },
+    [nodes, pushUndoSnapshot, setNodes]
+  );
+
+  const distributeSelectedComponents = useCallback(
+    (axis) => {
+      if (selectedNodes(nodes).length < 3) return;
+
+      pushUndoSnapshot();
+      setNodes((nds) => distributeNodes(nds, axis));
+      setHasUnsavedLayout(true);
+    },
+    [nodes, pushUndoSnapshot, setNodes]
+  );
 
   useEffect(() => {
     const warnBeforeClose = (event) => {
@@ -1043,17 +1863,6 @@ export default function App() {
     window.addEventListener("beforeunload", warnBeforeClose);
     return () => window.removeEventListener("beforeunload", warnBeforeClose);
   }, [hasUnsavedLayout]);
-
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "z") return;
-      event.preventDefault();
-      undoLastAction();
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [undoLastAction]);
 
   const onNodesChange = useCallback(
     (changes) => {
@@ -1102,6 +1911,62 @@ export default function App() {
 
   const renderedEdges = useMemo(() => rerouteFlowEdges(nodes, rerouteHeatEdges(nodes, edges)), [edges, nodes]);
 
+  const copySelectionToClipboard = useCallback(async () => {
+    const storedForCanvas = copySelectionForCanvas();
+
+    try {
+      const count = await copySelectedGraphImage(renderedEdges);
+      setCopyStatus(`Copied ${count} component${count === 1 ? "" : "s"} as PNG`);
+    } catch (error) {
+      setCopyStatus(storedForCanvas ? "Copied selection for canvas paste" : error.message);
+    }
+  }, [copySelectionForCanvas, renderedEdges]);
+
+  const exportSelectionToPng = useCallback(async () => {
+    try {
+      const count = await exportSelectedGraphPng(renderedEdges);
+      setCopyStatus(`Exported ${count} component${count === 1 ? "" : "s"} to PNG`);
+    } catch (error) {
+      setCopyStatus(error.message);
+    } finally {
+      setContextMenu(null);
+    }
+  }, [renderedEdges]);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (isEditableTarget(event.target)) return;
+      if (!(event.ctrlKey || event.metaKey)) return;
+
+      const key = event.key.toLowerCase();
+      if (key === "c") {
+        if (!selectedNodes(nodes).length) return;
+        event.preventDefault();
+        copySelectionToClipboard();
+        return;
+      }
+
+      if (key === "v") {
+        event.preventDefault();
+        pasteCanvasSelection();
+        return;
+      }
+
+      if (key === "y" || (key === "z" && event.shiftKey)) {
+        event.preventDefault();
+        redoLastAction();
+        return;
+      }
+
+      if (key !== "z") return;
+      event.preventDefault();
+      undoLastAction();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [copySelectionToClipboard, nodes, pasteCanvasSelection, redoLastAction, undoLastAction]);
+
   const renderedNodes = useMemo(() => {
     const flowConnections = buildFlowConnectionMap(nodes, renderedEdges);
     const heatHandleMap = buildHeatHandleMapFromEdges(renderedEdges);
@@ -1116,12 +1981,25 @@ export default function App() {
       }
     }));
   }, [nodes, renderedEdges, rotateNode]);
+  const selectedComponentCount = selectedNodes(nodes).length;
+  const canAlignSelection = selectedComponentCount >= 2;
+  const canDistributeSelection = selectedComponentCount >= 3;
 
   const onConnect = useCallback(
     (params) => {
+      if (!params.source || !params.target || params.source === params.target) return;
+
       pushUndoSnapshot();
       setEdges((eds) => {
-        const edge = normalizedFlowConnection(params, nodes);
+        const source = nodes.find((node) => node.id === params.source);
+        const target = nodes.find((node) => node.id === params.target);
+        const isHeatConnection = source?.data.kind === "hslab" || target?.data.kind === "hslab";
+        const isBcConnection = source?.type === "bc" || target?.type === "bc";
+        const edge = isHeatConnection
+          ? hslabEdge(`${params.source}->${params.target}`, params.source, params.target, new Map(nodes.map((node) => [node.id, node.position])))
+          : isBcConnection
+            ? bcEdge(`${params.source}->${params.target}`, params.source, params.target)
+            : normalizedFlowConnection(params, nodes);
         if (!edge) return eds;
         return addEdge(edge, eds);
       });
@@ -1129,6 +2007,10 @@ export default function App() {
     },
     [nodes, pushUndoSnapshot, setEdges]
   );
+
+  const isValidConnection = useCallback((connection) => {
+    return Boolean(connection.source && connection.target && connection.source !== connection.target);
+  }, []);
 
   const onDragStart = (event, nodeType) => {
     setPendingComponentType(nodeType);
@@ -1154,6 +2036,7 @@ export default function App() {
 
   const onPaneClick = useCallback(
     (_event, position) => {
+      setContextMenu(null);
       if (!pendingComponentType) return;
       pushUndoSnapshot();
       setNodes((nds) => nds.concat(buildManualComponent(pendingComponentType, position)));
@@ -1162,6 +2045,61 @@ export default function App() {
     },
     [pendingComponentType, pushUndoSnapshot, setNodes]
   );
+
+  const onNodeContextMenu = useCallback(
+    (event, node) => {
+      event.preventDefault();
+
+      if (!node.selected) {
+        setNodes((nds) =>
+          nds.map((item) => ({
+            ...item,
+            selected: item.id === node.id
+          }))
+        );
+      }
+
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY
+      });
+    },
+    [setNodes]
+  );
+
+  const onNodeDoubleClick = useCallback((_event, node) => {
+    setContextMenu(null);
+    setAttributeEditorNodeId(node.id);
+  }, []);
+
+  const saveComponentAttributes = useCallback((xmlAttributes) => {
+    if (!attributeEditorNode) return;
+    pushUndoSnapshot();
+    const nextIdentifier = xmlAttributes.identifier.trim();
+    setNodes((current) => current.map((node) => node.id === attributeEditorNode.id
+      ? { ...node, data: { ...node.data, identifier: nextIdentifier, xmlAttributes } }
+      : node));
+    setAttributeEditorNodeId(null);
+    setHasUnsavedLayout(true);
+    setImportStatus(`Updated ${nextIdentifier}`);
+  }, [attributeEditorNode, pushUndoSnapshot, setNodes]);
+
+  const onCanvasContextMenu = useCallback(
+    (event) => {
+      if (!selectedNodes(nodes).length) return;
+
+      event.preventDefault();
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY
+      });
+    },
+    [nodes]
+  );
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
 
   const onDragOver = useCallback((event) => {
     event.preventDefault();
@@ -1183,12 +2121,19 @@ export default function App() {
         setDefaultLayoutEdges(parsed.edges);
         setNodes(applyStoredLayout(parsed.nodes, storedLayout));
         setEdges(parsed.edges);
+        setGeometryTemplate(parsed.templateXml);
+        setGeometryFilename(file.name.toLowerCase().endsWith(".xml") ? file.name : `${file.name}.xml`);
+        setOriginalGeometryFingerprint(geometryFingerprint(parsed.nodes, parsed.edges));
         setModelStats(parsed.stats);
         setFitViewTrigger((count) => count + 1);
         setImportStatus(`Loaded ${file.name}${storedLayout ? " with saved layout" : ""}`);
         setActiveWorkspace("model");
         setHasUnsavedLayout(false);
         setUndoStack([]);
+        setRedoStack([]);
+        setCopyStatus("");
+        graphClipboard.current = null;
+        setContextMenu(null);
       } catch (error) {
         setImportStatus(error.message);
       }
@@ -1220,21 +2165,6 @@ export default function App() {
     }
   }, []);
 
-  const exportJSON = () => {
-    const data = { nodes, edges };
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: "application/json"
-    });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-
-    anchor.href = url;
-    anchor.download = "opensd_flow.json";
-    anchor.click();
-
-    URL.revokeObjectURL(url);
-  };
-
   const newCircuit = () => {
     setLayoutKey(MANUAL_LAYOUT_KEY);
     setDefaultLayoutNodes(initialNodes);
@@ -1242,10 +2172,35 @@ export default function App() {
     setNodes(initialNodes);
     setEdges(initialEdges);
     setModelStats(null);
+    setGeometryTemplate("<geometry/>");
+    setGeometryFilename("geometry.xml");
+    setOriginalGeometryFingerprint("");
     setImportStatus("Blank circuit workspace");
     setActiveWorkspace("model");
     setHasUnsavedLayout(false);
     setUndoStack([]);
+    setRedoStack([]);
+    setCopyStatus("");
+    graphClipboard.current = null;
+    setContextMenu(null);
+  };
+
+  const exportGeometry = () => {
+    try {
+      const unchanged = originalGeometryFingerprint && geometryFingerprint(nodes, edges) === originalGeometryFingerprint;
+      const { xml, warnings } = unchanged
+        ? { xml: geometryTemplate, warnings: [] }
+        : serializeOpenSdGeometry(geometryTemplate, nodes, edges);
+      const url = URL.createObjectURL(new Blob([xml], { type: "application/xml;charset=utf-8" }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = geometryFilename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setImportStatus(warnings.length ? `Exported ${geometryFilename} (${warnings.length} connectivity warning${warnings.length === 1 ? "" : "s"})` : `Exported ${geometryFilename}`);
+    } catch (error) {
+      setImportStatus(error.message);
+    }
   };
 
   const saveLayout = () => {
@@ -1256,17 +2211,11 @@ export default function App() {
 
   const exportLayout = () => {
     if (!nodes.length) return;
-
-    const blob = new Blob([JSON.stringify(serializeLayout(nodes, layoutKey), null, 2)], {
-      type: "application/json"
-    });
-    const url = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(new Blob([JSON.stringify(serializeLayout(nodes, layoutKey), null, 2)], { type: "application/json" }));
     const anchor = document.createElement("a");
-
     anchor.href = url;
     anchor.download = layoutFilename(layoutKey);
     anchor.click();
-
     URL.revokeObjectURL(url);
     setImportStatus("Layout sidecar exported");
   };
@@ -1383,6 +2332,9 @@ export default function App() {
           <button className="primary-button" onClick={() => fileInput.current?.click()}>
             Import XML
           </button>
+          <button className="secondary-button secondary-button--inline" onClick={exportGeometry} disabled={!nodes.length}>
+            Export XML
+          </button>
           <div className="status-text">{importStatus}</div>
         </section>
 
@@ -1394,6 +2346,60 @@ export default function App() {
           <button className="secondary-button secondary-button--inline" onClick={undoLastAction} disabled={!undoStack.length}>
             Undo
           </button>
+          <button className="secondary-button secondary-button--inline" onClick={redoLastAction} disabled={!redoStack.length}>
+            Redo
+          </button>
+          <button
+            className="secondary-button secondary-button--inline"
+            onClick={copySelectionToClipboard}
+            disabled={!selectedComponentCount}
+          >
+            Copy figure
+          </button>
+          <button
+            className="secondary-button secondary-button--inline"
+            onClick={exportSelectionToPng}
+            disabled={!selectedComponentCount}
+          >
+            Export PNG
+          </button>
+          <div className="align-tools" aria-label="Alignment tools">
+            <button type="button" title="Align left" onClick={() => alignSelectedComponents("left")} disabled={!canAlignSelection}>
+              Left
+            </button>
+            <button type="button" title="Align center" onClick={() => alignSelectedComponents("center")} disabled={!canAlignSelection}>
+              Center
+            </button>
+            <button type="button" title="Align right" onClick={() => alignSelectedComponents("right")} disabled={!canAlignSelection}>
+              Right
+            </button>
+            <button type="button" title="Align top" onClick={() => alignSelectedComponents("top")} disabled={!canAlignSelection}>
+              Top
+            </button>
+            <button type="button" title="Align middle" onClick={() => alignSelectedComponents("middle")} disabled={!canAlignSelection}>
+              Middle
+            </button>
+            <button type="button" title="Align bottom" onClick={() => alignSelectedComponents("bottom")} disabled={!canAlignSelection}>
+              Bottom
+            </button>
+            <button
+              type="button"
+              title="Distribute horizontally"
+              onClick={() => distributeSelectedComponents("horizontal")}
+              disabled={!canDistributeSelection}
+            >
+              Dist H
+            </button>
+            <button
+              type="button"
+              title="Distribute vertically"
+              onClick={() => distributeSelectedComponents("vertical")}
+              disabled={!canDistributeSelection}
+            >
+              Dist V
+            </button>
+          </div>
+          {copyStatus && <div className="status-text status-text--hint">{copyStatus}</div>}
           <button className="secondary-button secondary-button--inline" onClick={saveLayout} disabled={!nodes.length}>
             Save layout
           </button>
@@ -1453,9 +2459,6 @@ export default function App() {
           )}
         </section>
 
-        <button className="secondary-button" onClick={exportJSON}>
-          Export JSON
-        </button>
       </aside>
 
       <main className="workspace">
@@ -1487,10 +2490,49 @@ export default function App() {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            isValidConnection={isValidConnection}
             onDrop={onDrop}
             onDragOver={onDragOver}
             onPaneClick={onPaneClick}
+            onCanvasContextMenu={onCanvasContextMenu}
+            onNodeContextMenu={onNodeContextMenu}
+            onNodeDoubleClick={onNodeDoubleClick}
             fitViewTrigger={fitViewTrigger}
+          />
+        )}
+
+        {contextMenu && activeWorkspace === "model" && (
+          <div
+            className="canvas-context-menu"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+            onContextMenu={(event) => event.preventDefault()}
+          >
+            <button type="button" onClick={exportSelectionToPng} disabled={!selectedComponentCount}>
+              Export selection to PNG
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                copySelectionForCanvas();
+                pasteCanvasSelection();
+                closeContextMenu();
+              }}
+              disabled={!selectedComponentCount}
+            >
+              Duplicate selection
+            </button>
+            <button type="button" onClick={closeContextMenu}>
+              Close
+            </button>
+          </div>
+        )}
+
+        {attributeEditorNode && (
+          <AttributeEditor
+            key={attributeEditorNode.id}
+            node={attributeEditorNode}
+            onCancel={() => setAttributeEditorNodeId(null)}
+            onSave={saveComponentAttributes}
           />
         )}
 

@@ -103,6 +103,148 @@ button {
   margin-top: 0;
 }
 
+.align-tools {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.align-tools button {
+  min-width: 0;
+  height: 30px;
+  border: 1px solid #c7d7ee;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #27466f;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.align-tools button:hover {
+  background: #eef5ff;
+}
+
+.align-tools button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.canvas-context-menu {
+  position: fixed;
+  z-index: 30;
+  min-width: 190px;
+  padding: 6px;
+  border: 1px solid #c8d1df;
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow: 0 16px 34px rgba(16, 24, 40, 0.18);
+}
+
+.attribute-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(20 28 42 / 48%);
+  backdrop-filter: blur(2px);
+}
+
+.attribute-modal {
+  width: min(680px, 100%);
+  max-height: min(760px, calc(100vh - 48px));
+  overflow: auto;
+  padding: 22px;
+  border: 1px solid #cbd3df;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgb(20 28 42 / 28%);
+}
+
+.attribute-modal-header,
+.attribute-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.attribute-modal-header span {
+  color: #6b7585;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.attribute-modal-header h2 {
+  margin: 3px 0 0;
+  font-size: 1.2rem;
+}
+
+.attribute-close,
+.attribute-row button {
+  border: 0;
+  background: transparent;
+  color: #5d6878;
+  font-size: 1.35rem;
+  cursor: pointer;
+}
+
+.attribute-grid {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.8fr) minmax(220px, 1.4fr) 32px;
+  gap: 7px;
+  margin: 20px 0 12px;
+  align-items: center;
+}
+
+.attribute-row {
+  display: contents;
+}
+
+.attribute-row input {
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid #cbd3df;
+  border-radius: 6px;
+  font: inherit;
+}
+
+.attribute-row input:disabled {
+  color: #566174;
+  background: #f1f4f8;
+}
+
+.attribute-modal-actions {
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.canvas-context-menu button {
+  width: 100%;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #202938;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.canvas-context-menu button:hover {
+  background: #eef5ff;
+}
+
+.canvas-context-menu button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .status-text {
   min-height: 34px;
   color: #667085;
