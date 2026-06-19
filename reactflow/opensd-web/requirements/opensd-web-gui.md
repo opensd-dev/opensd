@@ -250,7 +250,7 @@ Full attributes shall appear in a **tooltip** on hover.
 
 ### GUI-035 — Selected component rotation (Must)
 
-When a component is selected, the GUI shall show a nearby clockwise rotate-icon control that rotates the component in 90 degree steps.
+When a component is selected, the GUI shall show a nearby clockwise rotate-icon control that rotates the component in 45 degree steps.
 
 **Acceptance:** Selecting a pipe or other non-circular component reveals the rotate button; circular fluid nodes do not show rotation controls; pipe flow handles follow the pipe orientation.
 
@@ -308,11 +308,11 @@ Fluid edges shall not display text labels (e.g. “up”, “down”) on the can
 
 ## 6. Boundary condition edges
 
-### GUI-050 — Vertical BC edges (Must)
+### GUI-050 — Nearest-side BC edges (Must)
 
-BC-to-node connections shall be **vertical** straight lines.
+BC-to-node connections shall be straight lines attached to the nearest side of the fluid node. The BC endpoint shall use its top or bottom side, whichever faces the node.
 
-**Acceptance:** BC source handle bottom; node target handle top (`bc-in`).
+**Acceptance:** Moving either endpoint reroutes the connection to the nearest left, right, top, or bottom handle on the fluid node and to the facing top or bottom handle on the BC.
 
 **Implementation:** `bcEdge()` in [src/App.jsx](../src/App.jsx).
 
@@ -406,11 +406,19 @@ When enthalpy is available, GUI may plot **temperature from total enthalpy** usi
 
 ---
 
-## 10. Non-goals
+## 10. Solver workspace
 
-### GUI-090 — Not a solver (Must)
+### GUI-090 — Edit settings and run solver (Must)
 
-The web app shall **not** run or replace the OpenSD C++ solver; it only visualizes inputs and HDF5 outputs.
+The web app shall provide a Solver tab for editing the settings supported by `opensd.Settings`, importing and exporting `settings.xml`, and running `/mnt/c/codes/opensd/build/opensd` against a selected OpenSD working directory.
+
+**Acceptance:** A run writes the edited `settings.xml`, optionally writes the current Model geometry, invokes the solver without a shell, and displays the command, exit status, standard output, and standard error.
+
+**Implementation:** [src/SolverPanel.jsx](../src/SolverPanel.jsx), [solverServer.js](../solverServer.js), and the Vite plugin registration in [vite.config.js](../vite.config.js).
+
+---
+
+## 11. Non-goals
 
 ---
 
@@ -424,7 +432,7 @@ Internal hslab layer networks shall not be expanded on the main canvas (see GUI-
 
 | ID | Summary | Primary file(s) |
 |----|---------|-------------------|
-| GUI-001 | Model + Postprocess tabs | `App.jsx` |
+| GUI-001 | Model + Solver + Postprocess tabs | `App.jsx` |
 | GUI-002 | XML import | `App.jsx` |
 | GUI-010 | Fit/zoom toolbar | `ModelFlowCanvas.jsx` |
 | GUI-012 | Canvas undo/redo | `App.jsx` |
@@ -452,3 +460,4 @@ Internal hslab layer networks shall not be expanded on the main canvas (see GUI-
 | GUI-063 | No layer nodes | `App.jsx` |
 | GUI-064 | Layers in tooltip | `App.jsx` |
 | GUI-080 | Browser requirements management | `App.jsx`, `App.css` |
+| GUI-090 | Edit settings and run solver | `SolverPanel.jsx`, `solverServer.js`, `vite.config.js` |

@@ -9,6 +9,7 @@ import {
 import "reactflow/dist/style.css";
 import "./App.css";
 import ModelFlowCanvas from "./ModelFlowCanvas.jsx";
+import SolverPanel from "./SolverPanel.jsx";
 import guiRequirementsMarkdown from "../requirements/opensd-web-gui.md?raw";
 import {
   CIRCUIT_ROW_GAP,
@@ -421,6 +422,29 @@ function rerouteFlowEdges(nodes, edges) {
       ...edge,
       sourceHandle: preferences.sourceIsPipe ? "flow-out" : flowHandleForSide(sourceSide, "out", slotForSide(edge.source, sourceSide)),
       targetHandle: preferences.targetIsPipe ? "flow-in" : flowHandleForSide(targetSide, "in", slotForSide(edge.target, targetSide))
+    };
+  });
+}
+
+function rerouteBcEdges(nodes, edges) {
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+
+  return edges.map((edge) => {
+    if (edge.className !== "bc-edge") return edge;
+
+    const sourceNode = nodeById.get(edge.source);
+    const targetNode = nodeById.get(edge.target);
+    if (!sourceNode || !targetNode) return edge;
+
+    const sourceCenter = nodeCenter(sourceNode);
+    const targetCenter = nodeCenter(targetNode);
+    const sourceSide = targetCenter.y < sourceCenter.y ? "top" : "bottom";
+    const targetSide = preferredSourceSide(targetNode, sourceNode);
+
+    return {
+      ...edge,
+      sourceHandle: `bc-${sourceSide}-out`,
+      targetHandle: `bc-${targetSide}-in`
     };
   });
 }
@@ -1898,7 +1922,7 @@ export default function App() {
                 ...node,
                 data: {
                   ...node.data,
-                  rotation: ((node.data.rotation ?? 0) + 90) % 360
+                  rotation: ((node.data.rotation ?? 0) + 45) % 360
                 }
               }
             : node
@@ -1909,7 +1933,10 @@ export default function App() {
     [pushUndoSnapshot, setNodes]
   );
 
-  const renderedEdges = useMemo(() => rerouteFlowEdges(nodes, rerouteHeatEdges(nodes, edges)), [edges, nodes]);
+  const renderedEdges = useMemo(
+    () => rerouteBcEdges(nodes, rerouteFlowEdges(nodes, rerouteHeatEdges(nodes, edges))),
+    [edges, nodes]
+  );
 
   const copySelectionToClipboard = useCallback(async () => {
     const storedForCanvas = copySelectionForCanvas();
@@ -2203,6 +2230,12 @@ export default function App() {
     }
   };
 
+  const currentGeometryXml = useCallback(() => {
+    if (!nodes.length) return null;
+    const unchanged = originalGeometryFingerprint && geometryFingerprint(nodes, edges) === originalGeometryFingerprint;
+    return unchanged ? geometryTemplate : serializeOpenSdGeometry(geometryTemplate, nodes, edges).xml;
+  }, [edges, geometryTemplate, nodes, originalGeometryFingerprint]);
+
   const saveLayout = () => {
     saveStoredLayout(layoutKey, nodes);
     setHasUnsavedLayout(false);
@@ -2476,6 +2509,12 @@ export default function App() {
             Postprocess
           </button>
           <button
+            className={activeWorkspace === "solver" ? "active" : ""}
+            onClick={() => setActiveWorkspace("solver")}
+          >
+            Solver
+          </button>
+          <button
             className={activeWorkspace === "requirements" ? "active" : ""}
             onClick={() => setActiveWorkspace("requirements")}
           >
@@ -2621,6 +2660,10 @@ export default function App() {
               )}
             </div>
           </section>
+        )}
+
+        {activeWorkspace === "solver" && (
+          <SolverPanel currentGeometryXml={currentGeometryXml} />
         )}
 
         {activeWorkspace === "requirements" && (

@@ -33,7 +33,8 @@ function BcNode({ id, data, selected }) {
       onMouseLeave={() => setHovered(false)}
     >
       <RotateButton id={id} data={data} selected={selected} />
-      <Handle type="source" id="bc-out" position={Position.Bottom} />
+      <Handle type="source" id="bc-top-out" position={Position.Top} />
+      <Handle type="source" id="bc-bottom-out" position={Position.Bottom} />
       <span className="bc-node__label">{shortLabel(data.identifier, 10)}</span>
       <NodeTooltip lines={tooltipLines} visible={hovered} />
     </div>

@@ -73,7 +73,15 @@ function FlowNode({ data }) {
           style={style}
         />
       ))}
-      <Handle type="target" id="bc-in" position={Position.Top} className="handle-flow" />
+      {flowHandles.map(([side, position]) => (
+        <Handle
+          key={`bc-${side}-in`}
+          type="target"
+          id={`bc-${side}-in`}
+          position={position}
+          className="handle-flow"
+        />
+      ))}
       {heat.htIn && (
         <Handle
           type="target"

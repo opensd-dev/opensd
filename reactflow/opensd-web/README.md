@@ -14,6 +14,7 @@ Open the URL shown in the terminal (typically `http://localhost:5173`).
 ## Features
 
 - **Model** — Import `geometry.xml`, interactive graph (fluid nodes, pipes, BCs, hslabs).
+- **Solver** — Edit/import/export `settings.xml` and run `/mnt/c/codes/opensd/build/opensd` in a selected OpenSD working directory.
 - **Postprocess** — Import HDF5, plot node variables along pipes.
 
 ## Requirements
