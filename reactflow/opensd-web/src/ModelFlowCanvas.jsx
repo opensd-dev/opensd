@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import ReactFlow, {
   Background,
   ConnectionMode,
@@ -30,6 +30,7 @@ function ModelFlowInner({
   fitViewTrigger
 }) {
   const { fitView, screenToFlowPosition, zoomIn, zoomOut } = useReactFlow();
+  const selectionStart = useRef(null);
 
   useEffect(() => {
     if (fitViewTrigger <= 0) return undefined;
@@ -50,6 +51,49 @@ function ModelFlowInner({
   const handlePaneClick = (event) => {
     const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
     onPaneClick(event, position);
+  };
+
+  const handleSelectionStart = (event) => {
+    selectionStart.current = {
+      x: event.clientX,
+      y: event.clientY,
+      additive: event.ctrlKey || event.metaKey,
+      selectedIds: new Set(nodes.filter((node) => node.selected).map((node) => node.id))
+    };
+  };
+
+  const handleSelectionEnd = (event) => {
+    const start = selectionStart.current;
+    selectionStart.current = null;
+    if (!start || event.clientX >= start.x) return;
+
+    const selectionRect = {
+      left: event.clientX,
+      right: start.x,
+      top: Math.min(start.y, event.clientY),
+      bottom: Math.max(start.y, event.clientY)
+    };
+
+    requestAnimationFrame(() => {
+      const nodeElements = new Map(
+        Array.from(document.querySelectorAll(".canvas-wrap .react-flow__node[data-id]"))
+          .map((element) => [element.getAttribute("data-id"), element])
+      );
+      const changes = nodes.map((node) => {
+        const rect = nodeElements.get(node.id)?.getBoundingClientRect();
+        const intersects = Boolean(rect
+          && rect.left < selectionRect.right
+          && rect.right > selectionRect.left
+          && rect.top < selectionRect.bottom
+          && rect.bottom > selectionRect.top);
+        return {
+          id: node.id,
+          type: "select",
+          selected: intersects || (start.additive && start.selectedIds.has(node.id))
+        };
+      });
+      onNodesChange(changes);
+    });
   };
 
   return (
@@ -94,9 +138,13 @@ function ModelFlowInner({
         onPaneContextMenu={onCanvasContextMenu}
         onNodeContextMenu={onNodeContextMenu}
         onNodeDoubleClick={onNodeDoubleClick}
+        onSelectionStart={handleSelectionStart}
+        onSelectionEnd={handleSelectionEnd}
         connectionMode={ConnectionMode.Loose}
         deleteKeyCode={["Backspace", "Delete"]}
-        multiSelectionKeyCode={null}
+        multiSelectionKeyCode={["Control", "Meta"]}
+        elementsSelectable
+        edgesFocusable
         panOnDrag={[1, 2]}
         selectionOnDrag
         fitView

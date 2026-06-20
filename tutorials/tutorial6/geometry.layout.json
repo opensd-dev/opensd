@@ -1,0 +1,112 @@
+{
+  "schema": "opensd-web-layout/v1",
+  "source": "geometry:geometry.xml",
+  "savedAt": "2026-06-20T10:56:35.453Z",
+  "nodes": {
+    "circuit:circuit1": {
+      "position": {
+        "x": 154.00000000000006,
+        "y": -56.6872663066503
+      },
+      "rotation": 0
+    },
+    "node:node1": {
+      "position": {
+        "x": 258.3311598216453,
+        "y": -54.64663044745444
+      },
+      "rotation": 0
+    },
+    "pipe:pipe1": {
+      "position": {
+        "x": 255.33115982164531,
+        "y": -155.47867434646935
+      },
+      "rotation": 270
+    },
+    "node:node2": {
+      "position": {
+        "x": 258.3311598216453,
+        "y": -223.73711190864182
+      },
+      "rotation": 0
+    },
+    "bc:circuit1:bc1": {
+      "position": {
+        "x": 194.05330151896896,
+        "y": 16.373869792028458
+      },
+      "rotation": 0
+    },
+    "bc:circuit1:bc2": {
+      "position": {
+        "x": 247.33115982164531,
+        "y": 13.360447758645819
+      },
+      "rotation": 0
+    },
+    "bc:circuit1:bc3": {
+      "position": {
+        "x": 247.33115982164531,
+        "y": -300.32396191685785
+      },
+      "rotation": 0
+    },
+    "circuit:circuit2": {
+      "position": {
+        "x": 492.9877837182411,
+        "y": -227.11600711428994
+      },
+      "rotation": 180
+    },
+    "node:node3": {
+      "position": {
+        "x": 428.986635453651,
+        "y": -223.73711190864182
+      },
+      "rotation": 0
+    },
+    "pipe:pipe2": {
+      "position": {
+        "x": 425.986635453651,
+        "y": -153.91284134705788
+      },
+      "rotation": 90
+    },
+    "node:node4": {
+      "position": {
+        "x": 428.986635453651,
+        "y": -52.75317586335399
+      },
+      "rotation": 0
+    },
+    "bc:circuit2:bc4": {
+      "position": {
+        "x": 417.986635453651,
+        "y": -300.32396191685785
+      },
+      "rotation": 0
+    },
+    "bc:circuit2:bc5": {
+      "position": {
+        "x": 358.4734006179113,
+        "y": -300.32396191685785
+      },
+      "rotation": 0
+    },
+    "bc:circuit2:bc6": {
+      "position": {
+        "x": 417.986635453651,
+        "y": 16.406489620349873
+      },
+      "rotation": 0
+    },
+    "hslab:hslab1": {
+      "position": {
+        "x": 339.4824184201026,
+        "y": -155.28710171414053
+      },
+      "rotation": 90
+    }
+  }
+}

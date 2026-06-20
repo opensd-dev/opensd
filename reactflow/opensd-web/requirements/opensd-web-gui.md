@@ -8,11 +8,11 @@
 
 ## 1. Application scope
 
-### GUI-001 — Dual workspaces (Must)
+### GUI-001 — Application workspaces (Must)
 
-The application shall provide two tabs: **Model** (geometry graph) and **Postprocess** (HDF5 plots).
+The application shall provide tabs in this order: **Pre-processor** (geometry graph), **Solver**, **Postprocessor** (HDF5 plots), and **Requirements**.
 
-**Acceptance:** Tab switch preserves loaded data; Model shows React Flow canvas; Postprocess shows import controls and line plot.
+**Acceptance:** Tab switching preserves loaded data; Pre-processor shows the React Flow canvas; Solver shows solver controls; Postprocessor shows result import controls and line plots.
 
 **Implementation:** [src/App.jsx](../src/App.jsx).
 
@@ -80,9 +80,9 @@ The model canvas shall support undoing recent graph-edit actions with **Ctrl+Z**
 
 ### GUI-013 — Drag selection and delete (Must)
 
-The model canvas shall allow left-click drag selection of components and deletion of selected components.
+The model canvas shall support directional drag selection, additive Ctrl/Command-click selection, visible selection highlighting, and deletion of selected components or connections.
 
-**Acceptance:** Dragging a selection rectangle selects multiple components; selected components can be moved together and deleted with Delete/Backspace.
+**Acceptance:** Dragging left-to-right selects components fully enclosed by the rectangle. Dragging right-to-left selects components that are fully or partially enclosed. Ctrl/Command-click adds individual components to the selection. Selected components and connections are clearly highlighted; either can be deleted with Delete/Backspace.
 
 **Implementation:** React Flow selection settings in [src/ModelFlowCanvas.jsx](../src/ModelFlowCanvas.jsx).
 
@@ -100,21 +100,21 @@ The left sidebar shall scroll vertically when controls exceed viewport height.
 
 ## 3. Layout
 
-### GUI-020 — One horizontal row per circuit (Must)
+### GUI-020 — Separate layout region per circuit (Must)
 
-Each **circuit** shall be laid out on its own horizontal **row** (distinct vertical position).
+Each **circuit** shall be laid out in its own non-overlapping vertical region.
 
-**Acceptance:** Multiple circuits do not share the same baseline Y.
+**Acceptance:** Components and BC stacks from different circuits do not overlap.
 
-**Implementation:** [src/circuitLayout.js](../src/circuitLayout.js) `CIRCUIT_ROW_GAP`.
+**Implementation:** Dynamic circuit bounds in [src/circuitLayout.js](../src/circuitLayout.js).
 
 ---
 
-### GUI-021 — In-line fluid chain (Must)
+### GUI-021 — Layered fluid topology (Must)
 
-Within a circuit, connected **nodes and pipes** shall appear in a single left-to-right **chain** (node → pipe → node → …), not in separate columns by type.
+Within a circuit, connected **nodes, pipes, and pumps** shall use topology-derived horizontal layers and vertical branch lanes.
 
-**Acceptance:** Order derived from pipe `unode`/`dnode` topology walk.
+**Acceptance:** Branches spread vertically, component boxes do not overlap, and dense networks avoid coincident connector paths where practical.
 
 **Implementation:** `buildHorizontalSequence()` in [src/circuitLayout.js](../src/circuitLayout.js).
 
@@ -122,9 +122,9 @@ Within a circuit, connected **nodes and pipes** shall appear in a single left-to
 
 ### GUI-022 — Circuit label at row start (Must)
 
-The circuit identifier shall appear as the first element on the row, linked to the first component in the chain.
+The circuit identifier shall appear at the start of its layout region, linked to the first component.
 
-**Acceptance:** Rectangle labeled with circuit id; one edge to first node or pipe.
+**Acceptance:** Rectangle labeled with circuit id; one gray dotted membership edge to the first node, pipe, or pump, visually distinct from physical blue fluid-flow and orange heat-flow edges.
 
 **Implementation:** [src/App.jsx](../src/App.jsx) `parseGeometryXml`.
 
@@ -132,9 +132,9 @@ The circuit identifier shall appear as the first element on the row, linked to t
 
 ### GUI-023 — Spacing between elements (Must)
 
-Horizontal spacing between node and pipe slots shall be large enough for large networks to remain readable.
+Horizontal and vertical spacing shall be large enough for component shapes and labels to remain readable.
 
-**Acceptance:** `NODE_STEP` and `PIPE_STEP` in layout (currently 64 and 96 px).
+**Acceptance:** Layer and lane spacing account for branches, BC stacks, and component collision clearance.
 
 **Implementation:** [src/circuitLayout.js](../src/circuitLayout.js).
 
@@ -194,7 +194,7 @@ The model workspace should allow selected components to be copied and pasted wit
 
 The model workspace should provide diagramming alignment controls similar to PowerPoint or Flownex.
 
-**Acceptance:** Selected components can be aligned left/right/center/top/bottom/middle. Three or more selected components can be distributed horizontally or vertically. Alignment actions participate in undo/redo.
+**Acceptance:** Selected components can be aligned on a common vertical or horizontal axis, moved left/right/up/down in fixed increments, moved closer together or farther apart along either axis, and distributed horizontally or vertically. These actions participate in undo/redo.
 
 **Implementation:** Selection layout tools in [src/App.jsx](../src/App.jsx), controls styled in [src/App.css](../src/App.css).
 
@@ -220,7 +220,7 @@ The model workspace should provide diagramming alignment controls similar to Pow
 
 ### GUI-032 — BCs above target node (Must)
 
-**Boundary conditions** shall render as small rectangles **above** the attached flow node.
+**Boundary conditions** shall render as circles larger than fluid nodes **above** the attached flow node, with a visible `BC` mark and identifier label so they remain distinct from pipes.
 
 **Implementation:** [src/BcNode.jsx](../src/BcNode.jsx), vertical layout in [src/circuitLayout.js](../src/circuitLayout.js).
 
@@ -252,9 +252,9 @@ Full attributes shall appear in a **tooltip** on hover.
 
 When a component is selected, the GUI shall show a nearby clockwise rotate-icon control that rotates the component in 45 degree steps.
 
-**Acceptance:** Selecting a pipe or other non-circular component reveals the rotate button; circular fluid nodes do not show rotation controls; pipe flow handles follow the pipe orientation.
+**Acceptance:** Selecting a pipe or other non-circular component reveals the rotate button; circular fluid nodes and BCs do not show rotation controls; pipe flow handles follow the pipe orientation.
 
-**Implementation:** Rotate controls in [src/PipeNode.jsx](../src/PipeNode.jsx), [src/BcNode.jsx](../src/BcNode.jsx); rotation state in [src/App.jsx](../src/App.jsx).
+**Implementation:** Rotate controls in [src/PipeNode.jsx](../src/PipeNode.jsx); rotation state in [src/App.jsx](../src/App.jsx).
 
 ---
 
@@ -262,9 +262,19 @@ When a component is selected, the GUI shall show a nearby clockwise rotate-icon 
 
 The component palette shall show compact symbols that match the component shape used on the canvas.
 
-**Acceptance:** Fluid nodes use circle glyphs; pipes/pumps/valves/hslabs/BCs use rectangle glyphs matching their canvas styling.
+**Acceptance:** Fluid nodes use small circle glyphs; BCs use larger circle glyphs; pumps use a circular impeller/flow glyph; pipes, valves, and hslabs use rectangle glyphs matching their canvas styling.
 
 **Implementation:** Palette glyphs in [src/App.jsx](../src/App.jsx), styles in [src/App.css](../src/App.css).
+
+---
+
+### GUI-037 — Pump component (Must)
+
+The pre-processor shall provide a distinct pump component representing a two-node pressure-raising flow element.
+
+**Acceptance:** The palette and canvas show a recognizable pump symbol with inlet/outlet flow handles. Imported `<vspump>` and `<hpump>` elements retain their model type and attributes; newly added pumps default to `<vspump>` attributes including `Nop`, `curve_speed`, and `curve_file`.
+
+**Implementation:** Pump parsing and serialization in [src/App.jsx](../src/App.jsx), pump symbol in [src/PipeNode.jsx](../src/PipeNode.jsx) and [src/App.css](../src/App.css), based on `VSPump`/`HPump` in [opensd/turbo.py](../../../opensd/turbo.py).
 
 ---
 
@@ -272,9 +282,9 @@ The component palette shall show compact symbols that match the component shape 
 
 ### GUI-040 — Multi-pipe fluid node connectivity (Must)
 
-Fluid nodes shall act as junctions and may connect to any number of pipes. Fluid nodes shall not display upstream/downstream arrow glyphs of their own. A fluid edge shall not connect a node to itself.
+Fluid nodes shall act as junctions and may connect to any number of pipes. Fluid nodes shall not display upstream/downstream arrow glyphs of their own. A fluid edge shall not connect a node to itself, and direct fluid-node-to-fluid-node connections shall be rejected.
 
-**Acceptance:** Multiple pipes can connect to the same fluid node; fluid flow connections use unobtrusive handles rather than visible arrow glyphs; attempts to connect from and to the same node are rejected.
+**Acceptance:** Multiple pipes can connect to the same fluid node; fluid flow connections use unobtrusive handles rather than visible arrow glyphs; self-connections and direct node-to-node connections are rejected.
 
 **Implementation:** Invisible four-sided `flow-*` handles in [src/FlowNode.jsx](../src/FlowNode.jsx); pipe-side flow state in [src/App.jsx](../src/App.jsx).
 
@@ -312,7 +322,7 @@ Fluid edges shall not display text labels (e.g. “up”, “down”) on the can
 
 BC-to-node connections shall be straight lines attached to the nearest side of the fluid node. The BC endpoint shall use its top or bottom side, whichever faces the node.
 
-**Acceptance:** Moving either endpoint reroutes the connection to the nearest left, right, top, or bottom handle on the fluid node and to the facing top or bottom handle on the BC.
+**Acceptance:** Moving either endpoint reroutes the connection to the nearest left, right, top, or bottom handle on the fluid node and to the facing top or bottom handle on the BC. BC handles retain their connection hit area but are not visibly rendered as dots.
 
 **Implementation:** `bcEdge()` in [src/App.jsx](../src/App.jsx).
 
@@ -348,9 +358,9 @@ Heat connections to/from **pipes** and hslabs shall attach to the nearest **top*
 
 ### GUI-062 — Conditional heat handles (Must)
 
-Orange **heat connector** handles shall appear **only** on components that participate in at least one hslab heat edge.
+Heat connector handles shall retain an invisible connection hit area only on components that participate in at least one hslab heat edge.
 
-**Acceptance:** Components with no hslab link show no `ht-in`/`ht-out` dots.
+**Acceptance:** No orange heat-port dots are visible on pipes, hslabs, or nodes; existing and newly created heat connections can still attach to the appropriate handles.
 
 **Implementation:** `buildHeatHandleMap()` in [src/edgeUtils.js](../src/edgeUtils.js).
 
@@ -432,25 +442,27 @@ Internal hslab layer networks shall not be expanded on the main canvas (see GUI-
 
 | ID | Summary | Primary file(s) |
 |----|---------|-------------------|
-| GUI-001 | Model + Solver + Postprocess tabs | `App.jsx` |
+| GUI-001 | Pre-processor + Solver + Postprocessor tabs | `App.jsx` |
 | GUI-002 | XML import | `App.jsx` |
 | GUI-010 | Fit/zoom toolbar | `ModelFlowCanvas.jsx` |
 | GUI-012 | Canvas undo/redo | `App.jsx` |
-| GUI-013 | Drag selection and delete | `ModelFlowCanvas.jsx` |
+| GUI-013 | Directional/additive selection and delete | `ModelFlowCanvas.jsx`, `App.css` |
 | GUI-014 | Scrollable sidebar | `App.css` |
-| GUI-020 | Row per circuit | `circuitLayout.js` |
-| GUI-021 | Horizontal chain | `circuitLayout.js` |
+| GUI-020 | Separate circuit regions | `circuitLayout.js` |
+| GUI-021 | Layered fluid topology | `circuitLayout.js` |
 | GUI-024 | All pipe edges | `App.jsx` |
 | GUI-025 | Persistent layout | `App.jsx` |
 | GUI-026 | Circuit workspace controls | `App.jsx`, `ModelFlowCanvas.jsx` |
 | GUI-027 | Copy/export selected figure | `App.jsx` |
-| GUI-028 | Alignment tools | `App.jsx`, `App.css` |
+| GUI-028 | Alignment, nudge, and spacing tools | `App.jsx`, `App.css` |
 | GUI-029 | Duplicate selected components | `App.jsx` |
 | GUI-030 | Circle nodes | `FlowNode.jsx` |
 | GUI-031 | Rectangle pipes | `PipeNode.jsx` |
+| GUI-032 | Circular BCs above target nodes | `BcNode.jsx`, `circuitLayout.js`, `App.css` |
 | GUI-034 | Hover tooltips | `NodeTooltip.jsx` |
-| GUI-035 | Rotate selected component | `PipeNode.jsx`, `BcNode.jsx`, `App.jsx` |
+| GUI-035 | Rotate selected non-circular component | `PipeNode.jsx`, `App.jsx` |
 | GUI-036 | Component palette symbols | `App.jsx`, `App.css` |
+| GUI-037 | Pump component and XML | `App.jsx`, `PipeNode.jsx`, `App.css` |
 | GUI-040 | Multi-pipe fluid nodes | `FlowNode.jsx`, `App.jsx` |
 | GUI-042 | No pipe-attached fluid arrows | `PipeNode.jsx`, `App.css` |
 | GUI-050 | Vertical BCs | `BcNode.jsx`, `App.jsx` |

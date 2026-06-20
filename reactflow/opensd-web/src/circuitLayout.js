@@ -1,6 +1,6 @@
 const PIPE_STEP = 96;
-const BC_STACK_GAP = 46;
-const BC_LIFT = 58;
+const BC_STACK_GAP = 58;
+const BC_LIFT = 68;
 const CIRCUIT_LABEL_WIDTH = 88;
 const LAYER_STEP_X = 176;
 const LANE_GAP = 20;
@@ -168,8 +168,8 @@ export function layoutCircuitRow({ circuitId, sequence, bcRecords, previousBotto
       occupied.push({
         x: anchor.x,
         y: yOffset + anchor.y - BC_LIFT - index * BC_STACK_GAP,
-        width: 52,
-        height: 24
+        width: 44,
+        height: 44
       });
     }
   }

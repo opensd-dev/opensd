@@ -25,6 +25,7 @@ const LAYOUT_STORAGE_KEY = "opensd-web:component-layouts:v1";
 const MANUAL_LAYOUT_KEY = "manual";
 const MAX_UNDO_STEPS = 80;
 const FLOW_NODE_SIZE = { width: 22, height: 22 };
+const BC_NODE_SIZE = { width: 44, height: 44 };
 const PIPE_NODE_SIZE = { width: 64, height: 28 };
 const PIPE_NODE_VERTICAL_SIZE = { width: 28, height: 64 };
 const FLOW_SIDES = ["left", "right", "top", "bottom"];
@@ -115,10 +116,13 @@ function mandatoryAttributes(type, identifier) {
   if (type === "HSlab") {
     return { identifier, ucomp: "", uvar: "node", uval: "0.0", utype: "fixed", dcomp: "", dvar: "node", dval: "0.0", dtype: "fixed", uarea: "1.0", ninc: "1" };
   }
+  if (type === "Pump") {
+    return { identifier, curve_speed: "100.0", curve_file: "pump_curve.csv", Nop: "100.0", unode: "", dnode: "" };
+  }
   return { identifier, diameter: "1.0", length: "1.0", ncell: "1", unode: "", dnode: "", roughness: "0.0", cfarea: "1.0", heat_input: "0.0" };
 }
 
-function buildPipeNode({ id, position, identifier, details = [], kind = "pipe", heatHandleMap, circuitId = "", xmlAttributes = {}, sourceIdentifier = identifier }) {
+function buildPipeNode({ id, position, identifier, details = [], kind = "pipe", xmlTag = kind === "pump" ? "vspump" : "pipe", heatHandleMap, circuitId = "", xmlAttributes = {}, sourceIdentifier = identifier }) {
   return {
     id,
     type: "pipe",
@@ -126,6 +130,7 @@ function buildPipeNode({ id, position, identifier, details = [], kind = "pipe", 
     data: {
       ...nodeData(identifier, details),
       kind,
+      xmlTag,
       heat: heatFor(id, heatHandleMap),
       flowConnections: emptyFlowConnections(),
       rotation: 0,
@@ -250,6 +255,18 @@ function rerouteHeatEdges(nodes, edges) {
   });
 }
 
+function circuitEdge(id, source, target) {
+  return {
+    id,
+    source,
+    target,
+    sourceHandle: "flow-out",
+    targetHandle: "flow-in",
+    type: "straight",
+    className: "circuit-edge"
+  };
+}
+
 function nodeSize(node) {
   const measured = node.measured ?? {};
   if (node.width || node.height || measured.width || measured.height) {
@@ -263,6 +280,8 @@ function nodeSize(node) {
     const rotation = ((node.data?.rotation ?? 0) % 360 + 360) % 360;
     return rotation === 90 || rotation === 270 ? PIPE_NODE_VERTICAL_SIZE : PIPE_NODE_SIZE;
   }
+
+  if (node.type === "bc") return BC_NODE_SIZE;
 
   return FLOW_NODE_SIZE;
 }
@@ -618,6 +637,7 @@ function geometryFingerprint(nodes, edges) {
       id: node.id,
       type: node.type,
       kind: node.data.kind ?? "",
+      xmlTag: node.data.xmlTag ?? "",
       identifier: node.data.identifier,
       circuitId: node.data.circuitId ?? "",
       attributes: node.data.xmlAttributes ?? {}
@@ -734,6 +754,54 @@ function distributeNodes(nodes, axis) {
   });
 
   return nodes.map((node) => (nextPositionById.has(node.id) ? { ...node, position: nextPositionById.get(node.id) } : node));
+}
+
+function moveSelectedNodes(nodes, direction, distance = 12) {
+  const delta = {
+    left: { x: -distance, y: 0 },
+    right: { x: distance, y: 0 },
+    up: { x: 0, y: -distance },
+    down: { x: 0, y: distance }
+  }[direction];
+  if (!delta) return nodes;
+
+  return nodes.map((node) => node.selected
+    ? { ...node, position: { x: node.position.x + delta.x, y: node.position.y + delta.y } }
+    : node);
+}
+
+function adjustSelectedSpacing(nodes, axis, direction) {
+  const bounds = selectedNodeBounds(selectedNodes(nodes));
+  if (bounds.length < 2) return nodes;
+
+  const centerKey = axis === "horizontal" ? "centerX" : "centerY";
+  const positionKey = axis === "horizontal" ? "x" : "y";
+  const sizeKey = axis === "horizontal" ? "width" : "height";
+  const centers = bounds.map((bound) => bound[centerKey]);
+  const groupCenter = (Math.min(...centers) + Math.max(...centers)) / 2;
+  const currentSpan = Math.max(...centers) - Math.min(...centers);
+  const desiredSpan = direction === "farther" ? currentSpan + 24 : Math.max(24, currentSpan - 24);
+  const scale = currentSpan > 0 ? desiredSpan / currentSpan : 1;
+  const nextPositionById = new Map();
+
+  for (const bound of bounds) {
+    const nextCenter = groupCenter + (bound[centerKey] - groupCenter) * scale;
+    nextPositionById.set(bound.node.id, {
+      ...bound.node.position,
+      [positionKey]: nextCenter - bound[sizeKey] / 2
+    });
+  }
+
+  return nodes.map((node) => nextPositionById.has(node.id)
+    ? { ...node, position: nextPositionById.get(node.id) }
+    : node);
+}
+
+function isAllowedConnection(connection, nodes) {
+  if (!connection.source || !connection.target || connection.source === connection.target) return false;
+  const source = nodes.find((node) => node.id === connection.source);
+  const target = nodes.find((node) => node.id === connection.target);
+  return !(source?.type === "flow" && target?.type === "flow");
 }
 
 function graphClipboardFromSelection(nodes, edges) {
@@ -1309,6 +1377,7 @@ function parseGeometryXml(xmlText) {
     circuits: 0,
     nodes: 0,
     pipes: 0,
+    pumps: 0,
     hslabs: 0,
     bcs: 0
   };
@@ -1337,7 +1406,7 @@ function parseGeometryXml(xmlText) {
     stats.circuits += 1;
 
     const nodeElements = Array.from(circuit.querySelectorAll(":scope > node"));
-    const pipeElements = Array.from(circuit.querySelectorAll(":scope > pipe"));
+    const pipeElements = Array.from(circuit.querySelectorAll(":scope > pipe, :scope > vspump, :scope > hpump"));
     const bcElements = Array.from(circuit.querySelectorAll(":scope > bc"));
 
     const nodeByName = new Map();
@@ -1351,12 +1420,17 @@ function parseGeometryXml(xmlText) {
     });
 
     const pipes = pipeElements.map((pipeEl, pipeIndex) => {
-      const pipeName = attr(pipeEl, "identifier", `pipe_${pipeIndex + 1}`);
-      stats.pipes += 1;
+      const xmlTag = pipeEl.tagName.toLowerCase();
+      const isPump = xmlTag === "vspump" || xmlTag === "hpump";
+      const pipeName = attr(pipeEl, "identifier", `${isPump ? "pump" : "pipe"}_${pipeIndex + 1}`);
+      if (isPump) stats.pumps += 1;
+      else stats.pipes += 1;
       return {
         name: pipeName,
         unode: attr(pipeEl, "unode"),
         dnode: attr(pipeEl, "dnode"),
+        kind: isPump ? "pump" : "pipe",
+        xmlTag,
         element: pipeEl
       };
     });
@@ -1421,11 +1495,14 @@ function parseGeometryXml(xmlText) {
           id: `pipe:${item.name}`,
           position: positions.get(`pipe:${item.name}`),
           identifier: item.name,
+          kind: pipe.kind,
+          xmlTag: pipe.xmlTag,
           circuitId,
           xmlAttributes: attributesOf(pipe.element),
           details: [
-            attr(pipe.element, "ncell") && `${attr(pipe.element, "ncell")} cells`,
-            attr(pipe.element, "diameter") && `D ${attr(pipe.element, "diameter")} m`,
+            pipe.kind === "pump" && attr(pipe.element, "Nop") && `speed ${attr(pipe.element, "Nop")}`,
+            pipe.kind === "pipe" && attr(pipe.element, "ncell") && `${attr(pipe.element, "ncell")} cells`,
+            pipe.kind === "pipe" && attr(pipe.element, "diameter") && `D ${attr(pipe.element, "diameter")} m`,
             pipe.unode && pipe.dnode && `${pipe.unode} → ${pipe.dnode}`
           ]
         })
@@ -1479,7 +1556,7 @@ function parseGeometryXml(xmlText) {
     if (sequence.length > 0) {
       const first = sequence[0];
       const firstId = first.kind === "node" ? `node:${first.name}` : `pipe:${first.name}`;
-      pushEdge(flowEdge(`${circuitNodeId}->${firstId}`, circuitNodeId, firstId));
+      pushEdge(circuitEdge(`${circuitNodeId}->${firstId}`, circuitNodeId, firstId));
     }
 
     for (const pipe of pipes) {
@@ -1622,13 +1699,14 @@ function serializeOpenSdGeometry(templateXml, nodes, edges) {
     const circuitId = renamedCircuitIds.get(node.data.circuitId) ?? node.data.circuitId;
     return circuitElements.has(circuitId) ? circuitId : firstCircuitId;
   };
-  const usedByKind = { node: new Set(), pipe: new Set(), bc: new Set(), hslab: new Set() };
+  const usedByKind = { node: new Set(), pipe: new Set(), pump: new Set(), bc: new Set(), hslab: new Set() };
   const identifierById = new Map();
 
   for (const node of nodes) {
     let kind = node.type;
     if (node.data.kind === "circuit") continue;
     if (node.data.kind === "hslab") kind = "hslab";
+    else if (node.data.kind === "pump") kind = "pump";
     else if (node.type === "flow") kind = "node";
     else if (node.type === "pipe") kind = "pipe";
     const preferred = node.data.identifier;
@@ -1637,7 +1715,7 @@ function serializeOpenSdGeometry(templateXml, nodes, edges) {
 
   const existing = new Map();
   for (const circuit of circuitElements.values()) {
-    for (const tag of ["node", "pipe", "bc"]) {
+    for (const tag of ["node", "pipe", "vspump", "hpump", "bc"]) {
       for (const element of directChildren(circuit, tag)) existing.set(`${tag}:${element.getAttribute("identifier")}`, element);
     }
   }
@@ -1697,16 +1775,26 @@ function serializeOpenSdGeometry(templateXml, nodes, edges) {
         }
       }
     } else if (node.type === "pipe") {
-      const element = ensureElement("pipe", node);
+      const isPump = node.data.kind === "pump";
+      const pumpTag = node.data.xmlTag === "hpump" ? "hpump" : "vspump";
+      const element = ensureElement(isPump ? pumpTag : "pipe", node);
       const upstream = connectionTo(node.id, "in", isFluidNode);
       const downstream = connectionTo(node.id, "out", isFluidNode);
       if (upstream) element.setAttribute("unode", identifierById.get(upstream.id));
       else { element.removeAttribute("unode"); warnings.push(`${identifierById.get(node.id)} has no upstream node`); }
       if (downstream) element.setAttribute("dnode", identifierById.get(downstream.id));
       else { element.removeAttribute("dnode"); warnings.push(`${identifierById.get(node.id)} has no downstream node`); }
-      if (!element.hasAttribute("diameter")) element.setAttribute("diameter", "1.0");
-      if (!element.hasAttribute("length")) element.setAttribute("length", "1.0");
-      if (!element.hasAttribute("ncell")) element.setAttribute("ncell", "1");
+      if (isPump) {
+        if (!element.hasAttribute("Nop")) element.setAttribute("Nop", "100.0");
+        if (pumpTag === "vspump") {
+          if (!element.hasAttribute("curve_speed")) element.setAttribute("curve_speed", "100.0");
+          if (!element.hasAttribute("curve_file")) element.setAttribute("curve_file", "pump_curve.csv");
+        }
+      } else {
+        if (!element.hasAttribute("diameter")) element.setAttribute("diameter", "1.0");
+        if (!element.hasAttribute("length")) element.setAttribute("length", "1.0");
+        if (!element.hasAttribute("ncell")) element.setAttribute("ncell", "1");
+      }
     }
   }
 
@@ -1888,6 +1976,26 @@ export default function App() {
     [nodes, pushUndoSnapshot, setNodes]
   );
 
+  const moveSelectedComponents = useCallback(
+    (direction) => {
+      if (!selectedNodes(nodes).length) return;
+      pushUndoSnapshot();
+      setNodes((nds) => moveSelectedNodes(nds, direction));
+      setHasUnsavedLayout(true);
+    },
+    [nodes, pushUndoSnapshot, setNodes]
+  );
+
+  const changeSelectedSpacing = useCallback(
+    (axis, direction) => {
+      if (selectedNodes(nodes).length < 2) return;
+      pushUndoSnapshot();
+      setNodes((nds) => adjustSelectedSpacing(nds, axis, direction));
+      setHasUnsavedLayout(true);
+    },
+    [nodes, pushUndoSnapshot, setNodes]
+  );
+
   useEffect(() => {
     const warnBeforeClose = (event) => {
       if (!hasUnsavedLayout) return;
@@ -2025,7 +2133,7 @@ export default function App() {
 
   const onConnect = useCallback(
     (params) => {
-      if (!params.source || !params.target || params.source === params.target) return;
+      if (!isAllowedConnection(params, nodes)) return;
 
       pushUndoSnapshot();
       setEdges((eds) => {
@@ -2047,8 +2155,8 @@ export default function App() {
   );
 
   const isValidConnection = useCallback((connection) => {
-    return Boolean(connection.source && connection.target && connection.source !== connection.target);
-  }, []);
+    return isAllowedConnection(connection, nodes);
+  }, [nodes]);
 
   const onDragStart = (event, nodeType) => {
     setPendingComponentType(nodeType);
@@ -2306,6 +2414,7 @@ export default function App() {
       ["Circuits", modelStats.circuits],
       ["Flow Nodes", modelStats.nodes],
       ["Pipes", modelStats.pipes],
+      ["Pumps", modelStats.pumps],
       ["Heat Slabs", modelStats.hslabs],
       ["BCs", modelStats.bcs]
     ];
@@ -2408,23 +2517,35 @@ export default function App() {
             Export PNG
           </button>
           <div className="align-tools" aria-label="Alignment tools">
-            <button type="button" title="Align left" onClick={() => alignSelectedComponents("left")} disabled={!canAlignSelection}>
-              Left
+            <button type="button" title="Align selected components on one vertical axis" onClick={() => alignSelectedComponents("center")} disabled={!canAlignSelection}>
+              Align vertical
             </button>
-            <button type="button" title="Align center" onClick={() => alignSelectedComponents("center")} disabled={!canAlignSelection}>
-              Center
+            <button type="button" title="Align selected components on one horizontal axis" onClick={() => alignSelectedComponents("middle")} disabled={!canAlignSelection}>
+              Align horizontal
             </button>
-            <button type="button" title="Align right" onClick={() => alignSelectedComponents("right")} disabled={!canAlignSelection}>
-              Right
+            <button type="button" title="Move selected components left" onClick={() => moveSelectedComponents("left")} disabled={!selectedComponentCount}>
+              Move &larr;
             </button>
-            <button type="button" title="Align top" onClick={() => alignSelectedComponents("top")} disabled={!canAlignSelection}>
-              Top
+            <button type="button" title="Move selected components right" onClick={() => moveSelectedComponents("right")} disabled={!selectedComponentCount}>
+              Move &rarr;
             </button>
-            <button type="button" title="Align middle" onClick={() => alignSelectedComponents("middle")} disabled={!canAlignSelection}>
-              Middle
+            <button type="button" title="Move selected components up" onClick={() => moveSelectedComponents("up")} disabled={!selectedComponentCount}>
+              Move &uarr;
             </button>
-            <button type="button" title="Align bottom" onClick={() => alignSelectedComponents("bottom")} disabled={!canAlignSelection}>
-              Bottom
+            <button type="button" title="Move selected components down" onClick={() => moveSelectedComponents("down")} disabled={!selectedComponentCount}>
+              Move &darr;
+            </button>
+            <button type="button" title="Move horizontally aligned components closer" onClick={() => changeSelectedSpacing("horizontal", "closer")} disabled={!canAlignSelection}>
+              Closer H
+            </button>
+            <button type="button" title="Move horizontally aligned components farther apart" onClick={() => changeSelectedSpacing("horizontal", "farther")} disabled={!canAlignSelection}>
+              Farther H
+            </button>
+            <button type="button" title="Move vertically aligned components closer" onClick={() => changeSelectedSpacing("vertical", "closer")} disabled={!canAlignSelection}>
+              Closer V
+            </button>
+            <button type="button" title="Move vertically aligned components farther apart" onClick={() => changeSelectedSpacing("vertical", "farther")} disabled={!canAlignSelection}>
+              Farther V
             </button>
             <button
               type="button"
@@ -2511,19 +2632,19 @@ export default function App() {
             className={activeWorkspace === "model" ? "active" : ""}
             onClick={() => setActiveWorkspace("model")}
           >
-            Model
-          </button>
-          <button
-            className={activeWorkspace === "postprocess" ? "active" : ""}
-            onClick={() => setActiveWorkspace("postprocess")}
-          >
-            Postprocess
+            Pre-processor
           </button>
           <button
             className={activeWorkspace === "solver" ? "active" : ""}
             onClick={() => setActiveWorkspace("solver")}
           >
             Solver
+          </button>
+          <button
+            className={activeWorkspace === "postprocess" ? "active" : ""}
+            onClick={() => setActiveWorkspace("postprocess")}
+          >
+            Postprocessor
           </button>
           <button
             className={activeWorkspace === "requirements" ? "active" : ""}

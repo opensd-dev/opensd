@@ -4,25 +4,7 @@ import { Handle, Position } from "reactflow";
 import { shortLabel } from "./labelUtils.js";
 import NodeTooltip from "./NodeTooltip.jsx";
 
-function RotateButton({ id, data, selected }) {
-  if (!selected || !data.onRotate) return null;
-
-  return (
-    <button
-      type="button"
-      className="node-rotate-button nodrag nopan"
-      title="Rotate component"
-      onClick={(event) => {
-        event.stopPropagation();
-        data.onRotate(id);
-      }}
-    >
-      ↻
-    </button>
-  );
-}
-
-function BcNode({ id, data, selected }) {
+function BcNode({ data }) {
   const [hovered, setHovered] = useState(false);
   const tooltipLines = data.tooltipLines ?? [data.identifier].filter(Boolean);
 
@@ -32,10 +14,10 @@ function BcNode({ id, data, selected }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <RotateButton id={id} data={data} selected={selected} />
-      <Handle type="source" id="bc-top-out" position={Position.Top} />
-      <Handle type="source" id="bc-bottom-out" position={Position.Bottom} />
-      <span className="bc-node__label">{shortLabel(data.identifier, 10)}</span>
+      <Handle type="source" id="bc-top-out" position={Position.Top} className="bc-node__handle" />
+      <Handle type="source" id="bc-bottom-out" position={Position.Bottom} className="bc-node__handle" />
+      <span className="bc-node__mark">BC</span>
+      <span className="bc-node__label">{shortLabel(data.identifier, 8)}</span>
       <NodeTooltip lines={tooltipLines} visible={hovered} />
     </div>
   );

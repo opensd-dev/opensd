@@ -139,6 +139,7 @@ function PipeNode({ id, data, selected }) {
         />
       )}
       <div className="pipe-node__body">
+        {kind === "pump" && <span className="pump-node__symbol" aria-hidden="true" />}
         <span className="pipe-node__label">{shortLabel(data.identifier, 14)}</span>
       </div>
       <NodeTooltip lines={tooltipLines} visible={hovered} />
