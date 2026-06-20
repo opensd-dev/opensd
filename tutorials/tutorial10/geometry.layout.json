@@ -1,0 +1,84 @@
+{
+  "schema": "opensd-web-layout/v1",
+  "source": "geometry:geometry.xml",
+  "savedAt": "2026-06-20T17:20:31.543Z",
+  "nodes": {
+    "circuit:circuit1": {
+      "position": {
+        "x": 154.00000000000006,
+        "y": -56.6872663066503
+      },
+      "rotation": 0
+    },
+    "node:node1": {
+      "position": {
+        "x": 258.3311598216453,
+        "y": -54.64663044745444
+      },
+      "rotation": 0
+    },
+    "pipe:pipe1": {
+      "position": {
+        "x": 255.33115982164531,
+        "y": 8.476025628232378
+      },
+      "rotation": 90
+    },
+    "node:node2": {
+      "position": {
+        "x": 258.3311598216453,
+        "y": 116
+      },
+      "rotation": 0
+    },
+    "pipe:pipe2": {
+      "position": {
+        "x": 328.16557991082266,
+        "y": 113
+      },
+      "rotation": 0
+    },
+    "node:node3": {
+      "position": {
+        "x": 443.99125097069873,
+        "y": 116
+      },
+      "rotation": 0
+    },
+    "pipe:pipe3": {
+      "position": {
+        "x": 440.99125097069873,
+        "y": 15.209022667624893
+      },
+      "rotation": 270
+    },
+    "node:node4": {
+      "position": {
+        "x": 443.99125097069873,
+        "y": -59.39185823396737
+      },
+      "rotation": 0
+    },
+    "bc:circuit1:bc1": {
+      "position": {
+        "x": 219.05330151896896,
+        "y": -139.51570523766077
+      },
+      "rotation": 0
+    },
+    "bc:circuit1:bc2": {
+      "position": {
+        "x": 272.3311598216453,
+        "y": -139.51570523766077
+      },
+      "rotation": 0
+    },
+    "bc:circuit1:bc3": {
+      "position": {
+        "x": 432.99125097069873,
+        "y": -139.51570523766077
+      },
+      "rotation": 0
+    }
+  }
+}

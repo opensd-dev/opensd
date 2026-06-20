@@ -252,7 +252,7 @@ Full attributes shall appear in a **tooltip** on hover.
 
 When a component is selected, the GUI shall show a nearby clockwise rotate-icon control that rotates the component in 45 degree steps.
 
-**Acceptance:** Selecting a pipe or other non-circular component reveals the rotate button; circular fluid nodes and BCs do not show rotation controls; pipe flow handles follow the pipe orientation.
+**Acceptance:** Selecting a pipe or other non-circular component reveals the rotate button; the button remains at a fixed screen-relative offset while the component rotates so repeated clicks do not require pointer movement; circular fluid nodes and BCs do not show rotation controls; pipe flow handles follow the pipe orientation.
 
 **Implementation:** Rotate controls in [src/PipeNode.jsx](../src/PipeNode.jsx); rotation state in [src/App.jsx](../src/App.jsx).
 

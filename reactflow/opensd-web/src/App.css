@@ -1010,8 +1010,8 @@ button {
 
 .node-rotate-button {
   position: absolute;
-  left: 50%;
-  bottom: calc(100% + 10px);
+  left: 32px;
+  top: -38px;
   z-index: 12;
   transform: translateX(-50%);
   width: 28px;

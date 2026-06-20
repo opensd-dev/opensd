@@ -92,7 +92,7 @@ solids.append(chromoly)
 # Export all solids to a single XML
 solids.export_to_xml()
 
-hslab1 = opensd.HSlab("hslab1",ucomp="pipe1",uvar="pipe",utype="script",uval="script1",dcomp="pipe2",dvar="pipe",dtype="constant",dval=10000,uarea=Au,config="parallel")
+hslab1 = opensd.HSlab("hslab1",ucomp="pipe1",uvar="pipe",uval="script1",dcomp="pipe2",dvar="pipe",dval=10000,uarea=Au,config="parallel")
 hslab1.add_layer(thk_elem=(do-di)/2.,thk_cros=L,nnodes=3,darea=Ad,solname='chromoly',sollib="User")
 
 geometry = opensd.Geometry([circuit1,circuit2,hslab1])

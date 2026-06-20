@@ -1,0 +1,63 @@
+{
+  "schema": "opensd-web-layout/v1",
+  "source": "geometry:geometry.xml",
+  "savedAt": "2026-06-20T17:26:03.102Z",
+  "nodes": {
+    "circuit:circuit1": {
+      "position": {
+        "x": 154.00000000000006,
+        "y": -56.6872663066503
+      },
+      "rotation": 0
+    },
+    "node:node1": {
+      "position": {
+        "x": 258.3311598216453,
+        "y": -54.64663044745444
+      },
+      "rotation": 0
+    },
+    "pipe:pipe1": {
+      "position": {
+        "x": 255.33115982164531,
+        "y": -155.47867434646935
+      },
+      "rotation": 270
+    },
+    "node:node2": {
+      "position": {
+        "x": 258.3311598216453,
+        "y": -223.73711190864182
+      },
+      "rotation": 0
+    },
+    "bc:circuit1:bc1": {
+      "position": {
+        "x": 224.05330151896896,
+        "y": 16.373869792028458
+      },
+      "rotation": 0
+    },
+    "bc:circuit1:bc2": {
+      "position": {
+        "x": 277.3311598216453,
+        "y": 13.360447758645819
+      },
+      "rotation": 0
+    },
+    "bc:circuit1:bc3": {
+      "position": {
+        "x": 245.99743031898788,
+        "y": -307.10054437545756
+      },
+      "rotation": 0
+    },
+    "hslab:hslab1": {
+      "position": {
+        "x": 351.13539847711365,
+        "y": -156.7173126652333
+      },
+      "rotation": 270
+    }
+  }
+}
