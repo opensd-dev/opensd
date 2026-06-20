@@ -12,7 +12,6 @@ import ModelFlowCanvas from "./ModelFlowCanvas.jsx";
 import SolverPanel from "./SolverPanel.jsx";
 import guiRequirementsMarkdown from "../requirements/opensd-web-gui.md?raw";
 import {
-  CIRCUIT_ROW_GAP,
   PIPE_STEP,
   buildHorizontalSequence,
   layoutCircuitRow,
@@ -1328,6 +1327,8 @@ function parseGeometryXml(xmlText) {
   };
 
   const circuits = Array.from(geometry.querySelectorAll(":scope > circuit"));
+  let defaultLayoutBottom = 0;
+  let defaultLayoutRight = 0;
 
   circuits.forEach((circuit, circuitIndex) => {
     const circuitId = attr(circuit, "identifier", `circuit_${circuitIndex + 1}`);
@@ -1372,12 +1373,14 @@ function parseGeometryXml(xmlText) {
     });
 
     const sequence = buildHorizontalSequence(nodeNames, pipes, naturalCompare);
-    const { positions } = layoutCircuitRow({
-      circuitIndex,
+    const { positions, bounds } = layoutCircuitRow({
       circuitId,
       sequence,
-      bcRecords
+      bcRecords,
+      previousBottom: circuitIndex > 0 ? defaultLayoutBottom : undefined
     });
+    defaultLayoutBottom = bounds.bottom;
+    defaultLayoutRight = Math.max(defaultLayoutRight, bounds.right);
 
     pushNode(
       buildPipeNode({
@@ -1492,20 +1495,28 @@ function parseGeometryXml(xmlText) {
   });
 
   const hslabs = Array.from(geometry.querySelectorAll(":scope > hslab"));
-  const hslabBaseY = 50 + circuits.length * CIRCUIT_ROW_GAP + 60;
+  const hslabStepX = 96;
+  const hslabStepY = 56;
+  const usableLayoutWidth = Math.max(defaultLayoutRight - 24, hslabStepX);
+  const hslabColumns = Math.max(
+    1,
+    Math.min(hslabs.length, circuits.length > 0 ? Math.floor(usableLayoutWidth / hslabStepX) : Math.ceil(Math.sqrt(hslabs.length)))
+  );
+  const hslabBaseY = (circuits.length > 0 ? defaultLayoutBottom : 18) + 44;
 
   hslabs.forEach((hslab, hslabIndex) => {
     const hslabName = attr(hslab, "identifier", `hslab_${hslabIndex + 1}`);
     const hslabId = `hslab:${hslabName}`;
     const layers = Array.from(hslab.querySelectorAll(":scope > layer"));
-    const hslabOffset = hslabIndex * 220;
+    const hslabColumn = hslabIndex % hslabColumns;
+    const hslabRow = Math.floor(hslabIndex / hslabColumns);
 
     stats.hslabs += 1;
 
     pushNode(
       buildPipeNode({
         id: hslabId,
-        position: { x: 220 + hslabOffset, y: hslabBaseY },
+        position: { x: 24 + hslabColumn * hslabStepX, y: hslabBaseY + hslabRow * hslabStepY },
         identifier: hslabName,
         kind: "hslab",
         xmlAttributes: attributesOf(hslab),
