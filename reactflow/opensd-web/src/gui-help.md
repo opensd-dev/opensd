@@ -25,7 +25,7 @@ Press **F1** at any time to open this help page.
 - **Delete/Backspace** removes selected components or connections.
 - Double-click a component to edit its attributes. Press **Escape** to close without applying changes.
 - **Ctrl+C/Ctrl+V** copies and pastes selected graph components. **Ctrl+Z** undoes; **Ctrl+Y** or **Ctrl+Shift+Z** redoes.
-- **Ctrl+C** places a PNG on the clipboard where supported and stores an internal graph copy. The selection context menu can export PNG.
+- **Ctrl+C** places a clean PNG on the clipboard where supported and stores an internal graph copy. The selection context menu exports PNG for compatibility, compact SVG for scalable report graphics, or a tightly fitted high-resolution PDF for documents and printing. All exports include internal connections but omit unselected canvas content, selection outlines, selection rectangles, handles, and rotate controls.
 
 ## Alignment tools
 

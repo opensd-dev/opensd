@@ -33,6 +33,7 @@ const FLOW_SIDES = ["left", "right", "top", "bottom"];
 const FLOW_HORIZONTAL_LOCK_THRESHOLD = 32;
 const COPY_PADDING = 28;
 const COPY_SCALE = 2;
+const PDF_SCALE = 4;
 const nodeVariables = [
   { value: "temperature_from_tenth", label: "Temperature from total enthalpy" },
   { value: "ttemp_gues", label: "Total temperature" },
@@ -969,24 +970,25 @@ function pasteGraphClipboard(nodes, edges, clipboard, offset = 36) {
   };
 }
 
-function inlineComputedStyles(source, clone) {
-  if (!(source instanceof Element) || !(clone instanceof Element)) return;
-
-  const computed = window.getComputedStyle(source);
-  clone.setAttribute(
-    "style",
-    Array.from(computed)
-      .map((property) => `${property}:${computed.getPropertyValue(property)};`)
-      .join("")
-  );
-
-  const sourceChildren = Array.from(source.children);
-  const cloneChildren = Array.from(clone.children);
-  sourceChildren.forEach((child, index) => inlineComputedStyles(child, cloneChildren[index]));
+function documentStyles() {
+  const rules = [];
+  Array.from(document.styleSheets).forEach((sheet) => {
+    try {
+      Array.from(sheet.cssRules ?? []).forEach((rule) => rules.push(rule.cssText));
+    } catch {
+      // Cross-origin stylesheets cannot be read; the app's bundled styles remain available.
+    }
+  });
+  return rules.join("\n");
 }
 
 function elementId(element) {
-  return element.getAttribute("data-id") ?? element.getAttribute("data-nodeid") ?? "";
+  const directId = element.getAttribute("data-id") ?? element.getAttribute("data-nodeid");
+  if (directId) return directId;
+  const testId = element.getAttribute("data-testid") ?? "";
+  if (testId.startsWith("rf__edge-")) return testId.slice("rf__edge-".length);
+  const domId = element.getAttribute("id") ?? "";
+  return domId.startsWith("reactflow__edge-") ? domId.slice("reactflow__edge-".length) : "";
 }
 
 function copiedEdgeIds(edges, selectedIds) {
@@ -997,34 +999,90 @@ function copiedEdgeIds(edges, selectedIds) {
   );
 }
 
-function hideUnselectedGraphParts(sourceRenderer, cloneRenderer, selectedIds, selectedEdgeIds) {
+function pruneUnselectedGraphParts(sourceRenderer, cloneRenderer, selectedIds, selectedEdgeIds) {
   const sourceNodes = Array.from(sourceRenderer.querySelectorAll(".react-flow__node"));
   const cloneNodes = Array.from(cloneRenderer.querySelectorAll(".react-flow__node"));
   sourceNodes.forEach((node, index) => {
-    if (!selectedIds.has(elementId(node))) cloneNodes[index]?.setAttribute("style", `${cloneNodes[index]?.getAttribute("style") ?? ""};display:none;`);
+    if (!selectedIds.has(elementId(node))) cloneNodes[index]?.remove();
   });
 
   const sourceEdges = Array.from(sourceRenderer.querySelectorAll(".react-flow__edge"));
   const cloneEdges = Array.from(cloneRenderer.querySelectorAll(".react-flow__edge"));
   sourceEdges.forEach((edge, index) => {
     const id = elementId(edge);
-    if (!id || !selectedEdgeIds.has(id)) cloneEdges[index]?.setAttribute("style", `${cloneEdges[index]?.getAttribute("style") ?? ""};display:none;`);
+    if (!id || !selectedEdgeIds.has(id)) cloneEdges[index]?.remove();
   });
 }
 
-function blobFromCanvas(canvas) {
+function cleanGraphCloneForImage(cloneRenderer) {
+  cloneRenderer.querySelectorAll([
+    ".node-rotate-button",
+    ".node-tooltip",
+    ".react-flow__selection",
+    ".react-flow__nodesselection",
+    ".react-flow__nodesselection-rect",
+    ".react-flow__selectionpane",
+    ".react-flow__connectionline",
+    ".react-flow__handle",
+    ".react-flow__edge-interaction"
+  ].join(", "))
+    .forEach((element) => element.remove());
+
+  cloneRenderer.querySelectorAll(".react-flow__node.selected").forEach((node) => {
+    node.classList.remove("selected");
+    node.style.outline = "none";
+    const shell = node.querySelector(".component-shell");
+    if (!shell) return;
+    shell.style.outline = "none";
+    shell.style.outlineOffset = "0";
+    shell.style.boxShadow = shell.classList.contains("pipe-node--pump")
+      ? "none"
+      : shell.classList.contains("pipe-node")
+        ? "0 4px 12px rgba(16, 24, 40, 0.1)"
+        : "0 4px 10px rgba(16, 24, 40, 0.1)";
+  });
+
+  cloneRenderer.querySelectorAll(".react-flow__edge").forEach((edge) => {
+    edge.classList.remove("selected");
+    edge.style.display = "block";
+    edge.style.visibility = "visible";
+    edge.style.opacity = "1";
+    const path = edge.querySelector(".react-flow__edge-path");
+    if (!path) return;
+    if (edge.classList.contains("hslab-edge")) {
+      path.style.stroke = "#e67e22";
+      path.style.strokeWidth = "2px";
+    } else if (edge.classList.contains("bc-edge")) {
+      path.style.stroke = "#e57373";
+      path.style.strokeWidth = "2px";
+    } else if (edge.classList.contains("circuit-edge")) {
+      path.style.stroke = "#667085";
+      path.style.strokeWidth = "1.5px";
+    } else {
+      path.style.stroke = "#3468b5";
+      path.style.strokeWidth = "2px";
+    }
+  });
+
+  cloneRenderer.querySelectorAll(".react-flow__edges").forEach((edgeLayer) => {
+    edgeLayer.style.overflow = "visible";
+    edgeLayer.style.pointerEvents = "none";
+  });
+}
+
+function blobFromCanvas(canvas, type = "image/png", quality) {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (blob) {
         resolve(blob);
       } else {
-        reject(new Error("Unable to create clipboard image."));
+        reject(new Error("Unable to create image."));
       }
-    }, "image/png");
+    }, type, quality);
   });
 }
 
-async function selectedGraphImageBlob(edges) {
+function selectedGraphSvg(edges) {
   const sourceRenderer = document.querySelector(".canvas-wrap .react-flow__renderer");
   if (!sourceRenderer) throw new Error("Canvas is not ready.");
 
@@ -1048,8 +1106,16 @@ async function selectedGraphImageBlob(edges) {
   const height = Math.ceil(crop.bottom - crop.top + COPY_PADDING * 2);
   const cloneRenderer = sourceRenderer.cloneNode(true);
 
-  inlineComputedStyles(sourceRenderer, cloneRenderer);
-  hideUnselectedGraphParts(sourceRenderer, cloneRenderer, selectedIds, selectedEdgeIds);
+  pruneUnselectedGraphParts(sourceRenderer, cloneRenderer, selectedIds, selectedEdgeIds);
+  cleanGraphCloneForImage(cloneRenderer);
+  cloneRenderer.style.position = "absolute";
+  cloneRenderer.style.inset = "0";
+  cloneRenderer.style.width = `${sourceRect.width}px`;
+  cloneRenderer.style.height = `${sourceRect.height}px`;
+  cloneRenderer.querySelectorAll(".react-flow__edges").forEach((edgeLayer) => {
+    edgeLayer.setAttribute("width", String(sourceRect.width));
+    edgeLayer.setAttribute("height", String(sourceRect.height));
+  });
 
   const wrapper = document.createElement("div");
   wrapper.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
@@ -1058,6 +1124,10 @@ async function selectedGraphImageBlob(edges) {
   wrapper.style.height = `${height}px`;
   wrapper.style.overflow = "hidden";
   wrapper.style.background = "transparent";
+
+  const styleElement = document.createElement("style");
+  styleElement.textContent = documentStyles();
+  wrapper.appendChild(styleElement);
 
   const shifted = document.createElement("div");
   shifted.style.position = "absolute";
@@ -1074,6 +1144,11 @@ async function selectedGraphImageBlob(edges) {
     `<foreignObject width="100%" height="100%">${serialized}</foreignObject>`,
     "</svg>"
   ].join("");
+  return { svg, count: selectedIds.size, width, height };
+}
+
+async function selectedGraphCanvas(edges, scale = COPY_SCALE) {
+  const { svg, count, width, height } = selectedGraphSvg(edges);
   const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
 
   try {
@@ -1083,17 +1158,21 @@ async function selectedGraphImageBlob(edges) {
     await image.decode();
 
     const canvas = document.createElement("canvas");
-    canvas.width = width * COPY_SCALE;
-    canvas.height = height * COPY_SCALE;
+    canvas.width = width * scale;
+    canvas.height = height * scale;
     const context = canvas.getContext("2d");
-    context.scale(COPY_SCALE, COPY_SCALE);
+    context.scale(scale, scale);
     context.drawImage(image, 0, 0);
 
-    const blob = await blobFromCanvas(canvas);
-    return { blob, count: selectedIds.size };
+    return { canvas, count, width, height };
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+async function selectedGraphImageBlob(edges) {
+  const { canvas, count } = await selectedGraphCanvas(edges);
+  return { blob: await blobFromCanvas(canvas), count };
 }
 
 async function copySelectedGraphImage(edges) {
@@ -1112,6 +1191,77 @@ async function exportSelectedGraphPng(edges) {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = `opensd-selection-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+  return count;
+}
+
+function exportSelectedGraphSvg(edges) {
+  const { svg, count } = selectedGraphSvg(edges);
+  const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `opensd-selection-${new Date().toISOString().replace(/[:.]/g, "-")}.svg`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+  return count;
+}
+
+function pdfBlobFromJpeg(jpegBytes, pixelWidth, pixelHeight, logicalWidth, logicalHeight) {
+  const margin = 18;
+  const pointScale = Math.min(0.75, 960 / Math.max(logicalWidth, logicalHeight));
+  const imageWidth = logicalWidth * pointScale;
+  const imageHeight = logicalHeight * pointScale;
+  const pageWidth = imageWidth + margin * 2;
+  const pageHeight = imageHeight + margin * 2;
+  const content = `q ${imageWidth.toFixed(2)} 0 0 ${imageHeight.toFixed(2)} ${margin} ${margin} cm /Im0 Do Q`;
+  const chunks = [];
+  const offsets = [0];
+  let byteLength = 0;
+  const append = (chunk) => {
+    chunks.push(chunk);
+    byteLength += typeof chunk === "string" ? chunk.length : chunk.byteLength;
+  };
+  const object = (number, body) => {
+    offsets[number] = byteLength;
+    append(`${number} 0 obj\n`);
+    body();
+    append("\nendobj\n");
+  };
+
+  append("%PDF-1.4\n%OpenSD\n");
+  object(1, () => append("<< /Type /Catalog /Pages 2 0 R >>"));
+  object(2, () => append("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"));
+  object(3, () => append(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth.toFixed(2)} ${pageHeight.toFixed(2)}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`));
+  object(4, () => {
+    append(`<< /Type /XObject /Subtype /Image /Width ${pixelWidth} /Height ${pixelHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegBytes.byteLength} >>\nstream\n`);
+    append(jpegBytes);
+    append("\nendstream");
+  });
+  object(5, () => append(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`));
+  const xrefOffset = byteLength;
+  append("xref\n0 6\n0000000000 65535 f \n");
+  for (let index = 1; index <= 5; index += 1) append(`${String(offsets[index]).padStart(10, "0")} 00000 n \n`);
+  append(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
+  return new Blob(chunks, { type: "application/pdf" });
+}
+
+async function exportSelectedGraphPdf(edges) {
+  const { canvas, count, width, height } = await selectedGraphCanvas(edges, PDF_SCALE);
+  const pdfCanvas = document.createElement("canvas");
+  pdfCanvas.width = canvas.width;
+  pdfCanvas.height = canvas.height;
+  const context = pdfCanvas.getContext("2d");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, pdfCanvas.width, pdfCanvas.height);
+  context.drawImage(canvas, 0, 0);
+  const jpegBlob = await blobFromCanvas(pdfCanvas, "image/jpeg", 0.99);
+  const pdfBlob = pdfBlobFromJpeg(new Uint8Array(await jpegBlob.arrayBuffer()), pdfCanvas.width, pdfCanvas.height, width, height);
+  const url = URL.createObjectURL(pdfBlob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `opensd-selection-${new Date().toISOString().replace(/[:.]/g, "-")}.pdf`;
   anchor.click();
   URL.revokeObjectURL(url);
   return count;
@@ -2417,6 +2567,28 @@ export default function App() {
     }
   }, [renderedEdges]);
 
+  const exportSelectionToSvg = useCallback(() => {
+    try {
+      const count = exportSelectedGraphSvg(renderedEdges);
+      setCopyStatus(`Exported ${count} component${count === 1 ? "" : "s"} to SVG`);
+    } catch (error) {
+      setCopyStatus(error.message);
+    } finally {
+      setContextMenu(null);
+    }
+  }, [renderedEdges]);
+
+  const exportSelectionToPdf = useCallback(async () => {
+    try {
+      const count = await exportSelectedGraphPdf(renderedEdges);
+      setCopyStatus(`Exported ${count} component${count === 1 ? "" : "s"} to PDF`);
+    } catch (error) {
+      setCopyStatus(error.message);
+    } finally {
+      setContextMenu(null);
+    }
+  }, [renderedEdges]);
+
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === "F1") {
@@ -2978,6 +3150,12 @@ export default function App() {
           >
             <button type="button" onClick={exportSelectionToPng} disabled={!selectedComponentCount}>
               Export selection to PNG
+            </button>
+            <button type="button" onClick={exportSelectionToSvg} disabled={!selectedComponentCount}>
+              Export selection to SVG
+            </button>
+            <button type="button" onClick={exportSelectionToPdf} disabled={!selectedComponentCount}>
+              Export selection to PDF
             </button>
             <button
               type="button"

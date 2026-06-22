@@ -174,7 +174,7 @@ The model workspace shall provide a **Clear layout** control to remove all curre
 
 The model workspace should allow selected components to be copied or exported as a figure for use in external applications such as PowerPoint, Word, and Paint.
 
-**Acceptance:** Selecting one or more components and pressing **Ctrl+C** places a PNG image of the selected canvas region on the system clipboard where supported. Right-clicking selected components and choosing export downloads a PNG. Connections between selected components are included where available.
+**Acceptance:** Selecting one or more components and pressing **Ctrl+C** places a PNG image of the selected canvas region on the system clipboard where supported. The selection context menu offers PNG, scalable SVG, and tightly fitted high-resolution PDF downloads. Connections whose endpoints are both selected are included with their normal visual style. Rotate controls, connection handles, selection highlighting, selected-edge coloring, and selection rectangles are omitted so the result resembles a clean browser-canvas screenshot. SVG export removes unselected graph elements and embeds shared stylesheet rules once, avoiding impractically large files caused by repeated computed styles. PDF export uses a dedicated high-resolution render for clearer zooming and print output.
 
 **Implementation:** Clipboard image export in [src/App.jsx](../src/App.jsx).
 
