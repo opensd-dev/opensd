@@ -10,9 +10,9 @@
 
 ### GUI-001 — Application workspaces (Must)
 
-The application shall provide tabs in this order: **Pre-processor** (geometry graph), **Solver**, **Postprocessor** (HDF5 plots), and **Requirements**.
+The application shall provide tabs in this order: **Pre-processor** (geometry graph), **Solver**, **Postprocessor** (HDF5 plots), **Help**, and **Requirements**.
 
-**Acceptance:** Tab switching preserves loaded data; Pre-processor shows the React Flow canvas; Solver shows solver controls; Postprocessor shows result import controls and line plots.
+**Acceptance:** Tab switching preserves loaded data; Pre-processor shows the React Flow canvas; Solver shows solver controls; Postprocessor shows result import controls and line plots; Help displays the bundled GUI guide and opens with **F1**.
 
 **Implementation:** [src/App.jsx](../src/App.jsx).
 
@@ -72,7 +72,7 @@ React Flow **Controls** and **MiniMap** shall remain available.
 
 The model canvas shall support undoing recent graph-edit actions with **Ctrl+Z** and redoing them with **Ctrl+Y** or **Ctrl+Shift+Z**.
 
-**Acceptance:** Moving components, adding components, rotating components, connecting components, deleting components, and restoring default layout can be undone and redone. A continuous mouse drag records one undo step at drag start, so Ctrl+Z returns directly to the previous position instead of traversing intermediate pointer positions. Sidebar Undo and Redo buttons shall provide the same actions.
+**Acceptance:** Moving components, adding components, rotating components, connecting components, and deleting components can be undone and redone. A continuous mouse drag records one undo step at drag start, so Ctrl+Z returns directly to the previous position instead of traversing intermediate pointer positions.
 
 **Implementation:** Undo/redo history in [src/App.jsx](../src/App.jsx).
 
@@ -152,9 +152,9 @@ Every pipe **upstream** and **downstream** fluid edge shall be drawn after all e
 
 ### GUI-025 — Persistent component layout (Must)
 
-When users move components on the model canvas, the GUI shall preserve component positions for the same geometry file only after the user explicitly saves the layout.
+The GUI shall support explicit layout JSON export/import for preserving and sharing component positions.
 
-**Acceptance:** Re-importing the same XML file restores locally saved positions by stable component id after **Save layout**; users can export/import a `.layout.json` sidecar to share positions across computers; unmatched new components fall back to automatic layout; refreshing or closing with unsaved layout changes raises a browser warning.
+**Acceptance:** Users can export/import a `.layout.json` sidecar to share positions across computers; imported positions are matched by stable component id; unmatched components retain automatic positions; refreshing or closing with unsaved layout changes raises a browser warning.
 
 **Implementation:** Local browser layout storage plus JSON sidecar import/export in [src/App.jsx](../src/App.jsx).
 
@@ -162,9 +162,9 @@ When users move components on the model canvas, the GUI shall preserve component
 
 ### GUI-026 — Circuit workspace controls (Must)
 
-The model workspace shall provide explicit controls to start a blank circuit and restore the imported/generated default layout.
+The model workspace shall provide a **Clear layout** control to remove all current components and start a blank circuit.
 
-**Acceptance:** **New circuit** clears the model canvas without requiring browser refresh; **Default layout** restores the generated layout and clears the stored layout for the current geometry.
+**Acceptance:** **Clear layout** clears the model canvas without requiring browser refresh.
 
 **Implementation:** Circuit controls in [src/App.jsx](../src/App.jsx), fit behavior in [src/ModelFlowCanvas.jsx](../src/ModelFlowCanvas.jsx).
 
@@ -174,7 +174,7 @@ The model workspace shall provide explicit controls to start a blank circuit and
 
 The model workspace should allow selected components to be copied or exported as a figure for use in external applications such as PowerPoint, Word, and Paint.
 
-**Acceptance:** Selecting one or more components and pressing **Ctrl+C**, or choosing **Copy figure**, places a PNG image of the selected canvas region on the system clipboard where supported. Choosing **Export PNG**, or right-clicking the selected components and choosing export, downloads a PNG. Connections between selected components are included where available.
+**Acceptance:** Selecting one or more components and pressing **Ctrl+C** places a PNG image of the selected canvas region on the system clipboard where supported. Right-clicking selected components and choosing export downloads a PNG. Connections between selected components are included where available.
 
 **Implementation:** Clipboard image export in [src/App.jsx](../src/App.jsx).
 
@@ -194,7 +194,7 @@ The model workspace should allow selected components to be copied and pasted wit
 
 The model workspace should provide diagramming alignment controls similar to PowerPoint or Flownex.
 
-**Acceptance:** Selected components can be aligned on a common vertical or horizontal axis, rotated 90 degrees clockwise as a group around the selection center to exchange horizontal and vertical layout, moved left/right/up/down in fixed increments, moved closer together or farther apart along either axis, and distributed horizontally or vertically. Transpose also advances each selected pipe-like component's own rotation by 90 degrees and swaps its occupied width/height when calculating the new position, preserving center alignment and producing a geometric rotation of the selection. These actions participate in undo/redo.
+**Acceptance:** Selected components can be aligned on a common vertical or horizontal axis, rotated 90 degrees clockwise as a group around the selection center to exchange horizontal and vertical layout, moved left/right/up/down in fixed increments, moved closer together or farther apart along either axis, and distributed horizontally or vertically. Transpose also advances each selected pipe-like component's own rotation by 90 degrees and swaps its occupied width/height when calculating the new position, preserving center alignment and producing a geometric rotation of the selection. The Transpose button appears last in the alignment-control grid. These actions participate in undo/redo.
 
 **Implementation:** Selection layout tools in [src/App.jsx](../src/App.jsx), controls styled in [src/App.css](../src/App.css).
 
@@ -284,6 +284,16 @@ The pre-processor shall provide a distinct pump component representing a two-nod
 
 ---
 
+### GUI-038 — Project statistics and information (Should)
+
+The Pre-processor sidebar shall provide an on-demand **Project information** dialog without permanently occupying sidebar space.
+
+**Acceptance:** The dialog displays geometry filename, layout key/status, live totals for component and connection types, and component counts grouped by circuit. It closes by button, backdrop click, or Escape.
+
+**Implementation:** Project information dialog and live graph aggregation in [src/App.jsx](../src/App.jsx), styled in [src/App.css](../src/App.css).
+
+---
+
 ## 5. Fluid edges
 
 ### GUI-040 — Multi-pipe fluid node connectivity (Must)
@@ -302,7 +312,7 @@ Fluid edges shall be **straight**, solid **blue** lines with direction arrowhead
 
 **Implementation:** `flowEdge()` in [src/App.jsx](../src/App.jsx), `FLOW_MARKER` in [src/edgeUtils.js](../src/edgeUtils.js), [src/App.css](../src/App.css).
 
-**Occlusion:** A straight connection intersecting a non-endpoint component is elevated and rendered as a light dotted line so its path remains legible through the component.
+**Occlusion:** A straight connection intersecting a non-endpoint component is elevated and made dashed so its path remains legible through the component. Its original connection style—including color, thickness, marker, and opacity—is preserved.
 
 ---
 
@@ -328,9 +338,9 @@ Fluid edges shall not display text labels (e.g. “up”, “down”) on the can
 
 ### GUI-050 — Nearest-side BC edges (Must)
 
-BC-to-node connections shall be straight lines attached to the nearest side of the fluid node. The BC endpoint shall use its top or bottom side, whichever faces the node.
+BC-to-node connections shall be straight lines attached to the nearest side of the fluid node. Circular BCs shall expose eight evenly distributed invisible perimeter ports and use the port nearest the connected node.
 
-**Acceptance:** Moving either endpoint reroutes the connection to the nearest left, right, top, or bottom handle on the fluid node and to the facing top or bottom handle on the BC. BC handles retain their connection hit area but are not visibly rendered as dots.
+**Acceptance:** Moving either endpoint reroutes the connection to the nearest left, right, top, or bottom handle on the fluid node and to the nearest of the BC's north, northeast, east, southeast, south, southwest, west, or northwest ports. BC handles retain their connection hit area but are not visibly rendered as dots.
 
 **Implementation:** `bcEdge()` in [src/App.jsx](../src/App.jsx).
 
@@ -475,6 +485,7 @@ Internal hslab layer networks shall not be expanded on the main canvas (see GUI-
 | GUI-035 | Rotate selected non-circular component | `PipeNode.jsx`, `App.jsx` |
 | GUI-036 | Component palette symbols | `App.jsx`, `App.css` |
 | GUI-037 | Pump component and XML | `App.jsx`, `PipeNode.jsx`, `App.css` |
+| GUI-038 | Project statistics and information | `App.jsx`, `App.css` |
 | GUI-040 | Multi-pipe fluid nodes | `FlowNode.jsx`, `App.jsx` |
 | GUI-042 | No pipe-attached fluid arrows | `PipeNode.jsx`, `App.css` |
 | GUI-050 | Vertical BCs | `BcNode.jsx`, `App.jsx` |

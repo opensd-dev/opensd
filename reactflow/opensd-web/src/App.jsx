@@ -11,6 +11,7 @@ import "./App.css";
 import ModelFlowCanvas from "./ModelFlowCanvas.jsx";
 import SolverPanel from "./SolverPanel.jsx";
 import guiRequirementsMarkdown from "../requirements/opensd-web-gui.md?raw";
+import guiHelpMarkdown from "./gui-help.md?raw";
 import {
   PIPE_STEP,
   buildHorizontalSequence,
@@ -168,8 +169,8 @@ function bcEdge(id, source, target) {
     id,
     source,
     target,
-    sourceHandle: "bc-out",
-    targetHandle: "bc-in",
+    sourceHandle: "bc-s-out",
+    targetHandle: "bc-top-in",
     type: "straight",
     className: "bc-edge"
   };
@@ -363,10 +364,7 @@ function revealConnectionsBehindComponents(nodes, edges) {
       zIndex: 1,
       style: {
         ...edge.style,
-        stroke: "#98a2b3",
-        strokeWidth: 1.5,
-        strokeDasharray: "3 5",
-        opacity: 0.82
+        strokeDasharray: "5 4"
       }
     };
   });
@@ -532,14 +530,21 @@ function rerouteBcEdges(nodes, edges) {
     const targetNode = nodeById.get(edge.target);
     if (!sourceNode || !targetNode) return edge;
 
-    const sourceCenter = nodeCenter(sourceNode);
-    const targetCenter = nodeCenter(targetNode);
-    const sourceSide = targetCenter.y < sourceCenter.y ? "top" : "bottom";
-    const targetSide = preferredSourceSide(targetNode, sourceNode);
+    const bcNode = sourceNode.type === "bc" ? sourceNode : targetNode.type === "bc" ? targetNode : null;
+    const otherNode = bcNode === sourceNode ? targetNode : sourceNode;
+    if (!bcNode) return edge;
+    const bcCenter = nodeCenter(bcNode);
+    const otherCenter = nodeCenter(otherNode);
+    const angle = Math.atan2(otherCenter.y - bcCenter.y, otherCenter.x - bcCenter.x);
+    const portIndex = (Math.round(angle / (Math.PI / 4)) + 8) % 8;
+    const port = ["e", "se", "s", "sw", "w", "nw", "n", "ne"][portIndex];
+    const targetSide = preferredSourceSide(otherNode, bcNode);
 
     return {
       ...edge,
-      sourceHandle: `bc-${sourceSide}-out`,
+      source: bcNode.id,
+      target: otherNode.id,
+      sourceHandle: `bc-${port}-out`,
       targetHandle: `bc-${targetSide}-in`
     };
   });
@@ -618,17 +623,6 @@ function applyStoredLayout(nodes, storedLayout) {
       }
     };
   });
-}
-
-function clearStoredLayout(layoutKey) {
-  const layouts = readStoredLayouts();
-  delete layouts[layoutKey];
-
-  try {
-    window.localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layouts));
-  } catch {
-    // A failed cleanup should not block returning to the default generated layout.
-  }
 }
 
 function isFlowNodeId(nodeId) {
@@ -1866,6 +1860,22 @@ function parseGeometryXml(xmlText) {
   };
 }
 
+function HelpDocument({ text }) {
+  return (
+    <section className="workspace-pane help-view">
+      <article className="help-document">
+        {text.split(/\r?\n/).filter((line) => line.trim()).map((line, index) => {
+          const key = `${index}-${line.slice(0, 20)}`;
+          if (line.startsWith("# ")) return <h1 key={key}>{renderMarkdownInline(line.slice(2))}</h1>;
+          if (line.startsWith("## ")) return <h2 key={key}>{renderMarkdownInline(line.slice(3))}</h2>;
+          if (line.startsWith("- ")) return <ul key={key}><li>{renderMarkdownInline(line.slice(2))}</li></ul>;
+          return <p key={key}>{renderMarkdownInline(line)}</p>;
+        })}
+      </article>
+    </section>
+  );
+}
+
 function xmlIdentifier(value, fallback) {
   const cleaned = String(value ?? "").trim().replace(/[^A-Za-z0-9_.-]+/g, "_");
   return cleaned || fallback;
@@ -2098,6 +2108,68 @@ function AttributeEditor({ node, onCancel, onSave }) {
   );
 }
 
+function ProjectInformation({ filename, layoutKey, nodes, edges, hasUnsavedLayout, onClose }) {
+  useEffect(() => {
+    const closeOnEscape = (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
+
+  const components = nodes.filter((node) => node.data.kind !== "circuit");
+  const totals = [
+    ["Components", components.length],
+    ["Circuits", nodes.filter((node) => node.data.kind === "circuit").length],
+    ["Fluid nodes", nodes.filter((node) => node.type === "flow").length],
+    ["Pipes", nodes.filter((node) => node.type === "pipe" && node.data.kind === "pipe").length],
+    ["Pumps", nodes.filter((node) => node.data.kind === "pump").length],
+    ["Valves", nodes.filter((node) => node.data.kind === "valve").length],
+    ["Heat slabs", nodes.filter((node) => node.data.kind === "hslab").length],
+    ["Boundary conditions", nodes.filter((node) => node.type === "bc").length],
+    ["Fluid connections", edges.filter((edge) => edge.className === "flow-edge").length],
+    ["Heat connections", edges.filter((edge) => edge.className === "hslab-edge").length],
+    ["BC connections", edges.filter((edge) => edge.className === "bc-edge").length]
+  ];
+  const circuitCounts = new Map();
+  for (const node of components) {
+    if (node.data.kind === "hslab") continue;
+    const circuitId = node.data.circuitId || "Unassigned";
+    circuitCounts.set(circuitId, (circuitCounts.get(circuitId) ?? 0) + 1);
+  }
+
+  return (
+    <div className="attribute-modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section className="attribute-modal project-information" role="dialog" aria-modal="true" aria-labelledby="project-information-title">
+        <div className="attribute-modal-header">
+          <div>
+            <span>OpenSD project</span>
+            <h2 id="project-information-title">Project statistics and information</h2>
+          </div>
+          <button type="button" className="attribute-close" aria-label="Close" onClick={onClose}>&times;</button>
+        </div>
+        <dl className="project-information-summary">
+          <div><dt>Geometry file</dt><dd>{filename}</dd></div>
+          <div><dt>Layout key</dt><dd>{layoutKey}</dd></div>
+          <div><dt>Layout status</dt><dd>{hasUnsavedLayout ? "Unsaved changes" : "No unsaved changes"}</dd></div>
+        </dl>
+        <h3>Totals</h3>
+        <div className="project-statistics-grid">
+          {totals.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
+        </div>
+        <h3>Components by circuit</h3>
+        <div className="project-statistics-grid">
+          {circuitCounts.size
+            ? Array.from(circuitCounts, ([circuit, count]) => <div key={circuit}><span>{circuit}</span><strong>{count}</strong></div>)
+            : <div><span>No circuit components</span><strong>0</strong></div>}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export default function App() {
   const fileInput = useRef(null);
   const hdf5Input = useRef(null);
@@ -2106,12 +2178,9 @@ export default function App() {
   const dragUndoCaptured = useRef(false);
   const [nodes, setNodes, reactFlowOnNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, reactFlowOnEdgesChange] = useEdgesState(initialEdges);
-  const [defaultLayoutNodes, setDefaultLayoutNodes] = useState(initialNodes);
-  const [defaultLayoutEdges, setDefaultLayoutEdges] = useState(initialEdges);
   const [importStatus, setImportStatus] = useState("No geometry loaded");
   const [geometryTemplate, setGeometryTemplate] = useState("<geometry/>");
   const [geometryFilename, setGeometryFilename] = useState("geometry.xml");
-  const [modelStats, setModelStats] = useState(null);
   const [activeWorkspace, setActiveWorkspace] = useState("model");
   const [resultsStatus, setResultsStatus] = useState("No results loaded");
   const [results, setResults] = useState(null);
@@ -2123,12 +2192,13 @@ export default function App() {
   const [layoutKey, setLayoutKey] = useState(MANUAL_LAYOUT_KEY);
   const [hasUnsavedLayout, setHasUnsavedLayout] = useState(false);
   const [pendingComponentType, setPendingComponentType] = useState("");
-  const [undoStack, setUndoStack] = useState([]);
-  const [redoStack, setRedoStack] = useState([]);
+  const [, setUndoStack] = useState([]);
+  const [, setRedoStack] = useState([]);
   const [selectedRequirementId, setSelectedRequirementId] = useState("GUI-080");
   const [copyStatus, setCopyStatus] = useState("");
   const [contextMenu, setContextMenu] = useState(null);
   const [attributeEditorNodeId, setAttributeEditorNodeId] = useState(null);
+  const [showProjectInformation, setShowProjectInformation] = useState(false);
   const [originalGeometryFingerprint, setOriginalGeometryFingerprint] = useState("");
 
   const parsedRequirements = useMemo(() => parseRequirementSections(guiRequirementsMarkdown), []);
@@ -2349,6 +2419,11 @@ export default function App() {
 
   useEffect(() => {
     const handleKeyDown = (event) => {
+      if (event.key === "F1") {
+        event.preventDefault();
+        setActiveWorkspace("help");
+        return;
+      }
       if (isEditableTarget(event.target)) return;
       if (!(event.ctrlKey || event.metaKey)) return;
 
@@ -2416,10 +2491,12 @@ export default function App() {
         const target = nodes.find((node) => node.id === params.target);
         const isHeatConnection = source?.data.kind === "hslab" || target?.data.kind === "hslab";
         const isBcConnection = source?.type === "bc" || target?.type === "bc";
+        const bcNode = source?.type === "bc" ? source : target?.type === "bc" ? target : null;
+        const bcTarget = bcNode === source ? target : source;
         const edge = isHeatConnection
           ? hslabEdge(`${params.source}->${params.target}`, params.source, params.target, new Map(nodes.map((node) => [node.id, node.position])))
           : isBcConnection
-            ? bcEdge(`${params.source}->${params.target}`, params.source, params.target)
+            ? bcEdge(`${bcNode.id}->${bcTarget.id}`, bcNode.id, bcTarget.id)
             : normalizedFlowConnection(params, nodes);
         if (!edge) return eds;
         return addEdge(edge, eds);
@@ -2538,14 +2615,11 @@ export default function App() {
         const storedLayout = readStoredLayout(nextLayoutKey);
 
         setLayoutKey(nextLayoutKey);
-        setDefaultLayoutNodes(parsed.nodes);
-        setDefaultLayoutEdges(parsed.edges);
         setNodes(applyStoredLayout(parsed.nodes, storedLayout));
         setEdges(parsed.edges);
         setGeometryTemplate(parsed.templateXml);
         setGeometryFilename(file.name.toLowerCase().endsWith(".xml") ? file.name : `${file.name}.xml`);
         setOriginalGeometryFingerprint(geometryFingerprint(parsed.nodes, parsed.edges));
-        setModelStats(parsed.stats);
         setFitViewTrigger((count) => count + 1);
         setImportStatus(`Loaded ${file.name}${storedLayout ? " with saved layout" : ""}`);
         setActiveWorkspace("model");
@@ -2588,11 +2662,8 @@ export default function App() {
 
   const newCircuit = () => {
     setLayoutKey(MANUAL_LAYOUT_KEY);
-    setDefaultLayoutNodes(initialNodes);
-    setDefaultLayoutEdges(initialEdges);
     setNodes(initialNodes);
     setEdges(initialEdges);
-    setModelStats(null);
     setGeometryTemplate("<geometry/>");
     setGeometryFilename("geometry.xml");
     setOriginalGeometryFingerprint("");
@@ -2630,12 +2701,6 @@ export default function App() {
     return unchanged ? geometryTemplate : serializeOpenSdGeometry(geometryTemplate, nodes, edges).xml;
   }, [edges, geometryTemplate, nodes, originalGeometryFingerprint]);
 
-  const saveLayout = () => {
-    saveStoredLayout(layoutKey, nodes);
-    setHasUnsavedLayout(false);
-    setImportStatus("Layout saved");
-  };
-
   const exportLayout = () => {
     if (!nodes.length) return;
     const url = URL.createObjectURL(new Blob([JSON.stringify(serializeLayout(nodes, layoutKey), null, 2)], { type: "application/json" }));
@@ -2671,29 +2736,6 @@ export default function App() {
       }
     }
   };
-
-  const restoreDefaultLayout = () => {
-    pushUndoSnapshot();
-    clearStoredLayout(layoutKey);
-    setNodes(defaultLayoutNodes);
-    setEdges(defaultLayoutEdges);
-    setFitViewTrigger((count) => count + 1);
-    setHasUnsavedLayout(true);
-    setImportStatus("Default layout restored. Save to keep it.");
-  };
-
-  const summaryItems = useMemo(() => {
-    if (!modelStats) return [];
-
-    return [
-      ["Circuits", modelStats.circuits],
-      ["Flow Nodes", modelStats.nodes],
-      ["Pipes", modelStats.pipes],
-      ["Pumps", modelStats.pumps],
-      ["Heat Slabs", modelStats.hslabs],
-      ["BCs", modelStats.bcs]
-    ];
-  }, [modelStats]);
 
   const activeCircuit = useMemo(() => {
     return results?.circuits.find((circuit) => circuit.key === selectedCircuit) ?? null;
@@ -2757,10 +2799,10 @@ export default function App() {
             accept=".json,application/json"
             onChange={(event) => importLayout(event.target.files?.[0])}
           />
-          <button className="primary-button" onClick={() => fileInput.current?.click()}>
+          <button className="primary-button" onClick={() => fileInput.current?.click()} title="Import an OpenSD geometry XML file">
             Import XML
           </button>
-          <button className="secondary-button secondary-button--inline" onClick={exportGeometry} disabled={!nodes.length}>
+          <button className="secondary-button secondary-button--inline" onClick={exportGeometry} disabled={!nodes.length} title="Export current geometry and connectivity as XML">
             Export XML
           </button>
           <div className="status-text">{importStatus}</div>
@@ -2768,28 +2810,15 @@ export default function App() {
 
         <section className="panel">
           <div className="panel-title">Circuit</div>
-          <button className="primary-button" onClick={newCircuit}>
-            New circuit
-          </button>
-          <button className="secondary-button secondary-button--inline" onClick={undoLastAction} disabled={!undoStack.length}>
-            Undo
-          </button>
-          <button className="secondary-button secondary-button--inline" onClick={redoLastAction} disabled={!redoStack.length}>
-            Redo
+          <button className="primary-button" onClick={newCircuit} title="Remove all components and start with a blank layout">
+            Clear layout
           </button>
           <button
             className="secondary-button secondary-button--inline"
-            onClick={copySelectionToClipboard}
-            disabled={!selectedComponentCount}
+            onClick={() => setShowProjectInformation(true)}
+            title="Show project file, component, connection, and per-circuit statistics"
           >
-            Copy figure
-          </button>
-          <button
-            className="secondary-button secondary-button--inline"
-            onClick={exportSelectionToPng}
-            disabled={!selectedComponentCount}
-          >
-            Export PNG
+            Project information
           </button>
           <div className="align-tools" aria-label="Alignment tools">
             <button type="button" title="Align selected components on one vertical axis" onClick={() => alignSelectedComponents("center")} disabled={!canAlignSelection}>
@@ -2797,9 +2826,6 @@ export default function App() {
             </button>
             <button type="button" title="Align selected components on one horizontal axis" onClick={() => alignSelectedComponents("middle")} disabled={!canAlignSelection}>
               Align horizontal
-            </button>
-            <button type="button" title="Rotate selected layout and pipe orientations 90 degrees clockwise" onClick={transposeSelection} disabled={!canAlignSelection}>
-              Transpose
             </button>
             <button type="button" title="Move selected components left" onClick={() => moveSelectedComponents("left")} disabled={!selectedComponentCount}>
               Move &larr;
@@ -2841,37 +2867,19 @@ export default function App() {
             >
               Dist V
             </button>
+            <button type="button" title="Rotate selected layout and pipe orientations 90 degrees clockwise" onClick={transposeSelection} disabled={!canAlignSelection}>
+              Transpose
+            </button>
           </div>
           {copyStatus && <div className="status-text status-text--hint">{copyStatus}</div>}
-          <button className="secondary-button secondary-button--inline" onClick={saveLayout} disabled={!nodes.length}>
-            Save layout
-          </button>
-          <button className="secondary-button secondary-button--inline" onClick={exportLayout} disabled={!nodes.length}>
+          <button className="secondary-button secondary-button--inline" onClick={exportLayout} disabled={!nodes.length} title="Export component positions as layout JSON">
             Export layout
           </button>
-          <button className="secondary-button secondary-button--inline" onClick={() => layoutInput.current?.click()} disabled={!nodes.length}>
+          <button className="secondary-button secondary-button--inline" onClick={() => layoutInput.current?.click()} disabled={!nodes.length} title="Import component positions from layout JSON">
             Import layout
-          </button>
-          <button
-            className="secondary-button secondary-button--inline"
-            onClick={restoreDefaultLayout}
-            disabled={!defaultLayoutNodes.length && !nodes.length}
-          >
-            Default layout
           </button>
           {hasUnsavedLayout && <div className="status-text status-text--warning">Unsaved layout changes</div>}
         </section>
-
-        {summaryItems.length > 0 && (
-          <section className="panel metrics">
-            {summaryItems.map(([label, value]) => (
-              <div key={label} className="metric-row">
-                <span>{label}</span>
-                <strong>{value}</strong>
-              </div>
-            ))}
-          </section>
-        )}
 
         <section className="panel">
           <div className="panel-title">Components</div>
@@ -2883,6 +2891,7 @@ export default function App() {
                 role="button"
                 tabIndex={0}
                 draggable
+                title={`Add or drag a ${component} component`}
                 onClick={() => setPendingComponentType(component)}
                 onDragStart={(event) => onDragStart(event, component)}
                 onKeyDown={(event) => {
@@ -2909,24 +2918,35 @@ export default function App() {
           <button
             className={activeWorkspace === "model" ? "active" : ""}
             onClick={() => setActiveWorkspace("model")}
+            title="Edit OpenSD geometry (F1 opens Help)"
           >
             Pre-processor
           </button>
           <button
             className={activeWorkspace === "solver" ? "active" : ""}
             onClick={() => setActiveWorkspace("solver")}
+            title="Configure and run the OpenSD solver"
           >
             Solver
           </button>
           <button
             className={activeWorkspace === "postprocess" ? "active" : ""}
             onClick={() => setActiveWorkspace("postprocess")}
+            title="Import and plot HDF5 results"
           >
             Postprocessor
           </button>
           <button
+            className={activeWorkspace === "help" ? "active" : ""}
+            onClick={() => setActiveWorkspace("help")}
+            title="Open GUI help (F1)"
+          >
+            Help
+          </button>
+          <button
             className={activeWorkspace === "requirements" ? "active" : ""}
             onClick={() => setActiveWorkspace("requirements")}
+            title="Browse bundled GUI requirements"
           >
             Requirements
           </button>
@@ -2982,6 +3002,17 @@ export default function App() {
             node={attributeEditorNode}
             onCancel={() => setAttributeEditorNodeId(null)}
             onSave={saveComponentAttributes}
+          />
+        )}
+
+        {showProjectInformation && (
+          <ProjectInformation
+            filename={geometryFilename}
+            layoutKey={layoutKey}
+            nodes={nodes}
+            edges={edges}
+            hasUnsavedLayout={hasUnsavedLayout}
+            onClose={() => setShowProjectInformation(false)}
           />
         )}
 
@@ -3083,6 +3114,8 @@ export default function App() {
             onSelect={selectRequirement}
           />
         )}
+
+        {activeWorkspace === "help" && <HelpDocument text={guiHelpMarkdown} />}
       </main>
     </div>
   );

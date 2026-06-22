@@ -174,6 +174,55 @@ button {
   box-shadow: 0 24px 70px rgb(20 28 42 / 28%);
 }
 
+.project-information {
+  width: min(620px, 100%);
+}
+
+.project-information h3 {
+  margin: 20px 0 8px;
+  color: #344054;
+  font-size: 14px;
+}
+
+.project-information-summary {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0 0;
+}
+
+.project-information-summary div,
+.project-statistics-grid div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 10px;
+  border: 1px solid #e1e6ef;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.project-information-summary dt,
+.project-statistics-grid span {
+  color: #667085;
+  font-size: 13px;
+}
+
+.project-information-summary dd,
+.project-statistics-grid strong {
+  margin: 0;
+  color: #101827;
+  font-size: 13px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.project-statistics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .attribute-modal-header,
 .attribute-modal-actions {
   display: flex;
@@ -925,6 +974,45 @@ button {
   flex: 1 1 auto;
   overflow: auto;
   line-height: 1.5;
+}
+
+.help-view {
+  overflow: auto;
+  padding: 24px;
+  background: #f8fafc;
+}
+
+.help-document {
+  width: min(900px, 100%);
+  margin: 0 auto;
+  padding: 28px 34px;
+  border: 1px solid #dbe2ea;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
+  color: #344054;
+  line-height: 1.55;
+}
+
+.help-document h1 {
+  margin: 0 0 18px;
+  color: #101827;
+  font-size: 28px;
+}
+
+.help-document h2 {
+  margin: 26px 0 10px;
+  color: #1d2939;
+  font-size: 18px;
+}
+
+.help-document p,
+.help-document ul {
+  margin: 7px 0;
+}
+
+.help-document ul {
+  padding-left: 22px;
 }
 
 .requirements-body p {
