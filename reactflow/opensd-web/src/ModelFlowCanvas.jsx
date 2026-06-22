@@ -141,6 +141,7 @@ function ModelFlowInner({
         onSelectionStart={handleSelectionStart}
         onSelectionEnd={handleSelectionEnd}
         connectionMode={ConnectionMode.Loose}
+        connectOnClick={false}
         deleteKeyCode={["Backspace", "Delete"]}
         multiSelectionKeyCode={["Control", "Meta"]}
         elementsSelectable

@@ -4,6 +4,7 @@ const BC_LIFT = 68;
 const CIRCUIT_LABEL_WIDTH = 88;
 const LAYER_STEP_X = 176;
 const LANE_GAP = 20;
+const ELEVATION_GAP = 86;
 const ROW_TOP_PADDING = 12;
 const ROW_BOTTOM_EXTENT = 32;
 const ROW_GAP = 24;
@@ -65,7 +66,7 @@ export function buildHorizontalSequence(nodeNames, pipes, compare) {
   return sequence;
 }
 
-export function layoutCircuitRow({ circuitId, sequence, bcRecords, previousBottom }) {
+export function layoutCircuitRow({ circuitId, sequence, bcRecords, nodeElevations = new Map(), elevationPositions = new Map(), circuitX = 24, previousBottom }) {
   const nodeNames = sequence.filter((item) => item.kind === "node").map((item) => item.name);
   const pipes = sequence.filter((item) => item.kind === "pipe").map((item) => item.pipe);
   const nodeOrder = new Map(nodeNames.map((name, index) => [name, index]));
@@ -89,9 +90,14 @@ export function layoutCircuitRow({ circuitId, sequence, bcRecords, previousBotto
 
     for (let cursor = 0; cursor < queue.length; cursor += 1) {
       const name = queue[cursor];
-      const nextDepth = depthByNode.get(name) + 1;
       for (const target of outgoing.get(name) ?? []) {
         if (depthByNode.has(target)) continue;
+        const sourceElevation = nodeElevations.get(name);
+        const targetElevation = nodeElevations.get(target);
+        const changesElevation = Number.isFinite(sourceElevation)
+          && Number.isFinite(targetElevation)
+          && Math.abs(sourceElevation - targetElevation) > 1e-9;
+        const nextDepth = depthByNode.get(name) + (changesElevation ? 0 : 1);
         depthByNode.set(target, nextDepth);
         queue.push(target);
       }
@@ -116,6 +122,23 @@ export function layoutCircuitRow({ circuitId, sequence, bcRecords, previousBotto
     (counts, bc) => counts.set(bc.targetNode, (counts.get(bc.targetNode) ?? 0) + 1),
     new Map()
   );
+  const elevationValues = Array.from(new Set(
+    nodeNames.map((name) => nodeElevations.get(name)).filter(Number.isFinite)
+  )).sort((a, b) => b - a);
+  const usesSharedElevations = elevationPositions.size > 0;
+  const elevationY = usesSharedElevations ? new Map(elevationPositions) : new Map();
+  let elevationCursor = 0;
+  for (const elevation of usesSharedElevations ? [] : elevationValues) {
+    const namesAtElevation = nodeNames.filter((name) => nodeElevations.get(name) === elevation);
+    const topExtent = Math.max(ROW_TOP_PADDING, ...namesAtElevation.map((name) => {
+      const bcCount = bcCountByTarget.get(name) ?? 0;
+      return bcCount > 0 ? BC_LIFT + (bcCount - 1) * BC_STACK_GAP + ROW_TOP_PADDING : ROW_TOP_PADDING;
+    }));
+    const y = elevationCursor + topExtent;
+    elevationY.set(elevation, y);
+    elevationCursor = y + ROW_BOTTOM_EXTENT + ELEVATION_GAP;
+  }
+  const elevationCenter = usesSharedElevations ? 0 : Math.max(0, elevationCursor - ELEVATION_GAP) / 2;
   const relativeNodePositions = new Map();
   for (const [depth, names] of nodesByDepth) {
     let laneCursor = 0;
@@ -127,10 +150,16 @@ export function layoutCircuitRow({ circuitId, sequence, bcRecords, previousBotto
       return { name, y };
     });
     const layerHeight = Math.max(0, laneCursor - LANE_GAP);
+    const positionCount = new Map();
     lanePositions.forEach(({ name, y }) => {
+      const elevation = nodeElevations.get(name);
+      const elevationPosition = Number.isFinite(elevation) ? elevationY.get(elevation) - elevationCenter : y - layerHeight / 2;
+      const positionKey = `${depth}:${elevationPosition}`;
+      const duplicateIndex = positionCount.get(positionKey) ?? 0;
+      positionCount.set(positionKey, duplicateIndex + 1);
       relativeNodePositions.set(name, {
-        x: 24 + CIRCUIT_LABEL_WIDTH + depth * LAYER_STEP_X,
-        y: y - layerHeight / 2
+        x: circuitX + CIRCUIT_LABEL_WIDTH + depth * LAYER_STEP_X + duplicateIndex * 96,
+        y: elevationPosition
       });
     });
   }
@@ -144,13 +173,13 @@ export function layoutCircuitRow({ circuitId, sequence, bcRecords, previousBotto
     contentBottom = Math.max(contentBottom, position.y + ROW_BOTTOM_EXTENT);
   }
 
-  const layoutTop = previousBottom == null ? 38 : previousBottom + ROW_GAP;
-  const yOffset = layoutTop - contentTop;
+  const layoutTop = usesSharedElevations ? contentTop : previousBottom == null ? 38 : previousBottom + ROW_GAP;
+  const yOffset = usesSharedElevations ? 0 : layoutTop - contentTop;
   const firstNodeY = relativeNodePositions.get(nodeNames[0])?.y ?? 0;
   const circuitY = yOffset + firstNodeY;
   const positions = new Map();
 
-  positions.set(`circuit:${circuitId}`, { x: 24, y: circuitY });
+  positions.set(`circuit:${circuitId}`, { x: circuitX, y: circuitY });
   for (const [name, position] of relativeNodePositions) {
     positions.set(`node:${name}`, { x: position.x, y: yOffset + position.y });
   }
@@ -191,16 +220,22 @@ export function layoutCircuitRow({ circuitId, sequence, bcRecords, previousBotto
     pipeCountByPair.set(key, (pipeCountByPair.get(key) ?? 0) + 1);
   }
   for (const pipe of pipes) {
-    const source = relativeNodePositions.get(pipe.unode) ?? { x: 24 + CIRCUIT_LABEL_WIDTH, y: 0 };
+    const source = relativeNodePositions.get(pipe.unode) ?? { x: circuitX + CIRCUIT_LABEL_WIDTH, y: 0 };
     const target = relativeNodePositions.get(pipe.dnode) ?? { x: source.x + LAYER_STEP_X, y: source.y };
     const key = `${pipe.unode}->${pipe.dnode}`;
     const index = pipeIndexByPair.get(key) ?? 0;
     const count = pipeCountByPair.get(key) ?? 1;
-    const horizontalDelta = target.x - source.x;
-    const pipeX = source.x + (horizontalDelta === 0 ? LAYER_STEP_X / 2 : horizontalDelta / 2);
-    const preferredY = yOffset + source.y + (target.y - source.y) / 2 + (index - (count - 1) / 2) * 36;
+    const sourceCenter = { x: source.x + 11, y: source.y + 11 };
+    const targetCenter = { x: target.x + 11, y: target.y + 11 };
+    const horizontalDelta = targetCenter.x - sourceCenter.x;
+    const verticalDelta = targetCenter.y - sourceCenter.y;
+    const isVertical = Math.abs(verticalDelta) > Math.abs(horizontalDelta);
+    const pipeWidth = isVertical ? 28 : 64;
+    const pipeHeight = isVertical ? 64 : 28;
+    const pipeX = sourceCenter.x + horizontalDelta / 2 - pipeWidth / 2;
+    const preferredY = yOffset + sourceCenter.y + verticalDelta / 2 - pipeHeight / 2 + (index - (count - 1) / 2) * 36;
     let pipeY = preferredY;
-    for (let attempt = 1; overlapsOccupied({ x: pipeX, y: pipeY, width: 64, height: 28 }); attempt += 1) {
+    for (let attempt = 1; overlapsOccupied({ x: pipeX, y: pipeY, width: pipeWidth, height: pipeHeight }); attempt += 1) {
       const direction = attempt % 2 === 1 ? 1 : -1;
       const distance = Math.ceil(attempt / 2) * 42;
       pipeY = Math.max(layoutTop, preferredY + direction * distance);
@@ -210,7 +245,7 @@ export function layoutCircuitRow({ circuitId, sequence, bcRecords, previousBotto
       x: pipeX,
       y: pipeY
     });
-    occupied.push({ x: pipeX, y: pipeY, width: 64, height: 28 });
+    occupied.push({ x: pipeX, y: pipeY, width: pipeWidth, height: pipeHeight });
   }
 
   const bcsByTarget = new Map();
@@ -231,12 +266,25 @@ export function layoutCircuitRow({ circuitId, sequence, bcRecords, previousBotto
     });
   }
 
+  const firstItem = sequence[0];
+  const firstComponentId = firstItem
+    ? `${firstItem.kind === "node" ? "node" : "pipe"}:${firstItem.name}`
+    : "";
+  const firstComponentPosition = positions.get(firstComponentId);
+  if (firstComponentPosition) {
+    positions.set(`circuit:${circuitId}`, {
+      x: firstComponentPosition.x - CIRCUIT_LABEL_WIDTH,
+      y: firstComponentPosition.y
+    });
+  }
+  const finalCircuitY = positions.get(`circuit:${circuitId}`)?.y ?? circuitY;
+
   return {
-    circuitY,
+    circuitY: finalCircuitY,
     positions,
     bounds: {
       top: layoutTop,
-      right: Math.max(24 + CIRCUIT_LABEL_WIDTH, ...Array.from(positions.values(), (position) => position.x + PIPE_STEP)),
+      right: Math.max(circuitX + CIRCUIT_LABEL_WIDTH, ...Array.from(positions.values(), (position) => position.x + PIPE_STEP)),
       bottom: Math.max(yOffset + contentBottom, ...Array.from(positions.values(), (position) => position.y + ROW_BOTTOM_EXTENT))
     }
   };

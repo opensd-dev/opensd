@@ -971,7 +971,7 @@ button {
   position: absolute;
   left: 50%;
   bottom: calc(100% + 8px);
-  z-index: 10;
+  z-index: 10001;
   transform: translateX(-50%);
   min-width: 120px;
   max-width: 260px;
@@ -1012,7 +1012,7 @@ button {
   position: absolute;
   left: 32px;
   top: -38px;
-  z-index: 12;
+  z-index: 10002;
   transform: translateX(-50%);
   width: 28px;
   height: 28px;
@@ -1252,6 +1252,10 @@ button {
   font-size: 11px;
   letter-spacing: 0.04em;
   pointer-events: none;
+}
+
+.react-flow__node:hover {
+  z-index: 10000 !important;
 }
 
 .bc-node__label {

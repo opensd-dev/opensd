@@ -122,7 +122,7 @@ function mandatoryAttributes(type, identifier) {
   return { identifier, diameter: "1.0", length: "1.0", ncell: "1", unode: "", dnode: "", roughness: "0.0", cfarea: "1.0", heat_input: "0.0" };
 }
 
-function buildPipeNode({ id, position, identifier, details = [], kind = "pipe", xmlTag = kind === "pump" ? "vspump" : "pipe", heatHandleMap, circuitId = "", xmlAttributes = {}, sourceIdentifier = identifier }) {
+function buildPipeNode({ id, position, identifier, details = [], kind = "pipe", xmlTag = kind === "pump" ? "vspump" : "pipe", heatHandleMap, circuitId = "", xmlAttributes = {}, sourceIdentifier = identifier, rotation = 0 }) {
   return {
     id,
     type: "pipe",
@@ -133,7 +133,7 @@ function buildPipeNode({ id, position, identifier, details = [], kind = "pipe", 
       xmlTag,
       heat: heatFor(id, heatHandleMap),
       flowConnections: emptyFlowConnections(),
-      rotation: 0,
+      rotation,
       circuitId,
       xmlAttributes,
       sourceIdentifier
@@ -242,15 +242,35 @@ function applyHeatHandleMap(nodes, heatHandleMap) {
 }
 
 function rerouteHeatEdges(nodes, edges) {
-  const positionById = new Map(nodes.map((node) => [node.id, node.position]));
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+
+  const nearestLongSide = (node, otherNode) => {
+    if (!node || !otherNode) return "top";
+    const center = nodeCenter(node);
+    const otherCenter = nodeCenter(otherNode);
+    const rotation = node.type === "pipe" ? ((node.data?.rotation ?? 0) % 360 + 360) % 360 : 0;
+    const angle = (rotation * Math.PI) / 180;
+    const topNormal = rotation === 90
+      ? { x: -1, y: 0 }
+      : rotation === 270
+        ? { x: 1, y: 0 }
+        : { x: Math.sin(angle), y: -Math.cos(angle) };
+    const towardOther = { x: otherCenter.x - center.x, y: otherCenter.y - center.y };
+    return towardOther.x * topNormal.x + towardOther.y * topNormal.y >= 0 ? "top" : "bottom";
+  };
 
   return edges.map((edge) => {
     if (edge.className !== "hslab-edge") return edge;
+    const source = nodeById.get(edge.source);
+    const target = nodeById.get(edge.target);
+    const sourceSide = nearestLongSide(source, target);
+    const targetSide = nearestLongSide(target, source);
 
     return {
       ...edge,
       type: "straight",
-      ...heatHandlesFromPositions(edge.source, edge.target, positionById)
+      sourceHandle: `ht-${sourceSide}-out`,
+      targetHandle: `ht-${targetSide}-in`
     };
   });
 }
@@ -292,6 +312,64 @@ function nodeCenter(node) {
     x: (node.position?.x ?? 0) + size.width / 2,
     y: (node.position?.y ?? 0) + size.height / 2
   };
+}
+
+function segmentIntersectsRect(start, end, rect) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  let enter = 0;
+  let exit = 1;
+  const boundaries = [
+    [-dx, start.x - rect.left],
+    [dx, rect.right - start.x],
+    [-dy, start.y - rect.top],
+    [dy, rect.bottom - start.y]
+  ];
+
+  for (const [direction, distance] of boundaries) {
+    if (direction === 0) {
+      if (distance < 0) return false;
+      continue;
+    }
+    const ratio = distance / direction;
+    if (direction < 0) enter = Math.max(enter, ratio);
+    else exit = Math.min(exit, ratio);
+    if (enter > exit) return false;
+  }
+  return true;
+}
+
+function revealConnectionsBehindComponents(nodes, edges) {
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  return edges.map((edge) => {
+    const source = nodeById.get(edge.source);
+    const target = nodeById.get(edge.target);
+    if (!source || !target) return edge;
+    const start = nodeCenter(source);
+    const end = nodeCenter(target);
+    const isOccluded = nodes.some((node) => {
+      if (node.id === edge.source || node.id === edge.target) return false;
+      const size = nodeSize(node);
+      return segmentIntersectsRect(start, end, {
+        left: node.position.x - 2,
+        right: node.position.x + size.width + 2,
+        top: node.position.y - 2,
+        bottom: node.position.y + size.height + 2
+      });
+    });
+    if (!isOccluded) return edge;
+    return {
+      ...edge,
+      zIndex: 1,
+      style: {
+        ...edge.style,
+        stroke: "#98a2b3",
+        strokeWidth: 1.5,
+        strokeDasharray: "3 5",
+        opacity: 0.82
+      }
+    };
+  });
 }
 
 function preferredSourceSide(sourceNode, targetNode, lockHorizontal = false) {
@@ -797,11 +875,44 @@ function adjustSelectedSpacing(nodes, axis, direction) {
     : node);
 }
 
+function transposeSelectedLayout(nodes) {
+  const bounds = selectedNodeBounds(selectedNodes(nodes));
+  if (bounds.length < 2) return nodes;
+
+  const centerX = (Math.min(...bounds.map((bound) => bound.left)) + Math.max(...bounds.map((bound) => bound.right))) / 2;
+  const centerY = (Math.min(...bounds.map((bound) => bound.top)) + Math.max(...bounds.map((bound) => bound.bottom))) / 2;
+  const nextNodeById = new Map();
+
+  for (const bound of bounds) {
+    const rotatedNode = bound.node.type === "pipe"
+      ? { ...bound.node, data: { ...bound.node.data, rotation: ((bound.node.data?.rotation ?? 0) + 90) % 360 } }
+      : bound.node;
+    const rotatedSize = bound.node.type === "pipe"
+      ? { width: bound.height, height: bound.width }
+      : { width: bound.width, height: bound.height };
+    const offsetX = bound.centerX - centerX;
+    const offsetY = bound.centerY - centerY;
+    const rotatedCenterX = centerX - offsetY;
+    const rotatedCenterY = centerY + offsetX;
+    nextNodeById.set(bound.node.id, {
+      ...rotatedNode,
+      position: {
+        x: rotatedCenterX - rotatedSize.width / 2,
+        y: rotatedCenterY - rotatedSize.height / 2
+      }
+    });
+  }
+
+  return nodes.map((node) => nextNodeById.get(node.id) ?? node);
+}
+
 function isAllowedConnection(connection, nodes) {
   if (!connection.source || !connection.target || connection.source === connection.target) return false;
   const source = nodes.find((node) => node.id === connection.source);
   const target = nodes.find((node) => node.id === connection.target);
-  return !(source?.type === "flow" && target?.type === "flow");
+  const isDirectNodeConnection = source?.type === "flow" && target?.type === "flow";
+  const isDirectHslabConnection = source?.data.kind === "hslab" && target?.data.kind === "hslab";
+  return !isDirectNodeConnection && !isDirectHslabConnection;
 }
 
 function graphClipboardFromSelection(nodes, edges) {
@@ -1396,8 +1507,34 @@ function parseGeometryXml(xmlText) {
   };
 
   const circuits = Array.from(geometry.querySelectorAll(":scope > circuit"));
+  const sharedElevationValues = Array.from(new Set(
+    circuits.flatMap((circuit) => Array.from(circuit.querySelectorAll(":scope > node"), (node) => Number(attr(node, "elevation", "0"))))
+      .filter(Number.isFinite)
+  )).sort((a, b) => b - a);
+  const maxBcStackByElevation = new Map();
+  for (const circuit of circuits) {
+    const bcCountByNode = Array.from(circuit.querySelectorAll(":scope > bc")).reduce((counts, bc) => {
+      const target = attr(bc, "node");
+      counts.set(target, (counts.get(target) ?? 0) + 1);
+      return counts;
+    }, new Map());
+    for (const node of circuit.querySelectorAll(":scope > node")) {
+      const elevation = Number(attr(node, "elevation", "0"));
+      const stack = bcCountByNode.get(attr(node, "identifier")) ?? 0;
+      maxBcStackByElevation.set(elevation, Math.max(maxBcStackByElevation.get(elevation) ?? 0, stack));
+    }
+  }
+  const sharedElevationPositions = new Map();
+  let elevationY = 80;
+  sharedElevationValues.forEach((elevation, index) => {
+    sharedElevationPositions.set(elevation, elevationY);
+    const lowerElevation = sharedElevationValues[index + 1];
+    const lowerBcStack = maxBcStackByElevation.get(lowerElevation) ?? 0;
+    elevationY += Math.max(112, 102 + Math.max(0, lowerBcStack - 1) * 58);
+  });
   let defaultLayoutBottom = 0;
   let defaultLayoutRight = 0;
+  let nextCircuitX = 24;
 
   circuits.forEach((circuit, circuitIndex) => {
     const circuitId = attr(circuit, "identifier", `circuit_${circuitIndex + 1}`);
@@ -1410,12 +1547,14 @@ function parseGeometryXml(xmlText) {
     const bcElements = Array.from(circuit.querySelectorAll(":scope > bc"));
 
     const nodeByName = new Map();
+    const nodeElevations = new Map();
     const nodeNames = [];
 
     nodeElements.forEach((nodeEl, nodeIndex) => {
       const nodeName = attr(nodeEl, "identifier", `node_${nodeIndex + 1}`);
       nodeNames.push(nodeName);
       nodeByName.set(nodeName, nodeEl);
+      nodeElevations.set(nodeName, Number(attr(nodeEl, "elevation", "0")));
       stats.nodes += 1;
     });
 
@@ -1451,10 +1590,13 @@ function parseGeometryXml(xmlText) {
       circuitId,
       sequence,
       bcRecords,
-      previousBottom: circuitIndex > 0 ? defaultLayoutBottom : undefined
+      nodeElevations,
+      elevationPositions: sharedElevationPositions,
+      circuitX: nextCircuitX
     });
-    defaultLayoutBottom = bounds.bottom;
+    defaultLayoutBottom = Math.max(defaultLayoutBottom, bounds.bottom);
     defaultLayoutRight = Math.max(defaultLayoutRight, bounds.right);
+    nextCircuitX = bounds.right + 80;
 
     pushNode(
       buildPipeNode({
@@ -1490,6 +1632,12 @@ function parseGeometryXml(xmlText) {
       }
 
       const pipe = pipeByName.get(item.name);
+      const upstreamPosition = positions.get(`node:${pipe.unode}`);
+      const downstreamPosition = positions.get(`node:${pipe.dnode}`);
+      const defaultRotation = upstreamPosition && downstreamPosition
+        && Math.abs(downstreamPosition.y - upstreamPosition.y) > Math.abs(downstreamPosition.x - upstreamPosition.x)
+        ? 90
+        : 0;
       pushNode(
         buildPipeNode({
           id: `pipe:${item.name}`,
@@ -1497,6 +1645,7 @@ function parseGeometryXml(xmlText) {
           identifier: item.name,
           kind: pipe.kind,
           xmlTag: pipe.xmlTag,
+          rotation: defaultRotation,
           circuitId,
           xmlAttributes: attributesOf(pipe.element),
           details: [
@@ -1580,6 +1729,79 @@ function parseGeometryXml(xmlText) {
     Math.min(hslabs.length, circuits.length > 0 ? Math.floor(usableLayoutWidth / hslabStepX) : Math.ceil(Math.sqrt(hslabs.length)))
   );
   const hslabBaseY = (circuits.length > 0 ? defaultLayoutBottom : 18) + 44;
+  const occupiedLayoutBoxes = flowNodes.map((node) => {
+    const size = nodeSize(node);
+    return { x: node.position.x, y: node.position.y, width: size.width, height: size.height };
+  });
+  const hslabsBySinglePipe = new Map();
+
+  const overlapsLayout = (position, width = 64, height = 28) => occupiedLayoutBoxes.some((box) => {
+    const clearance = 12;
+    return position.x < box.x + box.width + clearance
+      && position.x + width + clearance > box.x
+      && position.y < box.y + box.height + clearance
+      && position.y + height + clearance > box.y;
+  });
+
+  const positionNearPipe = (pipeId) => {
+    const anchor = flowNodes.find((node) => node.id === pipeId);
+    if (!anchor) return null;
+    const stackIndex = hslabsBySinglePipe.get(pipeId) ?? 0;
+    hslabsBySinglePipe.set(pipeId, stackIndex + 1);
+    const anchorSize = nodeSize(anchor);
+    const rotation = [90, 270].includes(((anchor.data?.rotation ?? 0) % 360 + 360) % 360) ? 90 : 0;
+    const hslabSize = rotation === 90 ? { width: 28, height: 64 } : { width: 64, height: 28 };
+    const preferred = rotation === 90
+      ? {
+          x: anchor.position.x + anchorSize.width + 40 + stackIndex * hslabStepY,
+          y: anchor.position.y + (anchorSize.height - hslabSize.height) / 2
+        }
+      : {
+          x: anchor.position.x + (anchorSize.width - hslabSize.width) / 2,
+          y: anchor.position.y + anchorSize.height + 40 + stackIndex * hslabStepY
+        };
+
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const candidate = rotation === 90
+        ? { x: preferred.x + attempt * hslabStepY, y: preferred.y }
+        : { x: preferred.x, y: preferred.y + attempt * hslabStepY };
+      if (!overlapsLayout(candidate, hslabSize.width, hslabSize.height)) return { position: candidate, rotation };
+    }
+    return { position: preferred, rotation };
+  };
+
+  const positionBetweenPipes = (pipeIds) => {
+    const anchors = pipeIds.map((pipeId) => flowNodes.find((node) => node.id === pipeId)).filter(Boolean);
+    if (anchors.length !== 2) return null;
+    const centers = anchors.map((anchor) => {
+      const size = nodeSize(anchor);
+      return { x: anchor.position.x + size.width / 2, y: anchor.position.y + size.height / 2 };
+    });
+    const bothVertical = anchors.every((anchor) => [90, 270].includes(((anchor.data?.rotation ?? 0) % 360 + 360) % 360));
+    const rotation = bothVertical ? 90 : 0;
+    const size = rotation === 90 ? { width: 28, height: 64 } : { width: 64, height: 28 };
+    const preferred = {
+      x: (centers[0].x + centers[1].x) / 2 - size.width / 2,
+      y: (centers[0].y + centers[1].y) / 2 - size.height / 2
+    };
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const direction = attempt === 0 ? 0 : attempt % 2 === 1 ? 1 : -1;
+      const distance = Math.ceil(attempt / 2) * hslabStepY;
+      const candidate = rotation === 90
+        ? { x: preferred.x + direction * distance, y: preferred.y }
+        : { x: preferred.x, y: preferred.y + direction * distance };
+      if (!overlapsLayout(candidate, size.width, size.height)) return { rotation, position: candidate };
+    }
+    return { rotation, position: preferred };
+  };
+
+  const positionInPackedArea = (preferred) => {
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const candidate = { x: preferred.x, y: preferred.y + attempt * hslabStepY };
+      if (!overlapsLayout(candidate)) return candidate;
+    }
+    return preferred;
+  };
 
   hslabs.forEach((hslab, hslabIndex) => {
     const hslabName = attr(hslab, "identifier", `hslab_${hslabIndex + 1}`);
@@ -1587,15 +1809,31 @@ function parseGeometryXml(xmlText) {
     const layers = Array.from(hslab.querySelectorAll(":scope > layer"));
     const hslabColumn = hslabIndex % hslabColumns;
     const hslabRow = Math.floor(hslabIndex / hslabColumns);
+    const ucomp = attr(hslab, "ucomp");
+    const dcomp = attr(hslab, "dcomp");
+    const pipeConnections = new Set([
+      attr(hslab, "uvar") === "pipe" && nodeIds.has(`pipe:${ucomp}`) ? `pipe:${ucomp}` : "",
+      attr(hslab, "dvar") === "pipe" && nodeIds.has(`pipe:${dcomp}`) ? `pipe:${dcomp}` : ""
+    ].filter(Boolean));
+    const fallbackPosition = positionInPackedArea({ x: 24 + hslabColumn * hslabStepX, y: hslabBaseY + hslabRow * hslabStepY });
+    const connectedPipeIds = Array.from(pipeConnections);
+    const connectedPlacement = pipeConnections.size === 1
+      ? positionNearPipe(connectedPipeIds[0])
+      : pipeConnections.size === 2
+        ? positionBetweenPipes(connectedPipeIds)
+        : null;
+    const hslabPosition = connectedPlacement?.position ?? fallbackPosition;
+    const hslabRotation = connectedPlacement?.rotation ?? 0;
 
     stats.hslabs += 1;
 
     pushNode(
       buildPipeNode({
         id: hslabId,
-        position: { x: 24 + hslabColumn * hslabStepX, y: hslabBaseY + hslabRow * hslabStepY },
+        position: hslabPosition,
         identifier: hslabName,
         kind: "hslab",
+        rotation: hslabRotation,
         xmlAttributes: attributesOf(hslab),
         details: [
           attr(hslab, "uvar") && `u ${attr(hslab, "uvar")}`,
@@ -1604,9 +1842,13 @@ function parseGeometryXml(xmlText) {
         ]
       })
     );
+    occupiedLayoutBoxes.push({
+      x: hslabPosition.x,
+      y: hslabPosition.y,
+      width: hslabRotation === 90 ? 28 : 64,
+      height: hslabRotation === 90 ? 64 : 28
+    });
 
-    const ucomp = attr(hslab, "ucomp");
-    const dcomp = attr(hslab, "dcomp");
     const upstreamId = attr(hslab, "uvar") === "pipe" ? `pipe:${ucomp}` : `node:${ucomp}`;
     const downstreamId = attr(hslab, "dvar") === "pipe" ? `pipe:${dcomp}` : `node:${dcomp}`;
 
@@ -1809,6 +2051,16 @@ function AttributeEditor({ node, onCancel, onSave }) {
   const attributeName = (row) => String(row?.name ?? "").trim();
   const identifier = String(rows.find((row) => attributeName(row) === "identifier")?.value ?? "").trim();
 
+  useEffect(() => {
+    const closeOnEscape = (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onCancel();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onCancel]);
+
   return (
     <div className="attribute-modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onCancel()}>
       <section className="attribute-modal" role="dialog" aria-modal="true" aria-labelledby="attribute-modal-title">
@@ -1851,6 +2103,7 @@ export default function App() {
   const hdf5Input = useRef(null);
   const layoutInput = useRef(null);
   const graphClipboard = useRef(null);
+  const dragUndoCaptured = useRef(false);
   const [nodes, setNodes, reactFlowOnNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, reactFlowOnEdgesChange] = useEdgesState(initialEdges);
   const [defaultLayoutNodes, setDefaultLayoutNodes] = useState(initialNodes);
@@ -1996,6 +2249,13 @@ export default function App() {
     [nodes, pushUndoSnapshot, setNodes]
   );
 
+  const transposeSelection = useCallback(() => {
+    if (selectedNodes(nodes).length < 2) return;
+    pushUndoSnapshot();
+    setNodes((nds) => transposeSelectedLayout(nds));
+    setHasUnsavedLayout(true);
+  }, [nodes, pushUndoSnapshot, setNodes]);
+
   useEffect(() => {
     const warnBeforeClose = (event) => {
       if (!hasUnsavedLayout) return;
@@ -2009,8 +2269,13 @@ export default function App() {
 
   const onNodesChange = useCallback(
     (changes) => {
-      if (changes.some((change) => change.type === "position" && change.dragging === true)) {
+      const positionChanges = changes.filter((change) => change.type === "position");
+      const isDragging = positionChanges.some((change) => change.dragging === true);
+      if (isDragging && !dragUndoCaptured.current) {
         pushUndoSnapshot();
+        dragUndoCaptured.current = true;
+      } else if (positionChanges.length && !isDragging) {
+        dragUndoCaptured.current = false;
       }
       reactFlowOnNodesChange(changes);
       if (changes.some((change) => change.type === "position" || change.type === "dimensions")) {
@@ -2053,7 +2318,10 @@ export default function App() {
   );
 
   const renderedEdges = useMemo(
-    () => rerouteBcEdges(nodes, rerouteFlowEdges(nodes, rerouteHeatEdges(nodes, edges))),
+    () => revealConnectionsBehindComponents(
+      nodes,
+      rerouteBcEdges(nodes, rerouteFlowEdges(nodes, rerouteHeatEdges(nodes, edges)))
+    ),
     [edges, nodes]
   );
 
@@ -2117,15 +2385,22 @@ export default function App() {
     const flowConnections = buildFlowConnectionMap(nodes, renderedEdges);
     const heatHandleMap = buildHeatHandleMapFromEdges(renderedEdges);
 
-    return nodes.map((node) => ({
-      ...node,
-      data: {
-        ...node.data,
-        heat: heatFor(node.id, heatHandleMap),
-        flowConnections: flowConnections.get(node.id) ?? node.data.flowConnections ?? emptyFlowConnections(),
-        onRotate: rotateNode
-      }
-    }));
+    return nodes.map((node) => {
+      const tooltipDetails = (node.data.tooltipLines ?? []).slice(1).filter((line) => !String(line).startsWith("elevation "));
+      const elevation = node.data.xmlAttributes?.elevation;
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          tooltipLines: node.type === "flow"
+            ? [node.data.identifier, elevation != null && `elevation ${elevation}`, ...tooltipDetails].filter(Boolean)
+            : node.data.tooltipLines,
+          heat: heatFor(node.id, heatHandleMap),
+          flowConnections: flowConnections.get(node.id) ?? node.data.flowConnections ?? emptyFlowConnections(),
+          onRotate: rotateNode
+        }
+      };
+    });
   }, [nodes, renderedEdges, rotateNode]);
   const selectedComponentCount = selectedNodes(nodes).length;
   const canAlignSelection = selectedComponentCount >= 2;
@@ -2522,6 +2797,9 @@ export default function App() {
             </button>
             <button type="button" title="Align selected components on one horizontal axis" onClick={() => alignSelectedComponents("middle")} disabled={!canAlignSelection}>
               Align horizontal
+            </button>
+            <button type="button" title="Rotate selected layout and pipe orientations 90 degrees clockwise" onClick={transposeSelection} disabled={!canAlignSelection}>
+              Transpose
             </button>
             <button type="button" title="Move selected components left" onClick={() => moveSelectedComponents("left")} disabled={!selectedComponentCount}>
               Move &larr;

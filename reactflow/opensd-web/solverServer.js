@@ -4,6 +4,10 @@ import path from "node:path";
 
 const OPENSD_ROOT = "/mnt/c/codes/opensd";
 const OPENSD_EXECUTABLE = `${OPENSD_ROOT}/build/opensd`;
+const WORKING_DIRECTORY_ROOTS = (process.env.OPENSD_WORKING_ROOTS ?? "/mnt/c")
+  .split(",")
+  .map((root) => root.trim())
+  .filter(Boolean);
 const MAX_REQUEST_BYTES = 12 * 1024 * 1024;
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 const RUN_TIMEOUT_MS = 10 * 60 * 1000;
@@ -44,10 +48,11 @@ async function checkedWorkingDirectory(inputDirectory) {
     throw new Error("Working directory must be an absolute WSL path.");
   }
 
-  const root = await realpath(OPENSD_ROOT);
   const directory = await realpath(inputDirectory);
-  if (directory !== root && !directory.startsWith(`${root}/`)) {
-    throw new Error(`Working directory must be inside ${OPENSD_ROOT}.`);
+  const roots = await Promise.all(WORKING_DIRECTORY_ROOTS.map((root) => realpath(root)));
+  const isAllowed = roots.some((root) => directory === root || directory.startsWith(`${root}/`));
+  if (!isAllowed) {
+    throw new Error(`Working directory must be inside one of: ${WORKING_DIRECTORY_ROOTS.join(", ")}.`);
   }
   return directory;
 }

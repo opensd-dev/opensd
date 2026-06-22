@@ -55,6 +55,10 @@ function RotateButton({ id, data, selected }) {
       type="button"
       className="node-rotate-button nodrag nopan"
       title="Rotate component"
+      onDoubleClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
       onClick={(event) => {
         event.stopPropagation();
         data.onRotate(id);

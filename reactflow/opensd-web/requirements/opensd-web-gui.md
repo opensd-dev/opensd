@@ -72,7 +72,7 @@ React Flow **Controls** and **MiniMap** shall remain available.
 
 The model canvas shall support undoing recent graph-edit actions with **Ctrl+Z** and redoing them with **Ctrl+Y** or **Ctrl+Shift+Z**.
 
-**Acceptance:** Moving components, adding components, rotating components, connecting components, deleting components, and restoring default layout can be undone and redone. Sidebar Undo and Redo buttons shall provide the same actions.
+**Acceptance:** Moving components, adding components, rotating components, connecting components, deleting components, and restoring default layout can be undone and redone. A continuous mouse drag records one undo step at drag start, so Ctrl+Z returns directly to the previous position instead of traversing intermediate pointer positions. Sidebar Undo and Redo buttons shall provide the same actions.
 
 **Implementation:** Undo/redo history in [src/App.jsx](../src/App.jsx).
 
@@ -102,9 +102,9 @@ The left sidebar shall scroll vertically when controls exceed viewport height.
 
 ### GUI-020 — Separate layout region per circuit (Must)
 
-Each **circuit** shall be laid out in its own non-overlapping vertical region.
+Each **circuit** shall be laid out in its own non-overlapping horizontal region, with circuits placed side by side.
 
-**Acceptance:** Components and BC stacks from different circuits do not overlap.
+**Acceptance:** Components and BC stacks from different circuits do not overlap. All circuits use one shared elevation-to-y mapping, so nodes from different circuits with the same `elevation` appear on the same horizontal level.
 
 **Implementation:** Dynamic circuit bounds in [src/circuitLayout.js](../src/circuitLayout.js).
 
@@ -112,9 +112,9 @@ Each **circuit** shall be laid out in its own non-overlapping vertical region.
 
 ### GUI-021 — Layered fluid topology (Must)
 
-Within a circuit, connected **nodes, pipes, and pumps** shall use topology-derived horizontal layers and vertical branch lanes.
+Within a circuit, connected **nodes, pipes, and pumps** shall use topology- and elevation-derived placement. Connections between equal-elevation nodes advance horizontally; connections whose node elevations differ remain in the same x-column and advance vertically, with higher elevations placed above lower elevations.
 
-**Acceptance:** Branches spread vertically, component boxes do not overlap, and dense networks avoid coincident connector paths where practical.
+**Acceptance:** Node `elevation` values are sorted and used only to establish relative vertical order; numeric elevation differences do not scale canvas distance. Adjacent elevation ranks use compact minimum spacing expanded only when needed for BC stacks. Vertical pipes receive a 90-degree default orientation. Branches spread into collision-free lanes where needed, component boxes do not overlap, and dense networks avoid coincident connector paths where practical.
 
 **Implementation:** `buildHorizontalSequence()` in [src/circuitLayout.js](../src/circuitLayout.js).
 
@@ -122,9 +122,9 @@ Within a circuit, connected **nodes, pipes, and pumps** shall use topology-deriv
 
 ### GUI-022 — Circuit label at row start (Must)
 
-The circuit identifier shall appear at the start of its layout region, linked to the first component.
+The circuit identifier shall be positioned immediately to the left of the actual first connected component rather than at an unrelated region corner.
 
-**Acceptance:** Rectangle labeled with circuit id; one gray dotted membership edge to the first node, pipe, or pump, visually distinct from physical blue fluid-flow and orange heat-flow edges.
+**Acceptance:** Rectangle labeled with circuit id remains close to the first node, pipe, or pump; one gray dotted membership edge links them and remains visually distinct from physical blue fluid-flow and orange heat-flow edges.
 
 **Implementation:** [src/App.jsx](../src/App.jsx) `parseGeometryXml`.
 
@@ -194,7 +194,7 @@ The model workspace should allow selected components to be copied and pasted wit
 
 The model workspace should provide diagramming alignment controls similar to PowerPoint or Flownex.
 
-**Acceptance:** Selected components can be aligned on a common vertical or horizontal axis, moved left/right/up/down in fixed increments, moved closer together or farther apart along either axis, and distributed horizontally or vertically. These actions participate in undo/redo.
+**Acceptance:** Selected components can be aligned on a common vertical or horizontal axis, rotated 90 degrees clockwise as a group around the selection center to exchange horizontal and vertical layout, moved left/right/up/down in fixed increments, moved closer together or farther apart along either axis, and distributed horizontally or vertically. Transpose also advances each selected pipe-like component's own rotation by 90 degrees and swaps its occupied width/height when calculating the new position, preserving center alignment and producing a geometric rotation of the selection. These actions participate in undo/redo.
 
 **Implementation:** Selection layout tools in [src/App.jsx](../src/App.jsx), controls styled in [src/App.css](../src/App.css).
 
@@ -242,6 +242,12 @@ On-canvas text shall show **identifiers only** (truncated when long).
 
 Full attributes shall appear in a **tooltip** on hover.
 
+**Acceptance:** Fluid-node tooltips include the current `elevation` value from the node attributes.
+
+**Visibility:** The hovered component and tooltip render above all other canvas components and edges.
+
+**Editor interaction:** Pressing **Escape** while the component attribute editor is open closes the editor without applying changes.
+
 **Acceptance:** Tooltip lists identifier plus secondary fields from XML.
 
 **Implementation:** [src/NodeTooltip.jsx](../src/NodeTooltip.jsx).
@@ -252,7 +258,7 @@ Full attributes shall appear in a **tooltip** on hover.
 
 When a component is selected, the GUI shall show a nearby clockwise rotate-icon control that rotates the component in 45 degree steps.
 
-**Acceptance:** Selecting a pipe or other non-circular component reveals the rotate button; the button remains at a fixed screen-relative offset while the component rotates so repeated clicks do not require pointer movement; circular fluid nodes and BCs do not show rotation controls; pipe flow handles follow the pipe orientation.
+**Acceptance:** Selecting a pipe or other non-circular component reveals the rotate button; the button remains at a fixed screen-relative offset while the component rotates so repeated clicks do not require pointer movement and renders above any hover tooltip; clicking or double-clicking the rotate button does not open the component attribute editor; circular fluid nodes and BCs do not show rotation controls; pipe flow handles follow the pipe orientation.
 
 **Implementation:** Rotate controls in [src/PipeNode.jsx](../src/PipeNode.jsx); rotation state in [src/App.jsx](../src/App.jsx).
 
@@ -284,7 +290,7 @@ The pre-processor shall provide a distinct pump component representing a two-nod
 
 Fluid nodes shall act as junctions and may connect to any number of pipes. Fluid nodes shall not display upstream/downstream arrow glyphs of their own. A fluid edge shall not connect a node to itself, and direct fluid-node-to-fluid-node connections shall be rejected.
 
-**Acceptance:** Multiple pipes can connect to the same fluid node; fluid flow connections use unobtrusive handles rather than visible arrow glyphs; self-connections and direct node-to-node connections are rejected.
+**Acceptance:** Multiple pipes can connect to the same fluid node; fluid flow connections use unobtrusive handles rather than visible arrow glyphs; self-connections and direct node-to-node connections are rejected. A single click never creates a connection; users must drag from one connection handle to another.
 
 **Implementation:** Invisible four-sided `flow-*` handles in [src/FlowNode.jsx](../src/FlowNode.jsx); pipe-side flow state in [src/App.jsx](../src/App.jsx).
 
@@ -295,6 +301,8 @@ Fluid nodes shall act as junctions and may connect to any number of pipes. Fluid
 Fluid edges shall be **straight**, solid **blue** lines with direction arrowheads at the downstream end. They shall choose the nearest top/bottom/left/right fluid-node handles from current component positions. Pipe endpoints meaningfully offset left/right from a fluid node shall keep left/right handles even when vertical offset is larger; pipe endpoints nearly centered above/below the node shall use top/bottom. When exactly two fluid edges prefer the same node-side handle, they shall use different sides where possible. With three or more fluid edges, each edge shall keep its natural side, using offset handle positions on the same side when helpful.
 
 **Implementation:** `flowEdge()` in [src/App.jsx](../src/App.jsx), `FLOW_MARKER` in [src/edgeUtils.js](../src/edgeUtils.js), [src/App.css](../src/App.css).
+
+**Occlusion:** A straight connection intersecting a non-endpoint component is elevated and rendered as a light dotted line so its path remains legible through the component.
 
 ---
 
@@ -342,25 +350,29 @@ BC edges shall use distinct **red** styling.
 
 Heat transfer connections involving hslabs shall use **solid orange** lines with **open** arrowheads indicating direction.
 
-**Acceptance:** Not dashed; not animated.
+**Acceptance:** Not dashed; not animated. Direct hslab-to-hslab connections are rejected; heat connections must involve an hslab and a pipe or node-side thermal endpoint.
 
 **Implementation:** `hslabEdge()`, `.hslab-edge` in [src/App.css](../src/App.css), [src/edgeUtils.js](../src/edgeUtils.js).
+
+**Default layout:** An hslab with exactly one unique connected pipe shall be placed close to that pipe; if the pipe is vertical, the hslab is also vertical and placed parallel beside it. An hslab connected to two pipes begins at the mean of their horizontal centers and displayed elevations, and is vertical when both pipes are vertical. If two hslabs have the same mean position, deterministic perpendicular offsets prevent exact overlap. Hslabs involving non-pipe components use the packed fallback area.
 
 ---
 
 ### GUI-061 — Pipe heat from long sides (Must)
 
-Heat connections to/from **pipes** and hslabs shall attach to the nearest **top** or **bottom** handle based on their relative canvas positions. Heat edges shall be straight lines without enforced minimum bend length. Fluid flow remains on pipe short sides.
+Heat connections to/from **pipes** and hslabs shall attach to the nearest rotated **long edge** at each endpoint based on relative canvas positions. Heat edges shall be straight lines without enforced minimum bend length. Fluid flow remains on pipe short sides.
 
-**Implementation:** Dynamic heat handle selection in [src/App.jsx](../src/App.jsx); `ht-top-*` / `ht-bottom-*` handles on [src/PipeNode.jsx](../src/PipeNode.jsx) and [src/FlowNode.jsx](../src/FlowNode.jsx).
+**Acceptance:** Moving a pipe or hslab continuously reroutes the visible edge to the nearest inward-facing long sides without making the connection disappear.
+
+**Implementation:** Dynamic heat handle selection in [src/App.jsx](../src/App.jsx); both invisible long-side handle pairs remain mounted on participating components in [src/PipeNode.jsx](../src/PipeNode.jsx) and [src/FlowNode.jsx](../src/FlowNode.jsx).
 
 ---
 
 ### GUI-062 — Conditional heat handles (Must)
 
-Heat connector handles shall retain an invisible connection hit area only on components that participate in at least one hslab heat edge.
+Heat connector handles shall retain an invisible connection hit area only on the exact long edges used by hslab heat connections.
 
-**Acceptance:** No orange heat-port dots are visible on pipes, hslabs, or nodes; existing and newly created heat connections can still attach to the appropriate handles.
+**Acceptance:** No orange heat-port dots or stray orange segments are visible on the unused long edge of pipes, hslabs, or nodes; existing and newly created heat connections can still attach to the appropriate nearest handles.
 
 **Implementation:** `buildHeatHandleMap()` in [src/edgeUtils.js](../src/edgeUtils.js).
 
@@ -422,7 +434,7 @@ When enthalpy is available, GUI may plot **temperature from total enthalpy** usi
 
 The web app shall provide a Solver tab for editing the settings supported by `opensd.Settings`, importing and exporting `settings.xml`, and running `/mnt/c/codes/opensd/build/opensd` against a selected OpenSD working directory.
 
-**Acceptance:** A run writes the edited `settings.xml`, optionally writes the current Model geometry, invokes the solver without a shell, and displays the command, exit status, standard output, and standard error.
+**Acceptance:** A run accepts an existing absolute WSL working directory under an allowed root (default `/mnt/c`, configurable with comma-separated `OPENSD_WORKING_ROOTS`), writes the edited `settings.xml`, optionally writes the current Pre-processor geometry, invokes the solver without a shell, and displays the command, exit status, standard output, and standard error. Realpath validation prevents path traversal and symlink escape outside configured roots.
 
 **Implementation:** [src/SolverPanel.jsx](../src/SolverPanel.jsx), [solverServer.js](../solverServer.js), and the Vite plugin registration in [vite.config.js](../vite.config.js).
 
@@ -448,7 +460,7 @@ Internal hslab layer networks shall not be expanded on the main canvas (see GUI-
 | GUI-012 | Canvas undo/redo | `App.jsx` |
 | GUI-013 | Directional/additive selection and delete | `ModelFlowCanvas.jsx`, `App.css` |
 | GUI-014 | Scrollable sidebar | `App.css` |
-| GUI-020 | Separate circuit regions | `circuitLayout.js` |
+| GUI-020 | Side-by-side circuit regions with shared elevation levels | `App.jsx`, `circuitLayout.js` |
 | GUI-021 | Layered fluid topology | `circuitLayout.js` |
 | GUI-024 | All pipe edges | `App.jsx` |
 | GUI-025 | Persistent layout | `App.jsx` |

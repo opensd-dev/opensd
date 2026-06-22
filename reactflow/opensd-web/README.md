@@ -19,6 +19,8 @@ Open the URL shown in the terminal (typically `http://localhost:5173`).
 
 ## Requirements
 
+Solver working directories may be anywhere under `/mnt/c` by default. Set `OPENSD_WORKING_ROOTS` to a comma-separated list of absolute WSL roots to narrow or extend the allowed locations.
+
 Functional requirements are maintained under [requirements/](requirements/):
 
 - [opensd-web-gui.md](requirements/opensd-web-gui.md) — GUI behavior (`GUI-###`)

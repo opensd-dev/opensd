@@ -221,7 +221,7 @@ class HSlab:
         self.uvar = uvar
         self.uval = uval
 
-        if isinstance(uval, (int, float)):
+        if isinstance(uval, (int, float, list)):
             self.utype = "constant"
 
         elif isinstance(uval, str):
@@ -241,7 +241,7 @@ class HSlab:
         self.dvar = dvar
         self.dval = dval
 
-        if isinstance(dval, (int, float)):
+        if isinstance(dval, (int, float, list)):
             self.dtype = "constant"
 
         elif isinstance(dval, str):
@@ -256,7 +256,7 @@ class HSlab:
                 )
 
         else:
-            raise TypeError(f"Unsupported uval type: {type(dval)}")
+            raise TypeError(f"Unsupported dval type: {type(dval)}")
 
         self.solveSS=solveSS
         self.nlayers = nlayers
