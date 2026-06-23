@@ -80,6 +80,17 @@ function downloadSettings(xml) {
   URL.revokeObjectURL(url);
 }
 
+async function solverResponseJson(response) {
+  const text = await response.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    const contentType = response.headers.get("content-type") || "unknown content type";
+    const preview = text.trim().slice(0, 240);
+    throw new Error(`Solver server did not return JSON (${response.status} ${response.statusText}, ${contentType}). ${preview || "Empty response."}`);
+  }
+}
+
 export default function SolverPanel({ currentGeometryXml }) {
   const settingsInput = useRef(null);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -121,7 +132,7 @@ export default function SolverPanel({ currentGeometryXml }) {
           threads: Number.parseInt(threads, 10)
         })
       });
-      const result = await response.json();
+      const result = await solverResponseJson(response);
       const runOutput = [result.command, result.stdout, result.stderr].filter(Boolean).join("\n\n");
       if (runOutput) setOutput(runOutput);
       if (!response.ok) {

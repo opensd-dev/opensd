@@ -1,5 +1,5 @@
-import { memo, useState } from "react";
-import { Handle, Position } from "reactflow";
+import { memo, useEffect, useState } from "react";
+import { Handle, Position, useUpdateNodeInternals } from "reactflow";
 
 import { shortLabel } from "./labelUtils.js";
 import NodeTooltip from "./NodeTooltip.jsx";
@@ -71,6 +71,7 @@ function RotateButton({ id, data, selected }) {
 
 function PipeNode({ id, data, selected }) {
   const [hovered, setHovered] = useState(false);
+  const updateNodeInternals = useUpdateNodeInternals();
   const tooltipLines = data.tooltipLines ?? [data.identifier].filter(Boolean);
   const kind = data.kind ?? "pipe";
   const heat = data.heat ?? {};
@@ -90,6 +91,22 @@ function PipeNode({ id, data, selected }) {
   const heatTop = rotatedHandle(orientation, kind, 0, -dimensions.height / 2);
   const heatBottom = rotatedHandle(orientation, kind, 0, dimensions.height / 2);
   const showFlowHandles = !["hslab", "layer"].includes(kind);
+
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [
+    id,
+    orientation,
+    updateNodeInternals,
+    heat.htIn,
+    heat.htOut,
+    heat.htTopIn,
+    heat.htTopOut,
+    heat.htBottomIn,
+    heat.htBottomOut,
+    heat.htSideIn,
+    heat.htSideOut
+  ]);
 
   return (
     <div

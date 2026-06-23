@@ -608,6 +608,12 @@ function serializeLayout(nodes, source = "opensd-web") {
   };
 }
 
+function normalizeRotation(value, fallback = 0) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return ((Math.round(numeric / 45) * 45) % 360 + 360) % 360;
+}
+
 function applyStoredLayout(nodes, storedLayout) {
   if (!storedLayout?.nodes) return nodes;
 
@@ -620,10 +626,21 @@ function applyStoredLayout(nodes, storedLayout) {
       position: saved.position ?? node.position,
       data: {
         ...node.data,
-        rotation: saved.rotation ?? node.data?.rotation ?? 0
+        rotation: normalizeRotation(saved.rotation, node.data?.rotation ?? 0)
       }
     };
   });
+}
+
+function applyStoredLayoutGraph(nodes, edges, storedLayout) {
+  const layoutNodes = applyStoredLayout(nodes, storedLayout);
+  const routedEdges = rerouteHeatEdges(layoutNodes, edges);
+  const heatHandleMap = buildHeatHandleMapFromEdges(routedEdges);
+
+  return {
+    nodes: applyHeatHandleMap(layoutNodes, heatHandleMap),
+    edges: routedEdges
+  };
 }
 
 function isFlowNodeId(nodeId) {
@@ -2635,6 +2652,8 @@ export default function App() {
     return nodes.map((node) => {
       const tooltipDetails = (node.data.tooltipLines ?? []).slice(1).filter((line) => !String(line).startsWith("elevation "));
       const elevation = node.data.xmlAttributes?.elevation;
+      const heat = heatFor(node.id, heatHandleMap);
+      const connections = flowConnections.get(node.id) ?? node.data.flowConnections ?? emptyFlowConnections();
       return {
         ...node,
         data: {
@@ -2642,8 +2661,8 @@ export default function App() {
           tooltipLines: node.type === "flow"
             ? [node.data.identifier, elevation != null && `elevation ${elevation}`, ...tooltipDetails].filter(Boolean)
             : node.data.tooltipLines,
-          heat: heatFor(node.id, heatHandleMap),
-          flowConnections: flowConnections.get(node.id) ?? node.data.flowConnections ?? emptyFlowConnections(),
+          heat,
+          flowConnections: connections,
           onRotate: rotateNode
         }
       };
@@ -2785,10 +2804,11 @@ export default function App() {
         const parsed = parseGeometryXml(xmlText);
         const nextLayoutKey = layoutKeyForFile(file);
         const storedLayout = readStoredLayout(nextLayoutKey);
+        const nextGraph = applyStoredLayoutGraph(parsed.nodes, parsed.edges, storedLayout);
 
         setLayoutKey(nextLayoutKey);
-        setNodes(applyStoredLayout(parsed.nodes, storedLayout));
-        setEdges(parsed.edges);
+        setNodes(nextGraph.nodes);
+        setEdges(nextGraph.edges);
         setGeometryTemplate(parsed.templateXml);
         setGeometryFilename(file.name.toLowerCase().endsWith(".xml") ? file.name : `${file.name}.xml`);
         setOriginalGeometryFingerprint(geometryFingerprint(parsed.nodes, parsed.edges));
@@ -2894,9 +2914,10 @@ export default function App() {
       }
 
       pushUndoSnapshot();
-      const nextNodes = applyStoredLayout(nodes, layout);
-      setNodes(nextNodes);
-      saveStoredLayout(layoutKey, nextNodes);
+      const nextGraph = applyStoredLayoutGraph(nodes, edges, layout);
+      setNodes(nextGraph.nodes);
+      setEdges(nextGraph.edges);
+      saveStoredLayout(layoutKey, nextGraph.nodes);
       setHasUnsavedLayout(false);
       setImportStatus(`Imported layout ${file.name}`);
       setFitViewTrigger((count) => count + 1);
