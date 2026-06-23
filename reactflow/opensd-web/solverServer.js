@@ -1,6 +1,32 @@
 import { spawn } from "node:child_process";
+import { timingSafeEqual } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { access, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const SERVER_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
+
+function loadLocalEnv() {
+  try {
+    const envText = readFileSync(path.join(SERVER_DIRECTORY, ".env"), "utf8");
+    for (const line of envText.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+
+      const separatorIndex = trimmed.indexOf("=");
+      if (separatorIndex < 1) continue;
+
+      const key = trimmed.slice(0, separatorIndex).trim();
+      const value = trimmed.slice(separatorIndex + 1).trim().replace(/^(['"])(.*)\1$/, "$2");
+      if (process.env[key] === undefined) process.env[key] = value;
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+}
+
+loadLocalEnv();
 
 const OPENSD_ROOT = "/mnt/c/codes/opensd";
 const OPENSD_EXECUTABLE = `${OPENSD_ROOT}/build/opensd`;
@@ -11,11 +37,85 @@ const WORKING_DIRECTORY_ROOTS = (process.env.OPENSD_WORKING_ROOTS ?? "/mnt/c")
 const MAX_REQUEST_BYTES = 12 * 1024 * 1024;
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 const RUN_TIMEOUT_MS = 10 * 60 * 1000;
+const AUTH_REALM = "OpenSD Web";
+const AUTH_DISABLED = process.env.OPENSD_WEB_AUTH === "off";
+const AUTH_USERNAME = process.env.OPENSD_WEB_USERNAME ?? "";
+const AUTH_PASSWORD = process.env.OPENSD_WEB_PASSWORD ?? "";
 
 function sendJson(response, status, body) {
   response.statusCode = status;
   response.setHeader("Content-Type", "application/json; charset=utf-8");
   response.end(JSON.stringify(body));
+}
+
+function sendText(response, status, body) {
+  response.statusCode = status;
+  response.setHeader("Content-Type", "text/plain; charset=utf-8");
+  response.end(body);
+}
+
+function unauthorized(response) {
+  response.statusCode = 401;
+  response.setHeader("WWW-Authenticate", `Basic realm="${AUTH_REALM}", charset="UTF-8"`);
+  response.setHeader("Content-Type", "text/plain; charset=utf-8");
+  response.end("Authentication required.");
+}
+
+function isAuthConfigured() {
+  return AUTH_USERNAME.length > 0 && AUTH_PASSWORD.length > 0;
+}
+
+function constantTimeEqual(left, right) {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  if (leftBuffer.length !== rightBuffer.length) return false;
+  return timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function parseBasicCredentials(header) {
+  if (typeof header !== "string" || !header.startsWith("Basic ")) return null;
+
+  const decoded = Buffer.from(header.slice(6), "base64").toString("utf8");
+  const separatorIndex = decoded.indexOf(":");
+  if (separatorIndex < 0) return null;
+
+  return {
+    username: decoded.slice(0, separatorIndex),
+    password: decoded.slice(separatorIndex + 1)
+  };
+}
+
+function isAuthorized(request) {
+  const credentials = parseBasicCredentials(request.headers.authorization);
+  if (!credentials) return false;
+
+  return (
+    constantTimeEqual(credentials.username, AUTH_USERNAME) &&
+    constantTimeEqual(credentials.password, AUTH_PASSWORD)
+  );
+}
+
+function authMiddleware(request, response, next) {
+  if (AUTH_DISABLED) {
+    next();
+    return;
+  }
+
+  if (!isAuthConfigured()) {
+    sendText(
+      response,
+      503,
+      "OpenSD web access control is enabled, but OPENSD_WEB_USERNAME and OPENSD_WEB_PASSWORD are not set."
+    );
+    return;
+  }
+
+  if (!isAuthorized(request)) {
+    unauthorized(response);
+    return;
+  }
+
+  next();
 }
 
 function readJson(request) {
@@ -135,9 +235,11 @@ export function solverServerPlugin() {
   return {
     name: "opensd-solver-server",
     configureServer(server) {
+      server.middlewares.use(authMiddleware);
       server.middlewares.use(solverMiddleware);
     },
     configurePreviewServer(server) {
+      server.middlewares.use(authMiddleware);
       server.middlewares.use(solverMiddleware);
     }
   };
