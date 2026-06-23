@@ -2992,12 +2992,20 @@ export default function App() {
             accept=".json,application/json"
             onChange={(event) => importLayout(event.target.files?.[0])}
           />
-          <button className="primary-button" onClick={() => fileInput.current?.click()} title="Import an OpenSD geometry XML file">
-            Import XML
-          </button>
-          <button className="secondary-button secondary-button--inline" onClick={exportGeometry} disabled={!nodes.length} title="Export current geometry and connectivity as XML">
-            Export XML
-          </button>
+          <div className="geometry-file-actions">
+            <button className="primary-button" onClick={() => fileInput.current?.click()} title="Import an OpenSD geometry XML file">
+              Import XML
+            </button>
+            <button className="primary-button" onClick={() => layoutInput.current?.click()} disabled={!nodes.length} title="Import component positions from layout JSON">
+              Import Layout
+            </button>
+            <button className="secondary-button secondary-button--inline" onClick={exportGeometry} disabled={!nodes.length} title="Export current geometry and connectivity as XML">
+              Export XML
+            </button>
+            <button className="secondary-button secondary-button--inline" onClick={exportLayout} disabled={!nodes.length} title="Export component positions as layout JSON">
+              Export Layout
+            </button>
+          </div>
           <div className="status-text">{importStatus}</div>
         </section>
 
@@ -3065,12 +3073,6 @@ export default function App() {
             </button>
           </div>
           {copyStatus && <div className="status-text status-text--hint">{copyStatus}</div>}
-          <button className="secondary-button secondary-button--inline" onClick={exportLayout} disabled={!nodes.length} title="Export component positions as layout JSON">
-            Export layout
-          </button>
-          <button className="secondary-button secondary-button--inline" onClick={() => layoutInput.current?.click()} disabled={!nodes.length} title="Import component positions from layout JSON">
-            Import layout
-          </button>
           {hasUnsavedLayout && <div className="status-text status-text--warning">Unsaved layout changes</div>}
         </section>
 
