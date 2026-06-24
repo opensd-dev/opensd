@@ -686,3 +686,27 @@ class FaceTher(object):
 
     def conductivity(self):
         return self._conductivity
+
+class LumpedMass(object):
+    _registry = []
+
+    TOREF = 200.0
+
+    def __init__(self,identifier,tau,node_id):
+        self._registry.append(self)
+        self.identifier = identifier
+        self.tau = tau
+        from opensd.project import get_comp
+        self.node = get_comp(node_id)
+
+    def update(self,time,delt):
+        T = self.node.stemp_gues
+        DT = T-self.TOREF
+        if (time==0.0):
+            self.DTST = DT
+            self.DTST0 = DT
+            self.DT0 = DT
+        else:
+            self.DTST = (0.5*delt/self.tau * (DT+self.DT0-self.DTST0) + self.DT0)/(1+0.5*delt/self.tau)
+            self.DTST0 = self.DTST
+            self.DT0 = DT
