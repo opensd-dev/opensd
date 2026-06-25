@@ -9,7 +9,8 @@ import {
 import "reactflow/dist/style.css";
 import "./App.css";
 import ModelFlowCanvas from "./ModelFlowCanvas.jsx";
-import SolverPanel from "./SolverPanel.jsx";
+import { SolverOutputPanel, SolverSidebarControls } from "./SolverPanel.jsx";
+import { useSolverPanelState } from "./solverState.js";
 import guiRequirementsMarkdown from "../requirements/opensd-web-gui.md?raw";
 import guiHelpMarkdown from "./gui-help.md?raw";
 import {
@@ -45,6 +46,13 @@ const nodeVariables = [
   { value: "velocity", label: "Velocity" },
   { value: "msource", label: "Mass source" }
 ];
+const defaultPlotFormat = {
+  xAxisTitle: "Node",
+  yAxisTitle: "",
+  showGrid: true,
+  showLegend: true,
+  showMarkers: true
+};
 
 function componentKindForType(type) {
   if (type === "Node") return "flow";
@@ -1426,15 +1434,68 @@ function getPipeNodeSeries(circuit, variable, pipeFilter, cp) {
     .sort((a, b) => naturalCompare(a.label, b.label));
 }
 
-function LinePlot({ data, variableLabel }) {
+function parseResResults(fileText) {
+  const lines = fileText.split(/\r?\n/).filter((line) => line.trim());
+  if (!lines.length) {
+    throw new Error("The .res file is empty.");
+  }
+
+  const splitLine = (line) => line.trim().split(line.includes(",") ? /\s*,\s*/ : /\s+/).filter(Boolean);
+  const headers = splitLine(lines[0]);
+  if (headers.length < 2) {
+    throw new Error("The .res file does not contain plottable columns.");
+  }
+
+  const timeIndex = headers.findIndex((header) => /^time(?:\(s\))?$/i.test(header));
+  const rows = [];
+  let skipped = 0;
+  let maxWidth = 0;
+
+  for (const line of lines.slice(1)) {
+    const values = splitLine(line).map((value) => Number(value));
+    if (values.length < 2 || !Number.isFinite(values[timeIndex >= 0 ? timeIndex : 0])) {
+      skipped += 1;
+      continue;
+    }
+
+    maxWidth = Math.max(maxWidth, values.length);
+    rows.push(values.slice(0, headers.length));
+  }
+
+  const columns = headers.map((header, index) => {
+    const match = header.match(/^([^:]+):(.+)$/);
+    return {
+      index,
+      header,
+      variable: match?.[1] ?? header,
+      entity: match?.[2] ?? header
+    };
+  });
+
+  return {
+    kind: "res",
+    headers,
+    rows,
+    skipped,
+    timeIndex: timeIndex >= 0 ? timeIndex : 0,
+    columns: columns.filter((column, index) => index < maxWidth && index !== (timeIndex >= 0 ? timeIndex : 0))
+  };
+}
+
+function LinePlot({ data, variableLabel, xAxisTitle = "", yAxisTitle = "", showGrid = false, showLegend = false, showMarkers = true }) {
   const width = 640;
   const height = 300;
-  const pad = { top: 18, right: 18, bottom: 52, left: 64 };
+  const pad = { top: showLegend ? 34 : 18, right: 18, bottom: 58, left: 72 };
 
   if (!data.length) {
     return <div className="empty-plot">No numeric values found for this selection.</div>;
   }
 
+  const hasNumericX = data.every((point) => Number.isFinite(point.xValue));
+  const xValues = hasNumericX ? data.map((point) => point.xValue) : data.map((_, index) => index);
+  const minX = Math.min(...xValues);
+  const maxX = Math.max(...xValues);
+  const spanX = maxX - minX || 1;
   const minY = Math.min(...data.map((point) => point.value));
   const maxY = Math.max(...data.map((point) => point.value));
   const spanY = maxY - minY || 1;
@@ -1442,17 +1503,43 @@ function LinePlot({ data, variableLabel }) {
   const innerHeight = height - pad.top - pad.bottom;
 
   const points = data.map((point, index) => {
-    const x = pad.left + (data.length === 1 ? innerWidth / 2 : (index / (data.length - 1)) * innerWidth);
+    const rawX = hasNumericX ? point.xValue : index;
+    const x = pad.left + (data.length === 1 ? innerWidth / 2 : ((rawX - minX) / spanX) * innerWidth);
     const y = pad.top + innerHeight - ((point.value - minY) / spanY) * innerHeight;
     return { ...point, x, y };
   });
 
   const pathData = points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
   const labelStep = Math.ceil(points.length / 8);
+  const gridLines = [0, 0.25, 0.5, 0.75, 1];
+  const xTickLabel = (ratio) => {
+    if (!hasNumericX) {
+      const index = Math.min(points.length - 1, Math.round(ratio * (points.length - 1)));
+      return points[index]?.label ?? "";
+    }
+
+    return (minX + ratio * spanX).toPrecision(5);
+  };
 
   return (
     <svg className="line-plot" viewBox={`0 0 ${width} ${height}`} role="img">
       <title>{variableLabel}</title>
+      {showGrid && gridLines.map((ratio) => (
+        <g className="plot-grid" key={`grid-${ratio}`}>
+          <line
+            x1={pad.left}
+            y1={pad.top + ratio * innerHeight}
+            x2={pad.left + innerWidth}
+            y2={pad.top + ratio * innerHeight}
+          />
+          <line
+            x1={pad.left + ratio * innerWidth}
+            y1={pad.top}
+            x2={pad.left + ratio * innerWidth}
+            y2={pad.top + innerHeight}
+          />
+        </g>
+      ))}
       <line x1={pad.left} y1={pad.top} x2={pad.left} y2={pad.top + innerHeight} />
       <line x1={pad.left} y1={pad.top + innerHeight} x2={pad.left + innerWidth} y2={pad.top + innerHeight} />
       <text x={pad.left - 10} y={pad.top + 4} textAnchor="end">
@@ -1461,17 +1548,41 @@ function LinePlot({ data, variableLabel }) {
       <text x={pad.left - 10} y={pad.top + innerHeight} textAnchor="end">
         {minY.toPrecision(5)}
       </text>
+      {gridLines.map((ratio) => (
+        <text key={`x-tick-${ratio}`} x={pad.left + ratio * innerWidth} y={height - 38} textAnchor="middle">
+          {xTickLabel(ratio)}
+        </text>
+      ))}
       <path d={pathData} />
       {points.map((point, index) => (
         <g key={point.label}>
-          <circle cx={point.x} cy={point.y} r="4" />
-          {index % labelStep === 0 && (
+          {showMarkers && <circle cx={point.x} cy={point.y} r="4" />}
+          {!hasNumericX && index % labelStep === 0 && (
             <text className="x-label" x={point.x} y={height - 24} textAnchor="middle">
               {point.label}
             </text>
           )}
         </g>
       ))}
+      {xAxisTitle && (
+        <text className="axis-title" x={pad.left + innerWidth / 2} y={height - 10} textAnchor="middle">
+          {xAxisTitle}
+        </text>
+      )}
+      {yAxisTitle && (
+        <text className="axis-title" transform={`translate(18 ${pad.top + innerHeight / 2}) rotate(-90)`} textAnchor="middle">
+          {yAxisTitle}
+        </text>
+      )}
+      {showLegend && (
+        <g className="plot-legend">
+          <line x1={pad.left} y1="18" x2={pad.left + 26} y2="18" />
+          {showMarkers && <circle cx={pad.left + 13} cy="18" r="4" />}
+          <text x={pad.left + 34} y="22">
+            {variableLabel}
+          </text>
+        </g>
+      )}
     </svg>
   );
 }
@@ -1553,9 +1664,8 @@ function MarkdownViewer({ text }) {
   );
 }
 
-function RequirementManager({ requirements, selectedId, onSelect }) {
-  const selectedRequirement = requirements.find((requirement) => requirement.id === selectedId);
-  const sections = requirements.reduce((groups, requirement) => {
+function groupRequirements(requirements) {
+  return requirements.reduce((groups, requirement) => {
     const section = groups.find((group) => group.title === requirement.sectionTitle);
     if (section) {
       section.requirements.push(requirement);
@@ -1564,6 +1674,38 @@ function RequirementManager({ requirements, selectedId, onSelect }) {
     }
     return groups;
   }, []);
+}
+
+function RequirementsSidebarControls({ requirements, selectedId, onSelect }) {
+  const sections = groupRequirements(requirements);
+
+  return (
+    <section className="panel sidebar-panel">
+      <div className="panel-title">Project Requirements</div>
+      <div className="status-text status-text--hint">Bundled GUI requirements</div>
+      <nav className="requirements-list requirements-list--sidebar" aria-label="Requirements">
+        {sections.map((section) => (
+          <div key={section.title} className="requirements-nav-section">
+            <h3>{section.title}</h3>
+            {section.requirements.map((requirement) => (
+              <button
+                key={requirement.id}
+                className={requirement.id === selectedId ? "active" : ""}
+                onClick={() => onSelect(requirement.id)}
+              >
+                <strong>{requirement.id}</strong>
+                <span>{requirement.summary}</span>
+              </button>
+            ))}
+          </div>
+        ))}
+      </nav>
+    </section>
+  );
+}
+
+function RequirementManager({ requirements, selectedId }) {
+  const selectedRequirement = requirements.find((requirement) => requirement.id === selectedId);
 
   return (
     <section className="workspace-pane requirements-view">
@@ -1572,25 +1714,7 @@ function RequirementManager({ requirements, selectedId, onSelect }) {
         <div className="status-strip">Read-only view of bundled GUI requirements</div>
       </div>
 
-      <div className="requirements-shell">
-        <nav className="requirements-list" aria-label="Requirements">
-          {sections.map((section) => (
-            <div key={section.title} className="requirements-nav-section">
-              <h3>{section.title}</h3>
-              {section.requirements.map((requirement) => (
-                <button
-                  key={requirement.id}
-                  className={requirement.id === selectedId ? "active" : ""}
-                  onClick={() => onSelect(requirement.id)}
-                >
-                  <strong>{requirement.id}</strong>
-                  <span>{requirement.summary}</span>
-                </button>
-              ))}
-            </div>
-          ))}
-        </nav>
-
+      <div className="requirements-shell requirements-shell--detail">
         <div className="requirements-editor">
           {selectedRequirement ? (
             <>
@@ -2340,6 +2464,7 @@ function ProjectInformation({ filename, layoutKey, nodes, edges, hasUnsavedLayou
 export default function App() {
   const fileInput = useRef(null);
   const hdf5Input = useRef(null);
+  const resInput = useRef(null);
   const layoutInput = useRef(null);
   const graphClipboard = useRef(null);
   const dragUndoCaptured = useRef(false);
@@ -2354,6 +2479,11 @@ export default function App() {
   const [selectedCircuit, setSelectedCircuit] = useState("");
   const [selectedPipe, setSelectedPipe] = useState("__all__");
   const [selectedVariable, setSelectedVariable] = useState("ttemp_gues");
+  const [resResults, setResResults] = useState(null);
+  const [selectedResVariable, setSelectedResVariable] = useState("");
+  const [selectedResEntity, setSelectedResEntity] = useState("");
+  const [plotMode, setPlotMode] = useState("hdf5");
+  const [plotFormat, setPlotFormat] = useState(defaultPlotFormat);
   const [cpValue, setCpValue] = useState("1267");
   const [fitViewTrigger, setFitViewTrigger] = useState(0);
   const [layoutKey, setLayoutKey] = useState(MANUAL_LAYOUT_KEY);
@@ -2837,6 +2967,8 @@ export default function App() {
       const firstCircuit = parsed.circuits[0]?.key ?? "";
 
       setResults(parsed);
+      setResResults(null);
+      setPlotMode("hdf5");
       setSelectedCircuit(firstCircuit);
       setSelectedPipe("__all__");
       setSelectedVariable(
@@ -2844,11 +2976,48 @@ export default function App() {
           ? "ttemp_gues"
           : "temperature_from_tenth"
       );
+      setPlotFormat((current) => ({
+        ...current,
+        xAxisTitle: "Node",
+        yAxisTitle: parsed.circuits[0]?.nodes.some((node) => Object.hasOwn(node, "ttemp_gues")) ? "Total temperature" : "Temperature"
+      }));
       setResultsStatus(`Loaded ${file.name}`);
       setActiveWorkspace("postprocess");
     } catch (error) {
       setResults(null);
       setResultsStatus(error.message);
+    }
+  }, []);
+
+  const importTransientResults = useCallback(async (file) => {
+    if (!file) return;
+
+    try {
+      setResultsStatus("Reading output.res...");
+      const parsed = parseResResults(await file.text());
+      const firstColumn = parsed.columns[0];
+
+      setResResults(parsed);
+      setResults(null);
+      setPlotMode("res");
+      setSelectedResVariable(firstColumn?.variable ?? "");
+      setSelectedResEntity(firstColumn?.entity ?? "");
+      setPlotFormat((current) => ({
+        ...current,
+        xAxisTitle: "Time (s)",
+        yAxisTitle: firstColumn?.variable ?? ""
+      }));
+      setResultsStatus(
+        `Loaded ${file.name}: ${parsed.rows.length} time step${parsed.rows.length === 1 ? "" : "s"}, ${parsed.columns.length} signal${parsed.columns.length === 1 ? "" : "s"}${parsed.skipped ? `, skipped ${parsed.skipped} malformed row${parsed.skipped === 1 ? "" : "s"}` : ""}`
+      );
+      setActiveWorkspace("postprocess");
+    } catch (error) {
+      setResResults(null);
+      setResultsStatus(error.message);
+    } finally {
+      if (resInput.current) {
+        resInput.current.value = "";
+      }
     }
   }, []);
 
@@ -2892,6 +3061,7 @@ export default function App() {
     const unchanged = originalGeometryFingerprint && geometryFingerprint(nodes, edges) === originalGeometryFingerprint;
     return unchanged ? geometryTemplate : serializeOpenSdGeometry(geometryTemplate, nodes, edges).xml;
   }, [edges, geometryTemplate, nodes, originalGeometryFingerprint]);
+  const solver = useSolverPanelState(currentGeometryXml);
 
   const exportLayout = () => {
     if (!nodes.length) return;
@@ -2960,13 +3130,43 @@ export default function App() {
     });
   }, [activeCircuit]);
 
+  const resVariableOptions = useMemo(() => {
+    if (!resResults) return [];
+    return Array.from(new Set(resResults.columns.map((column) => column.variable))).sort(naturalCompare);
+  }, [resResults]);
+
+  const resEntityOptions = useMemo(() => {
+    if (!resResults || !selectedResVariable) return [];
+    return resResults.columns
+      .filter((column) => column.variable === selectedResVariable)
+      .map((column) => column.entity)
+      .sort(naturalCompare);
+  }, [resResults, selectedResVariable]);
+
   const plotData = useMemo(() => {
+    if (plotMode === "res") {
+      const column = resResults?.columns.find((item) => item.variable === selectedResVariable && item.entity === selectedResEntity);
+      if (!resResults || !column) return [];
+
+      return resResults.rows
+        .map((row) => ({
+          label: String(row[resResults.timeIndex]),
+          xValue: row[resResults.timeIndex],
+          value: row[column.index]
+        }))
+        .filter((point) => Number.isFinite(point.xValue) && Number.isFinite(point.value));
+    }
+
     return getPipeNodeSeries(activeCircuit, selectedVariable, selectedPipe, cpValue);
-  }, [activeCircuit, cpValue, selectedPipe, selectedVariable]);
+  }, [activeCircuit, cpValue, plotMode, resResults, selectedPipe, selectedResEntity, selectedResVariable, selectedVariable]);
 
   const selectedVariableLabel = useMemo(() => {
+    if (plotMode === "res") {
+      return selectedResVariable && selectedResEntity ? `${selectedResVariable}: ${selectedResEntity}` : "Transient result";
+    }
+
     return nodeVariables.find((variable) => variable.value === selectedVariable)?.label ?? selectedVariable;
-  }, [selectedVariable]);
+  }, [plotMode, selectedResEntity, selectedResVariable, selectedVariable]);
 
   return (
     <div className="app-shell">
@@ -2976,6 +3176,8 @@ export default function App() {
           <p>Model graph</p>
         </div>
 
+        {activeWorkspace === "model" && (
+        <>
         <section className="panel">
           <div className="panel-title">Geometry</div>
           <input
@@ -3106,6 +3308,179 @@ export default function App() {
           )}
         </section>
 
+        </>
+        )}
+        {activeWorkspace === "solver" && <SolverSidebarControls solver={solver} />}
+        {activeWorkspace === "postprocess" && (
+          <>
+            <input
+              ref={hdf5Input}
+              className="file-input"
+              type="file"
+              accept=".h5,.hdf5,application/x-hdf5"
+              onChange={(event) => importResults(event.target.files?.[0])}
+            />
+            <input
+              ref={resInput}
+              className="file-input"
+              type="file"
+              accept=".res,text/plain"
+              onChange={(event) => importTransientResults(event.target.files?.[0])}
+            />
+
+            <section className="panel sidebar-panel">
+              <div className="panel-title">Postprocessor</div>
+              <button className="primary-button" onClick={() => hdf5Input.current?.click()}>
+                Import HDF5
+              </button>
+              <button className="secondary-button secondary-button--inline" onClick={() => resInput.current?.click()}>
+                Import output.res
+              </button>
+              <div className="status-text">{resultsStatus}</div>
+            </section>
+
+            {plotMode === "hdf5" && results && (
+              <section className="panel sidebar-panel">
+                <div className="panel-title">Selection</div>
+                <div className="post-controls post-controls--sidebar">
+                  <label>
+                    Circuit
+                    <select value={selectedCircuit} onChange={(event) => setSelectedCircuit(event.target.value)}>
+                      {results.circuits.map((circuit) => (
+                        <option key={circuit.key} value={circuit.key}>
+                          {circuit.identifier}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Pipe
+                    <select value={selectedPipe} onChange={(event) => setSelectedPipe(event.target.value)}>
+                      <option value="__all__">All nodes</option>
+                      {pipeOptions.map((pipe) => (
+                        <option key={pipe} value={pipe}>
+                          {pipe}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Variable
+                    <select value={selectedVariable} onChange={(event) => setSelectedVariable(event.target.value)}>
+                      {availableVariables.map((variable) => (
+                        <option key={variable.value} value={variable.value}>
+                          {variable.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {selectedVariable === "temperature_from_tenth" && (
+                    <label>
+                      Cp
+                      <input
+                        value={cpValue}
+                        inputMode="decimal"
+                        onChange={(event) => setCpValue(event.target.value)}
+                      />
+                    </label>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {plotMode === "res" && resResults && (
+              <section className="panel sidebar-panel">
+                <div className="panel-title">Selection</div>
+                <div className="post-controls post-controls--sidebar">
+                  <label>
+                    Variable
+                    <select
+                      value={selectedResVariable}
+                      onChange={(event) => {
+                        const nextVariable = event.target.value;
+                        const nextEntity = resResults.columns.find((column) => column.variable === nextVariable)?.entity ?? "";
+                        setSelectedResVariable(nextVariable);
+                        setSelectedResEntity(nextEntity);
+                        setPlotFormat((current) => ({ ...current, yAxisTitle: nextVariable }));
+                      }}
+                    >
+                      {resVariableOptions.map((variable) => (
+                        <option key={variable} value={variable}>
+                          {variable}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Signal
+                    <select value={selectedResEntity} onChange={(event) => setSelectedResEntity(event.target.value)}>
+                      {resEntityOptions.map((entity) => (
+                        <option key={entity} value={entity}>
+                          {entity}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </section>
+            )}
+
+            <section className="panel sidebar-panel">
+              <div className="panel-title">Plot Format</div>
+              <div className="plot-format-panel plot-format-panel--sidebar">
+                <label>
+                  X title
+                  <input
+                    value={plotFormat.xAxisTitle}
+                    onChange={(event) => setPlotFormat((current) => ({ ...current, xAxisTitle: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Y title
+                  <input
+                    value={plotFormat.yAxisTitle}
+                    onChange={(event) => setPlotFormat((current) => ({ ...current, yAxisTitle: event.target.value }))}
+                  />
+                </label>
+                <label className="toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={plotFormat.showGrid}
+                    onChange={(event) => setPlotFormat((current) => ({ ...current, showGrid: event.target.checked }))}
+                  />
+                  Gridlines
+                </label>
+                <label className="toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={plotFormat.showLegend}
+                    onChange={(event) => setPlotFormat((current) => ({ ...current, showLegend: event.target.checked }))}
+                  />
+                  Legend
+                </label>
+                <label className="toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={plotFormat.showMarkers}
+                    onChange={(event) => setPlotFormat((current) => ({ ...current, showMarkers: event.target.checked }))}
+                  />
+                  Markers
+                </label>
+              </div>
+            </section>
+          </>
+        )}
+        {activeWorkspace === "requirements" && (
+          <RequirementsSidebarControls
+            requirements={parsedRequirements}
+            selectedId={selectedRequirement?.id ?? ""}
+            onSelect={selectRequirement}
+          />
+        )}
       </aside>
 
       <main className="workspace">
@@ -3219,69 +3594,6 @@ export default function App() {
 
         {activeWorkspace === "postprocess" && (
           <section className="workspace-pane postprocess-view">
-            <input
-              ref={hdf5Input}
-              className="file-input"
-              type="file"
-              accept=".h5,.hdf5,application/x-hdf5"
-              onChange={(event) => importResults(event.target.files?.[0])}
-            />
-
-            <div className="post-toolbar">
-              <button className="primary-button" onClick={() => hdf5Input.current?.click()}>
-                Import HDF5
-              </button>
-
-              {results && (
-                <div className="post-controls">
-                  <label>
-                    Circuit
-                    <select value={selectedCircuit} onChange={(event) => setSelectedCircuit(event.target.value)}>
-                      {results.circuits.map((circuit) => (
-                        <option key={circuit.key} value={circuit.key}>
-                          {circuit.identifier}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    Pipe
-                    <select value={selectedPipe} onChange={(event) => setSelectedPipe(event.target.value)}>
-                      <option value="__all__">All nodes</option>
-                      {pipeOptions.map((pipe) => (
-                        <option key={pipe} value={pipe}>
-                          {pipe}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    Variable
-                    <select value={selectedVariable} onChange={(event) => setSelectedVariable(event.target.value)}>
-                      {availableVariables.map((variable) => (
-                        <option key={variable.value} value={variable.value}>
-                          {variable.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  {selectedVariable === "temperature_from_tenth" && (
-                    <label>
-                      Cp
-                      <input
-                        value={cpValue}
-                        inputMode="decimal"
-                        onChange={(event) => setCpValue(event.target.value)}
-                      />
-                    </label>
-                  )}
-                </div>
-              )}
-            </div>
-
             <div className="status-strip">{resultsStatus}</div>
 
             <div className="plot-shell">
@@ -3289,8 +3601,16 @@ export default function App() {
                 <h2>{selectedVariableLabel}</h2>
                 <span>{plotData.length} points</span>
               </div>
-              <LinePlot data={plotData} variableLabel={selectedVariableLabel} />
-              {plotData.length > 0 && (
+              <LinePlot
+                data={plotData}
+                variableLabel={selectedVariableLabel}
+                xAxisTitle={plotFormat.xAxisTitle}
+                yAxisTitle={plotFormat.yAxisTitle}
+                showGrid={plotFormat.showGrid}
+                showLegend={plotFormat.showLegend}
+                showMarkers={plotFormat.showMarkers}
+              />
+              {plotMode !== "res" && plotData.length > 0 && (
                 <div className="data-table">
                   {plotData.map((point) => (
                     <div key={point.label}>
@@ -3305,14 +3625,13 @@ export default function App() {
         )}
 
         {activeWorkspace === "solver" && (
-          <SolverPanel currentGeometryXml={currentGeometryXml} />
+          <SolverOutputPanel solver={solver} />
         )}
 
         {activeWorkspace === "requirements" && (
           <RequirementManager
             requirements={parsedRequirements}
             selectedId={selectedRequirement?.id ?? ""}
-            onSelect={selectRequirement}
           />
         )}
 

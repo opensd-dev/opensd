@@ -519,7 +519,7 @@ button {
 
 .postprocess-view {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 12px;
   padding: 16px;
   background: #f4f7fb;
@@ -541,13 +541,41 @@ button {
   flex: 0 0 auto;
 }
 
+.post-toolbar .secondary-button {
+  width: 156px;
+  flex: 0 0 auto;
+}
+
 .solver-view {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 12px;
   padding: 16px;
   background: #f4f7fb;
   overflow: hidden;
+}
+
+.sidebar-panel {
+  padding-top: 2px;
+}
+
+.sidebar-field {
+  display: grid;
+  gap: 5px;
+  color: #475467;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.sidebar-field input {
+  width: 100%;
+  height: 34px;
+  padding: 0 9px;
+  border: 1px solid #cfd7e4;
+  border-radius: 5px;
+  color: #202938;
+  background: #ffffff;
+  font: inherit;
 }
 
 .solver-toolbar {
@@ -646,6 +674,11 @@ button {
   gap: 12px;
 }
 
+.solver-form-grid--sidebar {
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
 .solver-checks {
   display: flex;
   flex-wrap: wrap;
@@ -690,6 +723,22 @@ button {
   display: grid;
   grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr) minmax(200px, 1.4fr) minmax(90px, 0.6fr);
   gap: 10px;
+  width: 100%;
+}
+
+.solver-checks--sidebar {
+  display: grid;
+  gap: 8px;
+  margin-top: 0;
+}
+
+.post-controls--transient {
+  grid-template-columns: minmax(180px, 240px) minmax(180px, 240px);
+  width: auto;
+}
+
+.post-controls--sidebar {
+  grid-template-columns: 1fr;
   width: 100%;
 }
 
@@ -752,6 +801,60 @@ button {
   font-weight: 650;
 }
 
+.plot-format-panel {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) repeat(3, auto);
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid #e1e6ef;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.plot-format-panel label {
+  display: grid;
+  gap: 4px;
+  color: #475467;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.plot-format-panel input[type="text"],
+.plot-format-panel input:not([type]) {
+  width: 100%;
+  height: 32px;
+  border: 1px solid #cdd5df;
+  border-radius: 6px;
+  padding: 0 8px;
+  background: #ffffff;
+  color: #202938;
+  font: inherit;
+  font-size: 13px;
+}
+
+.plot-format-panel .toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  white-space: nowrap;
+}
+
+.plot-format-panel input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+}
+
+.plot-format-panel--sidebar {
+  grid-template-columns: 1fr;
+  margin-bottom: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
 .empty-plot {
   display: grid;
   min-height: 260px;
@@ -777,6 +880,11 @@ button {
   stroke-width: 1;
 }
 
+.line-plot .plot-grid line {
+  stroke: #d8e0ec;
+  stroke-width: 1;
+}
+
 .line-plot path {
   fill: none;
   stroke: #1f6feb;
@@ -798,6 +906,23 @@ button {
 
 .line-plot .x-label {
   font-size: 10px;
+}
+
+.line-plot .axis-title {
+  fill: #344054;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.line-plot .plot-legend line {
+  stroke: #1f6feb;
+  stroke-width: 3;
+}
+
+.line-plot .plot-legend text {
+  fill: #344054;
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .data-table {
@@ -857,12 +982,23 @@ button {
   overflow: hidden;
 }
 
+.requirements-shell--detail {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .requirements-list {
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: auto;
   border-right: 1px solid #e1e6ef;
+  background: #fbfcfe;
+}
+
+.requirements-list--sidebar {
+  border-right: 0;
+  border: 1px solid #e1e6ef;
+  border-radius: 7px;
   background: #fbfcfe;
 }
 
@@ -1440,7 +1576,17 @@ button {
     width: 100%;
   }
 
+  .post-toolbar .secondary-button {
+    width: 100%;
+  }
+
   .post-controls {
     grid-template-columns: 1fr;
+  }
+
+  .post-controls--transient,
+  .plot-format-panel {
+    grid-template-columns: 1fr;
+    width: 100%;
   }
 }
