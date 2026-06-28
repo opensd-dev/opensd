@@ -801,6 +801,13 @@ button {
   font-weight: 650;
 }
 
+.results-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .plot-format-panel {
   display: grid;
   grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) repeat(3, auto);
@@ -822,7 +829,9 @@ button {
 }
 
 .plot-format-panel input[type="text"],
-.plot-format-panel input:not([type]) {
+.plot-format-panel input[type="number"],
+.plot-format-panel input:not([type]),
+.plot-format-panel select {
   width: 100%;
   height: 32px;
   border: 1px solid #cdd5df;
@@ -832,6 +841,50 @@ button {
   color: #202938;
   font: inherit;
   font-size: 13px;
+}
+
+.plot-format-panel select:disabled {
+  color: #98a2b3;
+  background: #f2f4f7;
+}
+
+.plot-series-list {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.plot-series-list div {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid #e1e6ef;
+  border-radius: 7px;
+  background: #fbfcfe;
+}
+
+.plot-series-list span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.plot-series-list strong {
+  overflow: hidden;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plot-series-list button {
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
 }
 
 .plot-format-panel .toggle-label {
@@ -885,6 +938,11 @@ button {
   stroke-width: 1;
 }
 
+.line-plot .plot-grid--minor line {
+  stroke: #edf1f7;
+  stroke-width: 0.75;
+}
+
 .line-plot path {
   fill: none;
   stroke: #1f6feb;
@@ -897,6 +955,16 @@ button {
   fill: #ffffff;
   stroke: #1f6feb;
   stroke-width: 2;
+}
+
+.line-plot .plot-marker {
+  fill: #ffffff;
+  stroke-width: 2;
+}
+
+.line-plot .plot-marker-line line {
+  stroke-width: 2;
+  stroke-linecap: round;
 }
 
 .line-plot text {
@@ -917,6 +985,11 @@ button {
 .line-plot .plot-legend line {
   stroke: #1f6feb;
   stroke-width: 3;
+}
+
+.line-plot .plot-legend rect {
+  fill: rgb(255 255 255 / 88%);
+  stroke: #d8e0ec;
 }
 
 .line-plot .plot-legend text {
@@ -1122,6 +1195,7 @@ button {
   overflow: auto;
   padding: 24px;
   background: #f8fafc;
+  scroll-behavior: smooth;
 }
 
 .help-document {
@@ -1148,6 +1222,11 @@ button {
   font-size: 18px;
 }
 
+.help-document h1,
+.help-document h2 {
+  scroll-margin-top: 18px;
+}
+
 .help-document p,
 .help-document ul {
   margin: 7px 0;
@@ -1155,6 +1234,37 @@ button {
 
 .help-document ul {
   padding-left: 22px;
+}
+
+.help-nav {
+  display: grid;
+  gap: 2px;
+  max-height: 64vh;
+  overflow: auto;
+}
+
+.help-nav a {
+  display: block;
+  padding: 7px 8px 7px 18px;
+  border-radius: 6px;
+  color: #475467;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.25;
+  text-decoration: none;
+}
+
+.help-nav a:hover,
+.help-nav a:focus {
+  background: #eef5ff;
+  color: #175cc7;
+}
+
+.help-nav .help-nav-title {
+  padding-left: 8px;
+  color: #101827;
+  font-size: 13px;
+  font-weight: 750;
 }
 
 .requirements-body p {

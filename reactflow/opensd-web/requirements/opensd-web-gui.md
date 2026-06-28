@@ -10,9 +10,9 @@
 
 ### GUI-001 — Application workspaces (Must)
 
-The application shall provide tabs in this order: **Pre-processor** (geometry graph), **Solver**, **Postprocessor** (HDF5 plots), **Help**, and **Requirements**.
+The application shall provide tabs in this order: **Pre-processor** (geometry graph), **Solver**, **Postprocessor** (HDF5 and transient plots), **Help**, and **Requirements**.
 
-**Acceptance:** Tab switching preserves loaded data; Pre-processor shows the React Flow canvas; Solver shows solver controls; Postprocessor shows result import controls and line plots; Help displays the bundled GUI guide and opens with **F1**.
+**Acceptance:** Tab switching preserves loaded data and keeps the same tab/sidebar sizing; the application starts with an empty Pre-processor canvas and no default loaded graph; the sidebar shows controls relevant to the active workspace. Pre-processor shows the React Flow canvas; Solver shows run output with solver settings in the sidebar; Postprocessor shows line plots with import, selection, and formatting controls in the sidebar; Help displays the bundled GUI guide and opens with **F1**; Requirements displays the selected requirement with requirement navigation in the sidebar.
 
 **Implementation:** [src/App.jsx](../src/App.jsx).
 
@@ -32,7 +32,7 @@ Users shall import OpenSD **geometry.xml** (or equivalent) and render the networ
 
 Users shall import **HDF5** result files for postprocessing.
 
-**Acceptance:** File picker accepts `.h5`/`.hdf5`; circuit/node series plotted when variables exist.
+**Acceptance:** File picker accepts `.h5`/`.hdf5`; circuit/node series plotted when variables exist; HDF5 circuit, pipe, variable, and Cp controls are shown in the Postprocessor sidebar.
 
 **Implementation:** `parseHdf5Results()` in [src/App.jsx](../src/App.jsx).
 
@@ -420,11 +420,23 @@ The GUI should provide a browser-based way to view project requirements. Require
 
 ---
 
+### GUI-081 — Help heading navigation (Should)
+
+The Help workspace should provide sidebar navigation generated from the bundled Help document headings.
+
+**Acceptance:** The Help sidebar lists top-level and second-level Help headings. Selecting a heading scrolls the Help document to the corresponding section without leaving the Help workspace.
+
+**Implementation:** `parseHelpHeadings`, `HelpSidebarControls`, and `HelpDocument` in [src/App.jsx](../src/App.jsx), styles in [src/App.css](../src/App.css).
+
+---
+
 ## 9. Postprocess view
 
 ### GUI-070 — Circuit and pipe selection (Must)
 
-Postprocess shall allow selecting **circuit**, **pipe filter**, and **node variable** for line plots.
+Postprocess shall allow selecting **circuit**, **pipe filter**, and **node variable** for HDF5 line plots.
+
+**Acceptance:** HDF5 selection controls appear in the Postprocessor sidebar and the plot updates without tab or sidebar resizing.
 
 **Implementation:** [src/App.jsx](../src/App.jsx) postprocess controls.
 
@@ -438,6 +450,36 @@ When enthalpy is available, GUI may plot **temperature from total enthalpy** usi
 
 ---
 
+### GUI-072 — Plot format controls (Should)
+
+Postprocess plots should expose formatting controls suitable for publication and report figures.
+
+**Acceptance:** Users can edit x- and y-axis titles; choose display units for supported variables, including pressure in Pa/kPa/bar/MPa; show or hide major and minor gridlines; adjust line thickness and marker interval; show/hide markers and legend; keep markers off by default; overlay the legend inside the plot and choose left/middle/right plus top/middle/bottom placement; control x- and y-axis decimal places; choose a figure aspect ratio including an A4 two-figures option for two plots with captions on one A4 portrait page; and save the current plot as an SVG file.
+
+**Implementation:** `defaultPlotFormat`, unit conversion helpers, `exportPlotSvg`, and `LinePlot` in [src/App.jsx](../src/App.jsx), plot styles in [src/App.css](../src/App.css).
+
+---
+
+### GUI-074 — Transient output.res import (Must)
+
+Postprocess shall import OpenSD transient `output.res` files and plot selected signals against time.
+
+**Acceptance:** File picker accepts `.res`; comma-separated and whitespace-separated result tables are parsed; users can select transient variable and signal in the Postprocessor sidebar; transient plots do not show a tabulated value list below the plot.
+
+**Implementation:** `parseResResults`, transient postprocess state, and `LinePlot` in [src/App.jsx](../src/App.jsx).
+
+---
+
+### GUI-073 — Multiple plotted lines (Should)
+
+Postprocess should support overlaying multiple selected result series in one plot.
+
+**Acceptance:** Users can add the current HDF5 or transient `.res` selection as a plotted line, remove individual lines, clear the active line list, and view each line with a distinct stable color, marker shape, staggered marker offset, and shared axes. Marker staggering shall use the pointer interval so one line may mark points 1, 3, 5 while another marks 2, 4, 6, improving visibility when series overlap.
+
+**Implementation:** `plotSeriesSelections`, `currentPlotSelection`, `plotSeries`, and `LinePlot` in [src/App.jsx](../src/App.jsx), line-list styles in [src/App.css](../src/App.css).
+
+---
+
 ## 10. Solver workspace
 
 ### GUI-090 — Edit settings and run solver (Must)
@@ -446,7 +488,7 @@ The web app shall provide a Solver tab for editing the settings supported by `op
 
 **Acceptance:** A run accepts an existing absolute WSL working directory under an allowed root (default `/mnt/c`, configurable with comma-separated `OPENSD_WORKING_ROOTS`), writes the edited `settings.xml`, optionally writes the current Pre-processor geometry, invokes the solver without a shell, and displays the command, exit status, standard output, and standard error. Realpath validation prevents path traversal and symlink escape outside configured roots.
 
-**Implementation:** [src/SolverPanel.jsx](../src/SolverPanel.jsx), [solverServer.js](../solverServer.js), and the Vite plugin registration in [vite.config.js](../vite.config.js).
+**Implementation:** [src/SolverPanel.jsx](../src/SolverPanel.jsx), [src/solverState.js](../src/solverState.js), [solverServer.js](../solverServer.js), and the Vite plugin registration in [vite.config.js](../vite.config.js).
 
 ---
 
@@ -495,4 +537,10 @@ Internal hslab layer networks shall not be expanded on the main canvas (see GUI-
 | GUI-063 | No layer nodes | `App.jsx` |
 | GUI-064 | Layers in tooltip | `App.jsx` |
 | GUI-080 | Browser requirements management | `App.jsx`, `App.css` |
-| GUI-090 | Edit settings and run solver | `SolverPanel.jsx`, `solverServer.js`, `vite.config.js` |
+| GUI-081 | Help heading navigation | `App.jsx`, `App.css` |
+| GUI-070 | HDF5 circuit/pipe/variable selection | `App.jsx` |
+| GUI-071 | Derived temperature from enthalpy | `App.jsx` |
+| GUI-072 | Plot format controls | `App.jsx`, `App.css` |
+| GUI-073 | Multiple plotted lines | `App.jsx`, `App.css` |
+| GUI-074 | Transient output.res import | `App.jsx` |
+| GUI-090 | Edit settings and run solver | `SolverPanel.jsx`, `solverState.js`, `solverServer.js`, `vite.config.js` |

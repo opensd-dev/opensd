@@ -36,23 +36,113 @@ const COPY_PADDING = 28;
 const COPY_SCALE = 2;
 const PDF_SCALE = 4;
 const nodeVariables = [
-  { value: "temperature_from_tenth", label: "Temperature from total enthalpy" },
-  { value: "ttemp_gues", label: "Total temperature" },
-  { value: "stemp_gues", label: "Static temperature" },
-  { value: "tpres_gues", label: "Total pressure" },
-  { value: "spres_gues", label: "Static pressure" },
-  { value: "tenth_gues", label: "Total enthalpy" },
-  { value: "senth_gues", label: "Static enthalpy" },
-  { value: "velocity", label: "Velocity" },
-  { value: "msource", label: "Mass source" }
+  { value: "temperature_from_tenth", label: "Temperature from total enthalpy", unitFamily: "temperature" },
+  { value: "ttemp_gues", label: "Total temperature", unitFamily: "temperature" },
+  { value: "stemp_gues", label: "Static temperature", unitFamily: "temperature" },
+  { value: "tpres_gues", label: "Total pressure", unitFamily: "pressure" },
+  { value: "spres_gues", label: "Static pressure", unitFamily: "pressure" },
+  { value: "tenth_gues", label: "Total enthalpy", unitFamily: "enthalpy" },
+  { value: "senth_gues", label: "Static enthalpy", unitFamily: "enthalpy" },
+  { value: "velocity", label: "Velocity", unitFamily: "velocity" },
+  { value: "msource", label: "Mass source", unitFamily: "massFlow" }
 ];
+const unitFamilies = {
+  pressure: [
+    { value: "Pa", label: "Pa", factor: 1 },
+    { value: "kPa", label: "kPa", factor: 0.001 },
+    { value: "bar", label: "bar", factor: 0.00001 },
+    { value: "MPa", label: "MPa", factor: 0.000001 }
+  ],
+  temperature: [
+    { value: "K", label: "K", convert: (value) => value },
+    { value: "C", label: "deg C", convert: (value) => value - 273.15 }
+  ],
+  enthalpy: [
+    { value: "J/kg", label: "J/kg", factor: 1 },
+    { value: "kJ/kg", label: "kJ/kg", factor: 0.001 }
+  ],
+  velocity: [
+    { value: "m/s", label: "m/s", factor: 1 }
+  ],
+  massFlow: [
+    { value: "kg/s", label: "kg/s", factor: 1 }
+  ],
+  generic: [
+    { value: "base", label: "Base", factor: 1 }
+  ]
+};
 const defaultPlotFormat = {
   xAxisTitle: "Node",
   yAxisTitle: "",
+  yUnit: "",
+  xDecimals: 3,
+  yDecimals: 3,
+  aspectRatio: "default",
   showGrid: true,
+  showMinorGrid: false,
   showLegend: true,
-  showMarkers: true
+  overlayLegend: false,
+  legendX: "right",
+  legendY: "top",
+  showMarkers: false,
+  lineThickness: 3,
+  pointerInterval: 1
 };
+const plotColors = ["#1f6feb", "#d92d20", "#039855", "#7a5af8", "#dc6803", "#0086c9", "#c11574", "#4e5ba6"];
+const plotMarkerTypes = ["circle", "square", "triangle", "diamond", "cross", "plus"];
+const plotAspectRatios = {
+  default: { label: "Default", ratio: 640 / 300 },
+  a4TwoUp: { label: "A4 two figures", ratio: 1.55 },
+  widescreen: { label: "16:9", ratio: 16 / 9 },
+  fourThree: { label: "4:3", ratio: 4 / 3 },
+  square: { label: "1:1", ratio: 1 }
+};
+
+function unitFamilyForVariable(variable) {
+  const knownVariable = nodeVariables.find((item) => item.value === variable);
+  if (knownVariable?.unitFamily) return knownVariable.unitFamily;
+
+  const normalized = String(variable ?? "").toLowerCase();
+  if (normalized.includes("pres") || normalized.includes("pressure")) return "pressure";
+  if (normalized.includes("temp") || normalized.includes("temperature")) return "temperature";
+  if (normalized.includes("enth") || normalized.includes("enthalpy")) return "enthalpy";
+  if (normalized.includes("velo") || normalized.includes("velocity")) return "velocity";
+  if (normalized.includes("flow") || normalized.includes("msource")) return "massFlow";
+  return "generic";
+}
+
+function unitOptionsForVariable(variable) {
+  return unitFamilies[unitFamilyForVariable(variable)] ?? unitFamilies.generic;
+}
+
+function defaultUnitForVariable(variable) {
+  return unitOptionsForVariable(variable)[0]?.value ?? "";
+}
+
+function convertValueForUnit(value, unitOptions, unit) {
+  const option = unitOptions.find((item) => item.value === unit) ?? unitOptions[0];
+  if (!option) return value;
+  if (option.convert) return option.convert(value);
+  return value * (option.factor ?? 1);
+}
+
+function labelWithUnit(label, unit) {
+  if (!unit || unit === "base") return label;
+  return `${label} (${unit})`;
+}
+
+function formatAxisValue(value, decimals) {
+  const places = Math.max(0, Math.min(10, Math.round(Number(decimals) || 0)));
+  return Number.isFinite(value) ? value.toFixed(places) : "";
+}
+
+function hdf5SeriesId({ circuitKey, pipeFilter, variable }) {
+  return `hdf5:${circuitKey}:${pipeFilter}:${variable}`;
+}
+
+function resSeriesId({ variable, entity }) {
+  return `res:${variable}:${entity}`;
+}
 
 function componentKindForType(type) {
   if (type === "Node") return "flow";
@@ -1482,47 +1572,120 @@ function parseResResults(fileText) {
   };
 }
 
-function LinePlot({ data, variableLabel, xAxisTitle = "", yAxisTitle = "", showGrid = false, showLegend = false, showMarkers = true }) {
-  const width = 640;
-  const height = 300;
-  const pad = { top: showLegend ? 34 : 18, right: 18, bottom: 58, left: 72 };
+function PlotMarker({ type, x, y, r, color }) {
+  if (type === "square") {
+    return <rect className="plot-marker" x={x - r} y={y - r} width={r * 2} height={r * 2} style={{ stroke: color }} />;
+  }
+  if (type === "triangle") {
+    return <path className="plot-marker" d={`M ${x} ${y - r - 1} L ${x + r + 1} ${y + r} L ${x - r - 1} ${y + r} Z`} style={{ stroke: color }} />;
+  }
+  if (type === "diamond") {
+    return <path className="plot-marker" d={`M ${x} ${y - r - 1} L ${x + r + 1} ${y} L ${x} ${y + r + 1} L ${x - r - 1} ${y} Z`} style={{ stroke: color }} />;
+  }
+  if (type === "cross") {
+    return (
+      <g className="plot-marker-line" style={{ stroke: color }}>
+        <line x1={x - r} y1={y - r} x2={x + r} y2={y + r} />
+        <line x1={x + r} y1={y - r} x2={x - r} y2={y + r} />
+      </g>
+    );
+  }
+  if (type === "plus") {
+    return (
+      <g className="plot-marker-line" style={{ stroke: color }}>
+        <line x1={x - r} y1={y} x2={x + r} y2={y} />
+        <line x1={x} y1={y - r} x2={x} y2={y + r} />
+      </g>
+    );
+  }
 
-  if (!data.length) {
+  return <circle className="plot-marker" cx={x} cy={y} r={r} style={{ stroke: color }} />;
+}
+
+function LinePlot({
+  series,
+  svgRef,
+  variableLabel,
+  xAxisTitle = "",
+  yAxisTitle = "",
+  xDecimals = 3,
+  yDecimals = 3,
+  aspectRatio = "default",
+  showGrid = false,
+  showMinorGrid = false,
+  showLegend = false,
+  overlayLegend = false,
+  legendX = "right",
+  legendY = "top",
+  showMarkers = true,
+  lineThickness = 3,
+  pointerInterval = 1
+}) {
+  const width = 640;
+  const ratio = plotAspectRatios[aspectRatio]?.ratio ?? plotAspectRatios.default.ratio;
+  const height = Math.round(width / ratio);
+  const pad = { top: showLegend && !overlayLegend ? 34 : 18, right: 18, bottom: 58, left: 72 };
+  const visibleSeries = series.filter((item) => item.data.length);
+  const allPoints = visibleSeries.flatMap((item) => item.data);
+
+  if (!allPoints.length) {
     return <div className="empty-plot">No numeric values found for this selection.</div>;
   }
 
-  const hasNumericX = data.every((point) => Number.isFinite(point.xValue));
-  const xValues = hasNumericX ? data.map((point) => point.xValue) : data.map((_, index) => index);
+  const hasNumericX = allPoints.every((point) => Number.isFinite(point.xValue));
+  const longestSeriesLength = Math.max(...visibleSeries.map((item) => item.data.length));
+  const xValues = hasNumericX ? allPoints.map((point) => point.xValue) : Array.from({ length: longestSeriesLength }, (_, index) => index);
   const minX = Math.min(...xValues);
   const maxX = Math.max(...xValues);
   const spanX = maxX - minX || 1;
-  const minY = Math.min(...data.map((point) => point.value));
-  const maxY = Math.max(...data.map((point) => point.value));
+  const minY = Math.min(...allPoints.map((point) => point.value));
+  const maxY = Math.max(...allPoints.map((point) => point.value));
   const spanY = maxY - minY || 1;
   const innerWidth = width - pad.left - pad.right;
   const innerHeight = height - pad.top - pad.bottom;
-
-  const points = data.map((point, index) => {
-    const rawX = hasNumericX ? point.xValue : index;
-    const x = pad.left + (data.length === 1 ? innerWidth / 2 : ((rawX - minX) / spanX) * innerWidth);
-    const y = pad.top + innerHeight - ((point.value - minY) / spanY) * innerHeight;
-    return { ...point, x, y };
+  const plottedSeries = visibleSeries.map((item, seriesIndex) => {
+    const points = item.data.map((point, index) => {
+      const rawX = hasNumericX ? point.xValue : index;
+      const x = pad.left + (item.data.length === 1 ? innerWidth / 2 : ((rawX - minX) / spanX) * innerWidth);
+      const y = pad.top + innerHeight - ((point.value - minY) / spanY) * innerHeight;
+      return { ...point, x, y };
+    });
+    return {
+      ...item,
+      color: item.color ?? plotColors[seriesIndex % plotColors.length],
+      points,
+      pathData: points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ")
+    };
   });
-
-  const pathData = points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
-  const labelStep = Math.ceil(points.length / 8);
+  const labelSeries = plottedSeries[0]?.points ?? [];
+  const labelStep = Math.ceil(labelSeries.length / 8);
   const gridLines = [0, 0.25, 0.5, 0.75, 1];
+  const minorGridLines = Array.from({ length: 17 }, (_, index) => index / 16).filter((ratio) => !gridLines.includes(ratio));
+  const markerInterval = Math.max(1, Math.round(Number(pointerInterval) || 1));
+  const markerRadius = Math.max(2.5, Math.min(5, Number(lineThickness) + 1));
+  const legendWidth = Math.min(270, Math.max(160, 58 + Math.max(...plottedSeries.map((item) => item.label.length)) * 6.2));
+  const legendHeight = 18 + plottedSeries.length * 20;
+  const legendLeft = legendX === "left"
+    ? pad.left + 8
+    : legendX === "middle"
+      ? pad.left + (innerWidth - legendWidth) / 2
+      : pad.left + innerWidth - legendWidth - 8;
+  const legendTop = legendY === "bottom"
+    ? pad.top + innerHeight - legendHeight - 8
+    : legendY === "middle"
+      ? pad.top + (innerHeight - legendHeight) / 2
+      : pad.top + 8;
   const xTickLabel = (ratio) => {
     if (!hasNumericX) {
-      const index = Math.min(points.length - 1, Math.round(ratio * (points.length - 1)));
-      return points[index]?.label ?? "";
+      const index = Math.min(labelSeries.length - 1, Math.round(ratio * (labelSeries.length - 1)));
+      return labelSeries[index]?.label ?? "";
     }
 
-    return (minX + ratio * spanX).toPrecision(5);
+    return formatAxisValue(minX + ratio * spanX, xDecimals);
   };
 
   return (
-    <svg className="line-plot" viewBox={`0 0 ${width} ${height}`} role="img">
+    <svg ref={svgRef} className="line-plot" viewBox={`0 0 ${width} ${height}`} role="img">
       <title>{variableLabel}</title>
       {showGrid && gridLines.map((ratio) => (
         <g className="plot-grid" key={`grid-${ratio}`}>
@@ -1540,29 +1703,57 @@ function LinePlot({ data, variableLabel, xAxisTitle = "", yAxisTitle = "", showG
           />
         </g>
       ))}
+      {showMinorGrid && minorGridLines.map((ratio) => (
+        <g className="plot-grid plot-grid--minor" key={`minor-grid-${ratio}`}>
+          <line
+            x1={pad.left}
+            y1={pad.top + ratio * innerHeight}
+            x2={pad.left + innerWidth}
+            y2={pad.top + ratio * innerHeight}
+          />
+          <line
+            x1={pad.left + ratio * innerWidth}
+            y1={pad.top}
+            x2={pad.left + ratio * innerWidth}
+            y2={pad.top + innerHeight}
+          />
+        </g>
+      ))}
       <line x1={pad.left} y1={pad.top} x2={pad.left} y2={pad.top + innerHeight} />
       <line x1={pad.left} y1={pad.top + innerHeight} x2={pad.left + innerWidth} y2={pad.top + innerHeight} />
       <text x={pad.left - 10} y={pad.top + 4} textAnchor="end">
-        {maxY.toPrecision(5)}
+        {formatAxisValue(maxY, yDecimals)}
       </text>
       <text x={pad.left - 10} y={pad.top + innerHeight} textAnchor="end">
-        {minY.toPrecision(5)}
+        {formatAxisValue(minY, yDecimals)}
       </text>
       {gridLines.map((ratio) => (
         <text key={`x-tick-${ratio}`} x={pad.left + ratio * innerWidth} y={height - 38} textAnchor="middle">
           {xTickLabel(ratio)}
         </text>
       ))}
-      <path d={pathData} />
-      {points.map((point, index) => (
-        <g key={point.label}>
-          {showMarkers && <circle cx={point.x} cy={point.y} r="4" />}
-          {!hasNumericX && index % labelStep === 0 && (
-            <text className="x-label" x={point.x} y={height - 24} textAnchor="middle">
-              {point.label}
-            </text>
-          )}
+      {plottedSeries.map((item, seriesIndex) => (
+        <g key={item.id}>
+          <path d={item.pathData} style={{ stroke: item.color, strokeWidth: lineThickness }} />
+          {item.points.map((point, index) => (
+            <g key={`${item.id}-${point.label}`}>
+              {showMarkers && index % markerInterval === seriesIndex % markerInterval && (
+                <PlotMarker
+                  type={plotMarkerTypes[seriesIndex % plotMarkerTypes.length]}
+                  x={point.x}
+                  y={point.y}
+                  r={markerRadius}
+                  color={item.color}
+                />
+              )}
+            </g>
+          ))}
         </g>
+      ))}
+      {!hasNumericX && labelSeries.map((point, index) => index % labelStep === 0 && (
+        <text className="x-label" key={`x-label-${point.label}`} x={point.x} y={height - 24} textAnchor="middle">
+          {point.label}
+        </text>
       ))}
       {xAxisTitle && (
         <text className="axis-title" x={pad.left + innerWidth / 2} y={height - 10} textAnchor="middle">
@@ -1575,12 +1766,31 @@ function LinePlot({ data, variableLabel, xAxisTitle = "", yAxisTitle = "", showG
         </text>
       )}
       {showLegend && (
-        <g className="plot-legend">
-          <line x1={pad.left} y1="18" x2={pad.left + 26} y2="18" />
-          {showMarkers && <circle cx={pad.left + 13} cy="18" r="4" />}
-          <text x={pad.left + 34} y="22">
-            {variableLabel}
-          </text>
+        <g className={`plot-legend ${overlayLegend ? "plot-legend--overlay" : ""}`}>
+          {overlayLegend && (
+            <rect x={legendLeft} y={legendTop} width={legendWidth} height={legendHeight} rx="5" />
+          )}
+          {plottedSeries.map((item, index) => {
+            const y = overlayLegend ? legendTop + 18 + index * 20 : 18 + index * 18;
+            const x = overlayLegend ? legendLeft + 12 : pad.left + index * 140;
+            return (
+              <g key={`legend-${item.id}`}>
+                <line x1={x} y1={y} x2={x + 26} y2={y} style={{ stroke: item.color, strokeWidth: lineThickness }} />
+                {showMarkers && (
+                  <PlotMarker
+                    type={plotMarkerTypes[index % plotMarkerTypes.length]}
+                    x={x + 13}
+                    y={y}
+                    r={markerRadius}
+                    color={item.color}
+                  />
+                )}
+                <text x={x + 34} y={y + 4}>
+                  {item.label}
+                </text>
+              </g>
+            );
+          })}
         </g>
       )}
     </svg>
@@ -1661,6 +1871,47 @@ function MarkdownViewer({ text }) {
         <p key={`${index}-${block.slice(0, 16)}`}>{renderMarkdownInline(block)}</p>
       ))}
     </div>
+  );
+}
+
+function slugifyHeading(text) {
+  return String(text)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "section";
+}
+
+function parseHelpHeadings(text) {
+  const used = new Map();
+  return text.split(/\r?\n/)
+    .map((line) => {
+      const match = line.match(/^(#{1,2})\s+(.+)$/);
+      if (!match) return null;
+      const title = match[2].trim();
+      const baseId = slugifyHeading(title);
+      const count = used.get(baseId) ?? 0;
+      used.set(baseId, count + 1);
+      return {
+        id: count ? `${baseId}-${count + 1}` : baseId,
+        title,
+        level: match[1].length
+      };
+    })
+    .filter(Boolean);
+}
+
+function HelpSidebarControls({ headings }) {
+  return (
+    <section className="panel sidebar-panel">
+      <div className="panel-title">Help</div>
+      <nav className="help-nav" aria-label="Help headings">
+        {headings.map((heading) => (
+          <a key={heading.id} className={heading.level === 1 ? "help-nav-title" : ""} href={`#${heading.id}`}>
+            {heading.title}
+          </a>
+        ))}
+      </nav>
+    </section>
   );
 }
 
@@ -2152,13 +2403,22 @@ function parseGeometryXml(xmlText) {
 }
 
 function HelpDocument({ text }) {
+  const headings = parseHelpHeadings(text);
+  let headingIndex = 0;
+
   return (
     <section className="workspace-pane help-view">
       <article className="help-document">
         {text.split(/\r?\n/).filter((line) => line.trim()).map((line, index) => {
           const key = `${index}-${line.slice(0, 20)}`;
-          if (line.startsWith("# ")) return <h1 key={key}>{renderMarkdownInline(line.slice(2))}</h1>;
-          if (line.startsWith("## ")) return <h2 key={key}>{renderMarkdownInline(line.slice(3))}</h2>;
+          if (line.startsWith("# ")) {
+            const heading = headings[headingIndex++];
+            return <h1 id={heading?.id} key={key}>{renderMarkdownInline(line.slice(2))}</h1>;
+          }
+          if (line.startsWith("## ")) {
+            const heading = headings[headingIndex++];
+            return <h2 id={heading?.id} key={key}>{renderMarkdownInline(line.slice(3))}</h2>;
+          }
           if (line.startsWith("- ")) return <ul key={key}><li>{renderMarkdownInline(line.slice(2))}</li></ul>;
           return <p key={key}>{renderMarkdownInline(line)}</p>;
         })}
@@ -2467,6 +2727,7 @@ export default function App() {
   const resInput = useRef(null);
   const layoutInput = useRef(null);
   const graphClipboard = useRef(null);
+  const plotSvgRef = useRef(null);
   const dragUndoCaptured = useRef(false);
   const [nodes, setNodes, reactFlowOnNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, reactFlowOnEdgesChange] = useEdgesState(initialEdges);
@@ -2483,6 +2744,7 @@ export default function App() {
   const [selectedResVariable, setSelectedResVariable] = useState("");
   const [selectedResEntity, setSelectedResEntity] = useState("");
   const [plotMode, setPlotMode] = useState("hdf5");
+  const [plotSeriesSelections, setPlotSeriesSelections] = useState([]);
   const [plotFormat, setPlotFormat] = useState(defaultPlotFormat);
   const [cpValue, setCpValue] = useState("1267");
   const [fitViewTrigger, setFitViewTrigger] = useState(0);
@@ -2499,6 +2761,7 @@ export default function App() {
   const [originalGeometryFingerprint, setOriginalGeometryFingerprint] = useState("");
 
   const parsedRequirements = useMemo(() => parseRequirementSections(guiRequirementsMarkdown), []);
+  const helpHeadings = useMemo(() => parseHelpHeadings(guiHelpMarkdown), []);
 
   const selectedRequirement = useMemo(() => {
     return parsedRequirements.find((requirement) => requirement.id === selectedRequirementId) ?? parsedRequirements[0] ?? null;
@@ -2969,17 +3232,18 @@ export default function App() {
       setResults(parsed);
       setResResults(null);
       setPlotMode("hdf5");
+      setPlotSeriesSelections([]);
       setSelectedCircuit(firstCircuit);
       setSelectedPipe("__all__");
-      setSelectedVariable(
-        parsed.circuits[0]?.nodes.some((node) => Object.hasOwn(node, "ttemp_gues"))
-          ? "ttemp_gues"
-          : "temperature_from_tenth"
-      );
+      const nextVariable = parsed.circuits[0]?.nodes.some((node) => Object.hasOwn(node, "ttemp_gues"))
+        ? "ttemp_gues"
+        : "temperature_from_tenth";
+      setSelectedVariable(nextVariable);
       setPlotFormat((current) => ({
         ...current,
         xAxisTitle: "Node",
-        yAxisTitle: parsed.circuits[0]?.nodes.some((node) => Object.hasOwn(node, "ttemp_gues")) ? "Total temperature" : "Temperature"
+        yAxisTitle: parsed.circuits[0]?.nodes.some((node) => Object.hasOwn(node, "ttemp_gues")) ? "Total temperature" : "Temperature",
+        yUnit: defaultUnitForVariable(nextVariable)
       }));
       setResultsStatus(`Loaded ${file.name}`);
       setActiveWorkspace("postprocess");
@@ -3000,12 +3264,14 @@ export default function App() {
       setResResults(parsed);
       setResults(null);
       setPlotMode("res");
+      setPlotSeriesSelections([]);
       setSelectedResVariable(firstColumn?.variable ?? "");
       setSelectedResEntity(firstColumn?.entity ?? "");
       setPlotFormat((current) => ({
         ...current,
         xAxisTitle: "Time (s)",
-        yAxisTitle: firstColumn?.variable ?? ""
+        yAxisTitle: firstColumn?.variable ?? "",
+        yUnit: defaultUnitForVariable(firstColumn?.variable ?? "")
       }));
       setResultsStatus(
         `Loaded ${file.name}: ${parsed.rows.length} time step${parsed.rows.length === 1 ? "" : "s"}, ${parsed.columns.length} signal${parsed.columns.length === 1 ? "" : "s"}${parsed.skipped ? `, skipped ${parsed.skipped} malformed row${parsed.skipped === 1 ? "" : "s"}` : ""}`
@@ -3143,22 +3409,81 @@ export default function App() {
       .sort(naturalCompare);
   }, [resResults, selectedResVariable]);
 
-  const plotData = useMemo(() => {
+  const currentPlotSelection = useMemo(() => {
     if (plotMode === "res") {
-      const column = resResults?.columns.find((item) => item.variable === selectedResVariable && item.entity === selectedResEntity);
-      if (!resResults || !column) return [];
-
-      return resResults.rows
-        .map((row) => ({
-          label: String(row[resResults.timeIndex]),
-          xValue: row[resResults.timeIndex],
-          value: row[column.index]
-        }))
-        .filter((point) => Number.isFinite(point.xValue) && Number.isFinite(point.value));
+      if (!selectedResVariable || !selectedResEntity) return null;
+      return {
+        mode: "res",
+        id: resSeriesId({ variable: selectedResVariable, entity: selectedResEntity }),
+        variable: selectedResVariable,
+        entity: selectedResEntity,
+        label: `${selectedResVariable}: ${selectedResEntity}`
+      };
     }
 
-    return getPipeNodeSeries(activeCircuit, selectedVariable, selectedPipe, cpValue);
-  }, [activeCircuit, cpValue, plotMode, resResults, selectedPipe, selectedResEntity, selectedResVariable, selectedVariable]);
+    if (!selectedCircuit || !selectedVariable) return null;
+    const variableLabel = nodeVariables.find((variable) => variable.value === selectedVariable)?.label ?? selectedVariable;
+    return {
+      mode: "hdf5",
+      id: hdf5SeriesId({ circuitKey: selectedCircuit, pipeFilter: selectedPipe, variable: selectedVariable }),
+      circuitKey: selectedCircuit,
+      pipeFilter: selectedPipe,
+      variable: selectedVariable,
+      label: selectedPipe === "__all__" ? variableLabel : `${variableLabel}: ${selectedPipe}`
+    };
+  }, [plotMode, selectedCircuit, selectedPipe, selectedResEntity, selectedResVariable, selectedVariable]);
+
+  const activeSeriesSelections = useMemo(() => {
+    return plotSeriesSelections.filter((selection) => selection.mode === plotMode);
+  }, [plotMode, plotSeriesSelections]);
+
+  const effectiveSeriesSelections = useMemo(() => {
+    return activeSeriesSelections.length || !currentPlotSelection
+      ? activeSeriesSelections
+      : [currentPlotSelection];
+  }, [activeSeriesSelections, currentPlotSelection]);
+
+  const plotSeries = useMemo(() => {
+    return effectiveSeriesSelections.map((selection, index) => {
+      if (selection.mode === "res") {
+        const column = resResults?.columns.find((item) => item.variable === selection.variable && item.entity === selection.entity);
+        const data = !resResults || !column
+          ? []
+          : resResults.rows
+            .map((row) => ({
+              label: String(row[resResults.timeIndex]),
+              xValue: row[resResults.timeIndex],
+              value: row[column.index]
+            }))
+            .filter((point) => Number.isFinite(point.xValue) && Number.isFinite(point.value));
+        return { ...selection, color: plotColors[index % plotColors.length], data };
+      }
+
+      const circuit = results?.circuits.find((item) => item.key === selection.circuitKey) ?? null;
+      return {
+        ...selection,
+        color: plotColors[index % plotColors.length],
+        data: getPipeNodeSeries(circuit, selection.variable, selection.pipeFilter, cpValue)
+      };
+    });
+  }, [cpValue, effectiveSeriesSelections, resResults, results]);
+
+  const plotPointCount = plotSeries.reduce((count, item) => count + item.data.length, 0);
+  const selectedPlotVariable = currentPlotSelection?.variable ?? (plotMode === "res" ? selectedResVariable : selectedVariable);
+  const selectedUnitOptions = useMemo(() => unitOptionsForVariable(selectedPlotVariable), [selectedPlotVariable]);
+  const selectedUnit = selectedUnitOptions.some((option) => option.value === plotFormat.yUnit)
+    ? plotFormat.yUnit
+    : defaultUnitForVariable(selectedPlotVariable);
+  const displayPlotSeries = useMemo(() => {
+    return plotSeries.map((item) => ({
+      ...item,
+      data: item.data.map((point) => ({
+        ...point,
+        value: convertValueForUnit(point.value, selectedUnitOptions, selectedUnit)
+      }))
+    }));
+  }, [plotSeries, selectedUnit, selectedUnitOptions]);
+  const displayPrimarySeries = displayPlotSeries[0]?.data ?? [];
 
   const selectedVariableLabel = useMemo(() => {
     if (plotMode === "res") {
@@ -3167,6 +3492,51 @@ export default function App() {
 
     return nodeVariables.find((variable) => variable.value === selectedVariable)?.label ?? selectedVariable;
   }, [plotMode, selectedResEntity, selectedResVariable, selectedVariable]);
+
+  const displayYAxisTitle = labelWithUnit(plotFormat.yAxisTitle || selectedVariableLabel, selectedUnit);
+  const addCurrentPlotLine = () => {
+    if (!currentPlotSelection) return;
+    setPlotSeriesSelections((current) => {
+      if (current.some((selection) => selection.id === currentPlotSelection.id)) return current;
+      return [...current, currentPlotSelection];
+    });
+  };
+  const removePlotLine = (id) => {
+    setPlotSeriesSelections((current) => current.filter((selection) => selection.id !== id));
+  };
+  const exportPlotSvg = () => {
+    const svg = plotSvgRef.current;
+    if (!svg || !plotPointCount) return;
+
+    const clone = svg.cloneNode(true);
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
+    style.textContent = `
+      .line-plot{background:#fbfcfe}
+      .line-plot line{stroke:#98a2b3;stroke-width:1}
+      .line-plot .plot-grid line{stroke:#d8e0ec;stroke-width:1}
+      .line-plot .plot-grid--minor line{stroke:#edf1f7;stroke-width:.75}
+      .line-plot path{fill:none;stroke-linejoin:round;stroke-linecap:round}
+      .line-plot .plot-marker{fill:#fff;stroke-width:2}
+      .line-plot .plot-marker-line line{stroke-width:2;stroke-linecap:round}
+      .line-plot text{fill:#667085;font:11px Arial,sans-serif}
+      .line-plot .x-label{font-size:10px}
+      .line-plot .axis-title{fill:#344054;font-size:12px;font-weight:700}
+      .line-plot .plot-legend rect{fill:rgba(255,255,255,.88);stroke:#d8e0ec}
+      .line-plot .plot-legend text{fill:#344054;font-size:12px;font-weight:650}
+    `;
+    clone.insertBefore(style, clone.firstChild);
+
+    const svgText = new XMLSerializer().serializeToString(clone);
+    const url = URL.createObjectURL(new Blob([svgText], { type: "image/svg+xml;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    const name = (selectedVariableLabel || "plot").toLowerCase().replace(/[^a-z0-9_.-]+/g, "_").replace(/^_+|_+$/g, "") || "plot";
+    anchor.href = url;
+    anchor.download = `${name}.svg`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setResultsStatus(`Saved ${anchor.download}`);
+  };
 
   return (
     <div className="app-shell">
@@ -3311,6 +3681,7 @@ export default function App() {
         </>
         )}
         {activeWorkspace === "solver" && <SolverSidebarControls solver={solver} />}
+        {activeWorkspace === "help" && <HelpSidebarControls headings={helpHeadings} />}
         {activeWorkspace === "postprocess" && (
           <>
             <input
@@ -3368,7 +3739,18 @@ export default function App() {
 
                   <label>
                     Variable
-                    <select value={selectedVariable} onChange={(event) => setSelectedVariable(event.target.value)}>
+                    <select
+                      value={selectedVariable}
+                      onChange={(event) => {
+                        const nextVariable = event.target.value;
+                        setSelectedVariable(nextVariable);
+                        setPlotFormat((current) => ({
+                          ...current,
+                          yAxisTitle: nodeVariables.find((variable) => variable.value === nextVariable)?.label ?? nextVariable,
+                          yUnit: defaultUnitForVariable(nextVariable)
+                        }));
+                      }}
+                    >
                       {availableVariables.map((variable) => (
                         <option key={variable.value} value={variable.value}>
                           {variable.label}
@@ -3387,6 +3769,9 @@ export default function App() {
                       />
                     </label>
                   )}
+                  <button type="button" className="secondary-button secondary-button--inline" onClick={addCurrentPlotLine}>
+                    Add line
+                  </button>
                 </div>
               </section>
             )}
@@ -3404,7 +3789,11 @@ export default function App() {
                         const nextEntity = resResults.columns.find((column) => column.variable === nextVariable)?.entity ?? "";
                         setSelectedResVariable(nextVariable);
                         setSelectedResEntity(nextEntity);
-                        setPlotFormat((current) => ({ ...current, yAxisTitle: nextVariable }));
+                        setPlotFormat((current) => ({
+                          ...current,
+                          yAxisTitle: nextVariable,
+                          yUnit: defaultUnitForVariable(nextVariable)
+                        }));
                       }}
                     >
                       {resVariableOptions.map((variable) => (
@@ -3425,12 +3814,31 @@ export default function App() {
                       ))}
                     </select>
                   </label>
+                  <button type="button" className="secondary-button secondary-button--inline" onClick={addCurrentPlotLine}>
+                    Add line
+                  </button>
                 </div>
               </section>
             )}
 
             <section className="panel sidebar-panel">
               <div className="panel-title">Plot Format</div>
+              {activeSeriesSelections.length > 0 && (
+                <div className="plot-series-list">
+                  {activeSeriesSelections.map((selection, index) => (
+                    <div key={selection.id}>
+                      <span style={{ background: plotColors[index % plotColors.length] }} />
+                      <strong>{selection.label}</strong>
+                      <button type="button" onClick={() => removePlotLine(selection.id)}>
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  <button type="button" className="secondary-button secondary-button--inline" onClick={() => setPlotSeriesSelections((current) => current.filter((selection) => selection.mode !== plotMode))}>
+                    Clear lines
+                  </button>
+                </div>
+              )}
               <div className="plot-format-panel plot-format-panel--sidebar">
                 <label>
                   X title
@@ -3446,6 +3854,76 @@ export default function App() {
                     onChange={(event) => setPlotFormat((current) => ({ ...current, yAxisTitle: event.target.value }))}
                   />
                 </label>
+                <label>
+                  Y unit
+                  <select
+                    value={selectedUnit}
+                    onChange={(event) => setPlotFormat((current) => ({ ...current, yUnit: event.target.value }))}
+                  >
+                    {selectedUnitOptions.map((unit) => (
+                      <option key={unit.value} value={unit.value}>
+                        {unit.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  X decimals
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    step="1"
+                    value={plotFormat.xDecimals}
+                    onChange={(event) => setPlotFormat((current) => ({ ...current, xDecimals: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Y decimals
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    step="1"
+                    value={plotFormat.yDecimals}
+                    onChange={(event) => setPlotFormat((current) => ({ ...current, yDecimals: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Aspect
+                  <select
+                    value={plotFormat.aspectRatio}
+                    onChange={(event) => setPlotFormat((current) => ({ ...current, aspectRatio: event.target.value }))}
+                  >
+                    {Object.entries(plotAspectRatios).map(([value, option]) => (
+                      <option key={value} value={value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Line width
+                  <input
+                    type="number"
+                    min="1"
+                    max="8"
+                    step="0.5"
+                    value={plotFormat.lineThickness}
+                    onChange={(event) => setPlotFormat((current) => ({ ...current, lineThickness: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Pointer interval
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    step="1"
+                    value={plotFormat.pointerInterval}
+                    onChange={(event) => setPlotFormat((current) => ({ ...current, pointerInterval: event.target.value }))}
+                  />
+                </label>
                 <label className="toggle-label">
                   <input
                     type="checkbox"
@@ -3457,10 +3935,50 @@ export default function App() {
                 <label className="toggle-label">
                   <input
                     type="checkbox"
+                    checked={plotFormat.showMinorGrid}
+                    onChange={(event) => setPlotFormat((current) => ({ ...current, showMinorGrid: event.target.checked }))}
+                  />
+                  Minor gridlines
+                </label>
+                <label className="toggle-label">
+                  <input
+                    type="checkbox"
                     checked={plotFormat.showLegend}
                     onChange={(event) => setPlotFormat((current) => ({ ...current, showLegend: event.target.checked }))}
                   />
                   Legend
+                </label>
+                <label className="toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={plotFormat.overlayLegend}
+                    onChange={(event) => setPlotFormat((current) => ({ ...current, overlayLegend: event.target.checked }))}
+                  />
+                  Overlay legend
+                </label>
+                <label>
+                  Legend X
+                  <select
+                    value={plotFormat.legendX}
+                    onChange={(event) => setPlotFormat((current) => ({ ...current, legendX: event.target.value }))}
+                    disabled={!plotFormat.overlayLegend}
+                  >
+                    <option value="left">Left</option>
+                    <option value="middle">Middle</option>
+                    <option value="right">Right</option>
+                  </select>
+                </label>
+                <label>
+                  Legend Y
+                  <select
+                    value={plotFormat.legendY}
+                    onChange={(event) => setPlotFormat((current) => ({ ...current, legendY: event.target.value }))}
+                    disabled={!plotFormat.overlayLegend}
+                  >
+                    <option value="top">Top</option>
+                    <option value="middle">Middle</option>
+                    <option value="bottom">Bottom</option>
+                  </select>
                 </label>
                 <label className="toggle-label">
                   <input
@@ -3599,20 +4117,35 @@ export default function App() {
             <div className="plot-shell">
               <div className="results-header">
                 <h2>{selectedVariableLabel}</h2>
-                <span>{plotData.length} points</span>
+                <div className="results-header-actions">
+                  <span>{plotPointCount} points</span>
+                  <button type="button" className="secondary-button secondary-button--inline" onClick={exportPlotSvg} disabled={!plotPointCount}>
+                    Save plot
+                  </button>
+                </div>
               </div>
               <LinePlot
-                data={plotData}
+                series={displayPlotSeries}
+                svgRef={plotSvgRef}
                 variableLabel={selectedVariableLabel}
                 xAxisTitle={plotFormat.xAxisTitle}
-                yAxisTitle={plotFormat.yAxisTitle}
+                yAxisTitle={displayYAxisTitle}
+                xDecimals={plotFormat.xDecimals}
+                yDecimals={plotFormat.yDecimals}
+                aspectRatio={plotFormat.aspectRatio}
                 showGrid={plotFormat.showGrid}
+                showMinorGrid={plotFormat.showMinorGrid}
                 showLegend={plotFormat.showLegend}
+                overlayLegend={plotFormat.overlayLegend}
+                legendX={plotFormat.legendX}
+                legendY={plotFormat.legendY}
                 showMarkers={plotFormat.showMarkers}
+                lineThickness={Number(plotFormat.lineThickness) || defaultPlotFormat.lineThickness}
+                pointerInterval={Number(plotFormat.pointerInterval) || defaultPlotFormat.pointerInterval}
               />
-              {plotMode !== "res" && plotData.length > 0 && (
+              {plotMode !== "res" && displayPrimarySeries.length > 0 && (
                 <div className="data-table">
-                  {plotData.map((point) => (
+                  {displayPrimarySeries.map((point) => (
                     <div key={point.label}>
                       <span>{point.label}</span>
                       <strong>{point.value.toPrecision(7)}</strong>
