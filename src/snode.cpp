@@ -101,11 +101,10 @@ double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_he
   //     y = y + hslab->dval[0] * (this->temp_gues - hslab->dval[1].stemp_gues) * this->Ai * alpha_heat
   //           + this->heat_transfer_old * (1.0 - alpha_heat);
   //   }
-  //   else if (dvar == "hflux") {
-  //     // dval is a scalar heat flux per area
-  //     y = y - hslab->dval * this->Ai * alpha_heat * this->AFF
-  //           + this->heat_transfer_old * (1.0 - alpha_heat);
-  //   }
+    else if (dvar == "hflux") {
+      y = y - eval(hslab->dval) * Ai * alpha_heat * AFF;
+			// + heat_transfer_old*(1.-alpha_heat) 
+    }
     else {
       throw std::runtime_error(std::string("ht option not found. stopping: ") + dvar);
     }
@@ -160,10 +159,10 @@ double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_he
   //     double hA = h * this->Ai;
   //     y = y + alpha_heat * (Tw - Tf) * hA + (1.0 - alpha_heat) * this->heat_transfer_old;
   //   }
-  //   else if (uvar == "hflux") {
-  //     y = y - alpha_heat * hslab->uval * this->Ai * this->AFF
-  //           + (1.0 - alpha_heat) * this->heat_transfer_old;
-  //   }
+    else if (uvar == "hflux") {
+      y = y - alpha_heat * eval(hslab->uval) * Ai * AFF;
+			// + heat_transfer_old*(1.-alpha_heat) 
+    }
     else {
       throw std::runtime_error("ht option not found. stopping (uvar)");
     }

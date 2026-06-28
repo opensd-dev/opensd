@@ -15,19 +15,31 @@ class Geometry(list):
     Parameters
     ----------
     items : Iterable of opensd.Circuit, opensd.HeatSlab
-        Items (circuits or heatslabs) to add to the collection
+        Items (circuits or heatslabs) to add to the collection.
+    hslab : {None, "all"}
+        If set to "all", all heat slabs created with :class:`opensd.HSlab` are
+        added automatically if they are not already present.
 
     """
 
-    def __init__(self, items):
+    def __init__(self, items=(), hslab=None):
         super().__init__()
-        
+
+        items = list(items)
+        if hslab == "all":
+            items.extend(
+                registered_hslab for registered_hslab in HSlab._registry
+                if not any(registered_hslab is item for item in items)
+            )
+        elif hslab is not None:
+            raise ValueError("hslab must be None or 'all'")
+
         for item in items:
             super().append(item)
 
-            if type(item)==Circuit:
+            if isinstance(item, Circuit):
                 item.get_reference_prop()
-            elif type(item)==HSlab:
+            elif isinstance(item, HSlab):
                 item.get_reference_prop()
 
     def export_to_xml(self, path: PathLike = 'geometry.xml'):
