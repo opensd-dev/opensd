@@ -124,11 +124,11 @@ void Face::update_old() {
       ther_old->update();
     // }
 
-    // heat_hslab_old = heat_hslab;
+    heat_hslab_old = heat_hslab;
     heat_input_old = heat_input;
-    //
-    // if (upstream) upstream->update_old();
-    // if (downstream) downstream->update_old();
+
+    if (upstream) upstream->update_old();
+    if (downstream) downstream->update_old();
 }
 
 

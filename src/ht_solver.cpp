@@ -115,8 +115,6 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
     Eigen::MatrixXd A = Eigen::MatrixXd::Zero(n, n);
     Eigen::VectorXd b = Eigen::VectorXd::Zero(n);
 
-	alpha_heat = 1.0;
-	
     int i = -1;
     for (auto &layer : hslab->layers) {
       for (auto &node : layer->snodes) {
@@ -124,8 +122,8 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
         // East face
         if (node->eface != nullptr) {
           double aE  = alpha_heat * node->eface->A * node->eface->ther_gues->conductivity() / node->eface->delx;
-          // double aE0 = (1.0 - alpha_heat) * node->eface->A * node->eface->ther_old.conductivity() / node->eface->delx;
-          // b(i) -= (node->temp_old - node->eface->dnode->temp_old) * aE0;
+          double aE0 = (1.0 - alpha_heat) * node->eface->A * node->eface->ther_old->conductivity() / node->eface->delx;
+          b(i) -= (node->temp_old - node->eface->dnode->temp_old) * aE0;
           int col = i + hslab->ninc;
           if (col >= 0 && col < n) A(i, col) = -aE;
           A(i, i) = A(i, i) + aE;
@@ -134,8 +132,8 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
         // West face
         if (node->wface != nullptr) {
           double aW  = alpha_heat * node->wface->A * node->wface->ther_gues->conductivity() / node->wface->delx;
-          // double aW0 = (1.0 - alpha_heat) * node->wface->A * node->wface->ther_old.conductivity() / node->wface->delx;
-          // b(i) -= (node->temp_old - node->wface->unode->temp_old) * aW0;
+          double aW0 = (1.0 - alpha_heat) * node->wface->A * node->wface->ther_old->conductivity() / node->wface->delx;
+          b(i) -= (node->temp_old - node->wface->unode->temp_old) * aW0;
           int col = i - hslab->ninc;
           if (col >= 0 && col < n) A(i, col) = -aW;
           A(i, i) = A(i, i) + aW;
@@ -164,15 +162,15 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
 
         // Heat input and transient contribution
         b(i) = b(i) + alpha_heat * node->heat_input + (1.0 - alpha_heat) * node->heat_input_old;
-        // if (trans_sim) {
-          // b(i) = b(i) + node->ther_old.cpmass() * node->ther_old.rhomass() * node->volume / delt * node->temp_old;
-          // A(i, i) = A(i, i) + node->ther_gues.cpmass() * node->ther_gues.rhomass() * node->volume / delt;
-        // }
+        if (trans_sim) {
+          b(i) = b(i) + node->ther_old->cpmass() * node->ther_old->rhomass() * node->vol / delt * node->temp_old;
+          A(i, i) = A(i, i) + node->ther_gues->cpmass() * node->ther_gues->rhomass() * node->vol / delt;
+        }
   
         // Boundary conditions (uwnodes)
         if (std::find(hslab->uwnodes.begin(), hslab->uwnodes.end(), node) != hslab->uwnodes.end()) {
           auto [Ainc, binc] = exec_bc(hslab->uvar, hslab->uval, hslab->uval1, node->Ai, node, i); // exec_bc returns pair (Ainc,binc) - adapt to your implementation
-          b(i) = b(i) + alpha_heat * binc; // - (1.0 - alpha_heat) * node->heat_transfer_old;
+          b(i) = b(i) + alpha_heat * binc - (1.0 - alpha_heat) * node->heat_transfer_old;
           A(i, i) = A(i, i) + alpha_heat * Ainc;
         }
 
@@ -180,7 +178,7 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
         if (std::find(hslab->dwnodes.begin(), hslab->dwnodes.end(), node) != hslab->dwnodes.end()) {
           int bc_index = i - n + hslab->ninc; // as in Python
           auto [Ainc, binc] = exec_bc(hslab->dvar, hslab->dval, hslab->dval1, node->Ai, node, bc_index);
-          b(i) = b(i) + alpha_heat * binc; // - (1.0 - alpha_heat) * node->heat_transfer_old;
+          b(i) = b(i) + alpha_heat * binc - (1.0 - alpha_heat) * node->heat_transfer_old;
           A(i, i) = A(i, i) + alpha_heat * Ainc;
         }
       }
@@ -267,7 +265,7 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
     for (auto& layer : hslab->layers) {
       for (auto& snode : layer->snodes) {
   //       node->update_condeff();
-  //       node->update_heat_input(time, delt);
+        snode->heat_input = snode->heat_frac * layer->heat_input;
       }
     }
   } // end second pass over HSlabs
@@ -291,7 +289,7 @@ exec_bc(const std::string& bvar,
 
   if (bvar == "hflux") {
 
-    // binc = bval * A * wall_node->AFF;
+    binc = eval(bval) * A * wall_node->AFF;
 
   }
   else if (bvar == "conv") {
@@ -396,8 +394,8 @@ double exec_ht(const std::string& bvar,
         heat_transfer = eval(bval) * (wall_node->temp_gues - settings::T_ambient) * A;
 
     } else if (bvar == "hflux") {
-    //     heat_transfer = -std::any_cast<double>(bval[0]) * A * wall_node->AFF;
-    //
+        heat_transfer = -eval(bval) * A * wall_node->AFF;
+
     } else if (bvar == "node") {
     //     SNode* flow_node = std::any_cast<SNode*>(bval[1]);
     //     double h = wall_node->htc;

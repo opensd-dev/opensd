@@ -113,6 +113,14 @@ void read_settings_xml(pugi::xml_node root)
   no_flow_iter = stod(get_node_value(root, "no_flow_iter"));
   conv_crit_flow = stod(get_node_value(root, "conv_crit_flow"));
   conv_crit_temp_SS = stod(get_node_value(root, "conv_crit_temp_SS"));
+  if (check_for_node(root, "conv_crit_temp_trans")) {
+    conv_crit_temp_trans = stod(get_node_value(root, "conv_crit_temp_trans"));
+  } else {
+    conv_crit_temp_trans = conv_crit_temp_SS;
+  }
+  if (check_for_node(root, "conv_crit_ht")) {
+    conv_crit_ht = stod(get_node_value(root, "conv_crit_ht"));
+  }
   flag_write = get_node_value_bool(root, "flag_write");
   temp_solve = get_node_value_bool(root, "temp_solve");
 

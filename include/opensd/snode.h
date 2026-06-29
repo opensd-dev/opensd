@@ -41,11 +41,13 @@ public:
   double AFF;
   std::string solname;
 
+  double temp_old;
   double temp_gues;
 
   double heat_input;
   double heat_input_old;
   double heat_transfer;
+  double heat_transfer_old;
   double htc;
   
   // double esource;
@@ -70,7 +72,7 @@ public:
   double eqn_ener(double time, double delt, bool trans_sim, double alpha_ener);
   // void update_gues();
   void assign_prop();
-  // void update_old();
+  void update_old();
 
   // void save_to_hdf5(hid_t group_id) const;
   // void load_from_hdf5(hid_t group_id);

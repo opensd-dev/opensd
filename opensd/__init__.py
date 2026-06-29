@@ -8,5 +8,6 @@ from opensd.actions import *
 from opensd.tabular import *
 from opensd.conditions import *
 from opensd.initial_guess import *
+from opensd.post import *
 
 __version__ = '0.1.0'

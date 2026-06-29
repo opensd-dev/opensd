@@ -53,7 +53,7 @@ int opensd_run()
     
     bool trans_sim = settings::run_mode == RunMode::TRANSIENT;
     if (trans_sim) {
-      simulation::delt = settings::tim_slot[i] - settings::tim_slot[i-1];
+      simulation::delt = (i == 0) ? settings::tim_slot[i] : settings::tim_slot[i] - settings::tim_slot[i-1];
 	  settings::alpha_mom = 0.6;
     }
 	double alpha_mom = settings::alpha_mom;
@@ -99,12 +99,6 @@ int opensd_run()
         converged = (conv_global != 0);
 		simulation::time_convergence.stop();
 		
-		simulation::time_update_old.start();
-		if (converged) {
-			update_old();
-		}
-		simulation::time_update_old.stop();
-
         // if (flow_iter == 0) {
           // MPI_Abort(mpi::intracomm, 0);
           // std::exit(0);
@@ -168,11 +162,15 @@ int opensd_run()
       std::exit(EXIT_FAILURE);
     }
 
+    simulation::time_update_old.start();
+    update_old();
+    simulation::time_update_old.stop();
+
+    updateCalcs(simulation::current_time, simulation::delt);
+
     // for (auto& lmass : HTcomp.LumpedMass::_registry) {
       // lmass.update(time, delt);
     // }
-
-    // post.update_calcs(time, delt);
 
     if (settings::flag_write) {
 	if (mpi::rank == 0) {

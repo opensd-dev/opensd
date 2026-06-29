@@ -42,7 +42,7 @@ class Settings:
         self._tim_slot = [[0.,0.]]
         self._verbosity = 0
 
-        self._no_main_iter = 2500
+        self._no_main_iter = 3000
 
         self._conv_crit_flow=1.E-10
         self._no_flow_iter = 300
@@ -60,8 +60,7 @@ class Settings:
 
         self._show_warn = False
 
-        self._alpha_mom = 1.0
-        self._alpha_heat = np.array(0.6)
+        self._alpha_mom = 0.6
         self._alpha_ener = np.array(1.0)
         self._alpha_heat = np.array(1.0)
 
@@ -119,6 +118,8 @@ class Settings:
         self._create_T_ambient_subelement(element)
         self._create_conv_crit_flow_subelement(element)
         self._create_conv_crit_temp_SS_subelement(element)
+        self._create_conv_crit_temp_trans_subelement(element)
+        self._create_conv_crit_ht_subelement(element)
         
         # Clean the indentation in the file to be user-readable
         clean_indentation(element)
@@ -155,6 +156,14 @@ class Settings:
     def _create_conv_crit_temp_SS_subelement(self, root):
         elem = ET.SubElement(root, "conv_crit_temp_SS")
         elem.text = str(self._conv_crit_temp_SS)
+
+    def _create_conv_crit_temp_trans_subelement(self, root):
+        elem = ET.SubElement(root, "conv_crit_temp_trans")
+        elem.text = str(self._conv_crit_temp_trans)
+
+    def _create_conv_crit_ht_subelement(self, root):
+        elem = ET.SubElement(root, "conv_crit_ht")
+        elem.text = str(self._conv_crit_ht)
 
     def _create_alpha_ener_subelement(self, root):
         elem = ET.SubElement(root, "alpha_ener")
@@ -265,3 +274,22 @@ class Settings:
         cv.check_greater_than('conv_crit_temp_SS', conv_crit_temp_SS, 0)
         self._conv_crit_temp_SS = conv_crit_temp_SS
 
+    @property
+    def conv_crit_temp_trans(self) -> float:
+        return self._conv_crit_temp_trans
+
+    @conv_crit_temp_trans.setter
+    def conv_crit_temp_trans(self, conv_crit_temp_trans: float):
+        cv.check_type('conv_crit_temp_trans', conv_crit_temp_trans, Real)
+        cv.check_greater_than('conv_crit_temp_trans', conv_crit_temp_trans, 0)
+        self._conv_crit_temp_trans = conv_crit_temp_trans
+
+    @property
+    def conv_crit_ht(self) -> float:
+        return self._conv_crit_ht
+
+    @conv_crit_ht.setter
+    def conv_crit_ht(self, conv_crit_ht: float):
+        cv.check_type('conv_crit_ht', conv_crit_ht, Real)
+        cv.check_greater_than('conv_crit_ht', conv_crit_ht, 0)
+        self._conv_crit_ht = conv_crit_ht

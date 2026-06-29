@@ -27,6 +27,45 @@ class Action(object):
         self.distribution = distribution
         self.enabled = enabled
 
+    @staticmethod
+    def _target_id(target):
+        if target is None:
+            return ""
+        if isinstance(target, str):
+            return target
+        if hasattr(target, "identifier"):
+            return str(target.identifier)
+        if hasattr(target, "hslab") and hasattr(target.hslab, "identifier") and hasattr(target, "layerno"):
+            return f"{target.hslab.identifier}.layer{target.layerno}"
+        if callable(target) and hasattr(target, "__name__"):
+            return target.__name__
+        return str(target)
+
+    @staticmethod
+    def _as_list(value):
+        if isinstance(value, (list, tuple)):
+            return list(value)
+        return [value]
+
+    @classmethod
+    def _expand_targets(cls, targets, variables):
+        target_groups = cls._as_list(targets)
+        variable_groups = cls._as_list(variables)
+
+        if len(variable_groups) == 1 and len(target_groups) > 1:
+            variable_groups = variable_groups * len(target_groups)
+        if len(target_groups) != len(variable_groups):
+            raise ValueError("Action target and variable lists must have the same length")
+
+        expanded = []
+        for target, variable in zip(target_groups, variable_groups):
+            if isinstance(target, (list, tuple)):
+                for item in target:
+                    expanded.append((cls._target_id(item), str(variable)))
+            else:
+                expanded.append((cls._target_id(target), str(variable)))
+        return expanded
+
     def to_xml_element(self, element):
         """
         Converts this Action object to an XML subelement.
@@ -36,9 +75,21 @@ class Action(object):
 
         subelement = ET.SubElement(element, "action")
         subelement.set("identifier", self.identifier)
-        subelement.set("target", self.target)
-        subelement.set("variable", self.variable)
-        self.distribution.to_xml_element(subelement)
+
+        for target, variable in self._expand_targets(self.target, self.variable):
+            target_elem = ET.SubElement(subelement, "target")
+            target_elem.set("id", target)
+            target_elem.set("variable", variable)
+
+        if isinstance(self.distribution, str):
+            func_elem = ET.SubElement(subelement, "function")
+            func_elem.set("name", self.distribution)
+        else:
+            if len(subelement.findall("target")) == 1:
+                target_elem = subelement.find("target")
+                subelement.set("target", target_elem.get("id"))
+                subelement.set("variable", target_elem.get("variable"))
+            self.distribution.to_xml_element(subelement)
         return subelement
 
 

@@ -2,11 +2,17 @@
 
 #include "opensd/post.h"
 #include "opensd/circuit.h"
+#include "opensd/file_utils.h"
+#include "opensd/settings.h"
+
+#include <iostream>
 
 namespace opensd {
 
+namespace py = pybind11;
+
 std::ofstream f1;
-std::vector<Calculate*> Calculate::registry;
+std::vector<std::unique_ptr<Calculate>> Calculate::registry;
 
 // Map to access Node attributes by string
 std::unordered_map<std::string, std::function<double(const Node&)>> nodeAttributeMap = {
@@ -28,9 +34,48 @@ void openFile(const std::string& outputFile) {
 }
 
 
-Calculate::Calculate(double(*func)(const std::vector<double>&), const std::vector<std::string>& comps) {
-  // Assuming you have some initialization here
-  registry.push_back(this);
+Calculate::Calculate(pugi::xml_node node)
+{
+  identifier_ = node.attribute("identifier").as_string();
+  function_name_ = node.attribute("function").as_string();
+
+  for (auto comp : node.children("component")) {
+    component_ids_.push_back(comp.attribute("id").as_string());
+  }
+
+  py::gil_scoped_acquire gil;
+  py::module sys = py::module::import("sys");
+  sys.attr("path").attr("insert")(0, ".");
+  py::module scripts = py::module::import("scripts");
+  callable_ = scripts.attr(function_name_.c_str());
+  if (!PyCallable_Check(callable_.ptr())) {
+    throw std::runtime_error("Post calculation function '" + function_name_ + "' is not callable");
+  }
+}
+
+void Calculate::update(double time, double delt)
+{
+  py::gil_scoped_acquire gil;
+  py::module scripts = py::module::import("scripts");
+  scripts.attr("time") = time;
+  scripts.attr("delt") = delt;
+
+  py::object result;
+  if (component_ids_.empty()) {
+    result = callable_();
+  } else {
+    py::module bindings = py::module::import("bindings");
+    py::tuple args(component_ids_.size());
+    for (size_t i = 0; i < component_ids_.size(); ++i) {
+      args[i] = bindings.attr("get_comp")(component_ids_[i]);
+    }
+    result = callable_(*args);
+  }
+
+  if (!result.is_none()) {
+    val = result.cast<double>();
+    timeSeries.push_back(val);
+  }
 }
 
 void writeOutput(double time, double delt) {
@@ -97,11 +142,33 @@ void writeValue(double time, double delt) {
   f1.flush();
 }
 
-// void updateCalcs(double time, double delt) {
-  // for (auto& calc : Calculate::registry) {
-    // calc->timeSeries.push_back(time);
-    // calc->timeSeries.push_back(calc->val);
-  // }
-// }
+void updateCalcs(double time, double delt) {
+  for (auto& calc : Calculate::registry) {
+    calc->update(time, delt);
+  }
+}
+
+void read_post_xml()
+{
+  std::string filename = settings::path_input + "post.xml";
+  if (!file_exists(filename)) {
+    return;
+  }
+
+  pugi::xml_document doc;
+  if (!doc.load_file(filename.c_str())) {
+    throw std::runtime_error("Error: cannot open post.xml");
+  }
+
+  read_post_xml(doc.child("post"));
+}
+
+void read_post_xml(pugi::xml_node root)
+{
+  Calculate::registry.clear();
+  for (auto calc_node : root.children("calculate")) {
+    Calculate::registry.push_back(std::make_unique<Calculate>(calc_node));
+  }
+}
 
 } // namespace opensd

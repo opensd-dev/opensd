@@ -55,7 +55,7 @@ public:
 //   double spres_gues;
   double temp_gues;
   SFaceTher* ther_gues;
-//   FaceTher* ther_old;
+  SFaceTher* ther_old;
 //
 //   Connection* upstream;
 //   Connection* downstream;
@@ -74,6 +74,7 @@ public:
 //   void update_statevar();
 //   void update_staticpres();
   void update_temp();
+  void update_old();
 //   virtual void update_gues();
 //   void assign_prop();
 //   virtual void update_old();

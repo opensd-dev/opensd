@@ -24,7 +24,7 @@ namespace opensd {
 SFace::SFace(std::string identifier, std::shared_ptr<SNode> unode, std::shared_ptr<SNode> dnode, double A)
     : identifier(identifier), unode(unode), dnode(dnode), A(A) {
 
-  // ther_old = new FaceTher(this);
+  ther_old = new SFaceTher(this);
   ther_gues = new SFaceTher(this);
 
   delx1 = unode->layer->delx;
@@ -40,6 +40,10 @@ void SFace::update_temp(){
     + dnode->temp_gues * dnode->ther_gues->conductivity() * delx1 )
     / ( unode->ther_gues->conductivity() * delx2
       + dnode->ther_gues->conductivity() * delx1 );
+}
+
+void SFace::update_old() {
+  ther_old->update_old();
 }
 
 // void Face::update_statevar(){

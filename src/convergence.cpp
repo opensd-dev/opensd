@@ -57,7 +57,13 @@ std::tuple<bool, double, double, double, double> check_conv(double time, double 
     simulation::time_conv_mom.stop();
 
     for (auto& pipe : circuit->pipes) {
-      // pipe.update_mflow();
+      if (!pipe->faces.empty()) {
+        double total_mflow = 0.0;
+        for (auto& face : pipe->faces) {
+          total_mflow += face->mflow;
+        }
+        pipe->mflow = total_mflow / pipe->faces.size();
+      }
     }
     for (auto& face : circuit->faces_owned) {
       // std::cout << "rank " << mpi::rank << " vflow face " << face->faceno << " " << face->ther_gues->rhomass() << std::endl;
@@ -136,7 +142,7 @@ std::tuple<bool, double, double, double, double> check_conv(double time, double 
         hslab->mean_ht =  std::accumulate(hslab->htlist.begin(), hslab->htlist.end(), 0.0) / hslab->htlist.size();
 
         double max_eps_t = *std::max_element(hslab->eps_tlist.begin(),
-                                            hslab->eps_tlist.end());
+                                             hslab->eps_tlist.end());
 
         eps_t = (hslab->mean_ht < 1.0 && max_eps_t < 1.0)
                   ? 0.0
@@ -217,6 +223,20 @@ void update_old() {
     }
     
 	}
+
+    for (auto& hslab : model::hslabs) {
+      for (auto& layer : hslab->layers) {
+        for (auto& snode : layer->snodes) {
+          snode->update_old();
+        }
+        for (auto& iface : layer->ifaces) {
+          iface->update_old();
+        }
+        for (auto& jface : layer->jfaces) {
+          jface->update_old();
+        }
+      }
+    }
 }
 
 }

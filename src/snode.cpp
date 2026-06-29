@@ -25,7 +25,9 @@ namespace opensd {
 //==============================================================================
 
 SNode::SNode(std::string identifier)
-    : identifier(identifier), heat_input(0.0),heat_input_old(0.0), htc(0.0) {
+    : identifier(identifier), temp_old(0.0), temp_gues(0.0),
+      heat_input(0.0), heat_input_old(0.0),
+      heat_transfer(0.0), heat_transfer_old(0.0), htc(0.0) {
 
 }
 
@@ -33,24 +35,23 @@ SNode::SNode(std::string identifier)
 // SNode class method
 double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_heat) {
   // Start: combine heat input terms
-  double y = - alpha_heat * heat_input; // - (1.0 - alpha_heat) * heat_input_old;
+  double y = -alpha_heat * heat_input - (1.0 - alpha_heat) * heat_input_old;
 
   // Transient term (mass * cp * dT / dt)
-  // if (trans_sim) {
-  //   double cp_avg = 0.5 * (this->ther_old.cpmass() + this->ther_gues.cpmass());
-  //   y += cp_avg * ( this->ther_gues.rhomass() * this->temp_gues
-  //                 - this->ther_old.rhomass() * this->temp_old )
-  //        * this->volume / delt;
-  // }
+  if (trans_sim) {
+    double cp_avg = 0.5 * (ther_old->cpmass() + ther_gues->cpmass());
+    y += cp_avg * (ther_gues->rhomass() * temp_gues
+                 - ther_old->rhomass() * temp_old) * vol / delt;
+  }
 
   // EAST face conduction or boundary condition
   if (eface != nullptr) {
 
     y = ( y
          - alpha_heat * eface->A * eface->ther_gues->conductivity()
-             * ( eface->dnode->temp_gues - temp_gues ) / eface->delx);
-         // - (1.0 - alpha_heat) * eface->A * eface->ther_old->conductivity()
-         //     * ( eface->dnode->temp_old - temp_old ) / eface->delx );
+             * ( eface->dnode->temp_gues - temp_gues ) / eface->delx
+         - (1.0 - alpha_heat) * eface->A * eface->ther_old->conductivity()
+             * ( eface->dnode->temp_old - temp_old ) / eface->delx );
   // std::cout<<" flag2 "<<y<< " " << eface->ther_gues->conductivity()<<" "<< eface->dnode->temp_gues << " " << temp_gues << std::endl;
   // std::exit(0);
   }
@@ -87,13 +88,14 @@ double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_he
   //
       double Tf = flow_elem->stemp_gues;
       double hA = h * Ai;
-      y = y + alpha_heat * (temp_gues - Tf) * hA; // + (1.0 - alpha_heat) * heat_transfer_old;
+      y = y + alpha_heat * (temp_gues - Tf) * hA + (1.0 - alpha_heat) * heat_transfer_old;
       // std::cout<<" flag3 "<<y<< " " << alpha_heat<<" "<< Tf << " " << temp_gues << std::endl;
 
     }
     else if (dvar == "conv") {
       // dval[0] is h coefficient, dval[1] is reference temperature
-      y = y + eval(hslab->dval) * (temp_gues - settings::T_ambient) * Ai * alpha_heat; //hslab->dval1
+      y = y + eval(hslab->dval) * (temp_gues - settings::T_ambient) * Ai * alpha_heat
+            + heat_transfer_old * (1.0 - alpha_heat); //hslab->dval1
             // + this->heat_transfer_old * (1.0 - alpha_heat);
     }
   //   else if (dvar == "node") {
@@ -102,8 +104,8 @@ double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_he
   //           + this->heat_transfer_old * (1.0 - alpha_heat);
   //   }
     else if (dvar == "hflux") {
-      y = y - eval(hslab->dval) * Ai * alpha_heat * AFF;
-			// + heat_transfer_old*(1.-alpha_heat) 
+      y = y - eval(hslab->dval) * Ai * alpha_heat * AFF
+            + heat_transfer_old * (1.0 - alpha_heat);
     }
     else {
       throw std::runtime_error(std::string("ht option not found. stopping: ") + dvar);
@@ -115,9 +117,9 @@ double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_he
 
     y = ( y
          + alpha_heat * wface->A * wface->ther_gues->conductivity()
-             * ( temp_gues - wface->unode->temp_gues ) / wface->delx);
-         // + (1.0 - alpha_heat) * this->wface->A * this->wface->ther_old.conductivity()
-         //     * ( this->temp_old - this->wface->unode->temp_old ) / this->wface->delx );
+             * ( temp_gues - wface->unode->temp_gues ) / wface->delx
+         + (1.0 - alpha_heat) * wface->A * wface->ther_old->conductivity()
+             * ( temp_old - wface->unode->temp_old ) / wface->delx );
     // std::cout<<" flag4 "<<y<< " " << wface->ther_gues->conductivity()<<" "<< wface->unode->temp_gues << " " << temp_gues << std::endl;
   }
   else {
@@ -143,12 +145,13 @@ double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_he
   //
       double Tf = flow_elem->stemp_gues;
       double hA = h * Ai;
-      y = y + alpha_heat * (temp_gues - Tf) * hA; // + (1.0 - alpha_heat) * this->heat_transfer_old;
+      y = y + alpha_heat * (temp_gues - Tf) * hA + (1.0 - alpha_heat) * heat_transfer_old;
 
       // std::cout<<" flag5 "<<y<< " " << alpha_heat<<" "<< Tf << " " << temp_gues << std::endl;
     }
     else if (uvar == "conv") {
-      y = y + alpha_heat * eval(hslab->uval) * (temp_gues - settings::T_ambient) * Ai; //hslab->uval1
+      y = y + alpha_heat * eval(hslab->uval) * (temp_gues - settings::T_ambient) * Ai
+            + (1.0 - alpha_heat) * heat_transfer_old; //hslab->uval1
             // + (1.0 - alpha_heat) * this->heat_transfer_old;
     }
   //   else if (uvar == "node") {
@@ -160,8 +163,8 @@ double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_he
   //     y = y + alpha_heat * (Tw - Tf) * hA + (1.0 - alpha_heat) * this->heat_transfer_old;
   //   }
     else if (uvar == "hflux") {
-      y = y - alpha_heat * eval(hslab->uval) * Ai * AFF;
-			// + heat_transfer_old*(1.-alpha_heat) 
+      y = y - alpha_heat * eval(hslab->uval) * Ai * AFF
+            + heat_transfer_old * (1.0 - alpha_heat);
     }
     else {
       throw std::runtime_error("ht option not found. stopping (uvar)");
@@ -208,6 +211,15 @@ void SNode::assign_prop() {
     }
   }
   if (!found) fatal_error(fmt::format("Could not find solid '{}'", solname));
+}
+
+void SNode::update_old() {
+  temp_old = temp_gues;
+  heat_transfer_old = heat_transfer;
+  heat_input_old = heat_input;
+  if (ther_old) {
+    ther_old->update(temp_old);
+  }
 }
       // }
 

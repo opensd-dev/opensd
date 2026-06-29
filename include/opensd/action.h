@@ -1,34 +1,27 @@
 #ifndef OPENSD_ACTION_H
 #define OPENSD_ACTION_H
 
-#include <string>
-#include <memory>
-#include <vector>
 #include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include <pugixml.hpp>
-#include "opensd/circuit.h"
+#include <pybind11/pybind11.h>
+
 #include "opensd/bc.h"
+#include "opensd/circuit.h"
 #include "opensd/node.h"
+
+namespace py = pybind11;
 
 namespace opensd {
 
-//==============================================================================
-// Forward declarations
-//==============================================================================
-
 class Action;
-
-//==============================================================================
-// Global variables
-//==============================================================================
 
 namespace model {
 extern std::vector<std::unique_ptr<Action>> actions;
 }  // namespace model
-
-//==============================================================================
-//! Class representing a user-defined action (e.g., ramp, step, constant input)
-//==============================================================================
 
 class Action {
 public:
@@ -37,38 +30,42 @@ public:
     double value;
   };
 
-  // Constructor
   explicit Action(pugi::xml_node node);
 
-  // Update function called each timestep
   void update(double t, double dt) const;
 
-  // Accessors
   const std::string& identifier() const { return identifier_; }
   const std::string& target() const { return target_; }
   const std::string& variable() const { return variable_; }
   const std::string& interp() const { return interp_; }
 
 private:
-  // Data
+  enum class DistributionType {
+    TABULAR,
+    FUNCTION
+  };
+
+  struct TargetBinding {
+    std::string target;
+    std::string variable;
+    std::function<void(double)> setter;
+  };
+
   std::string identifier_;
   std::string target_;
   std::string variable_;
   std::string interp_;
+  DistributionType distribution_type_ {DistributionType::TABULAR};
   std::vector<Point> points_;
+  std::vector<TargetBinding> targets_;
+  py::object py_callable_;
 
-  // Resolved target object
-  Node* obj_ {nullptr};
-  std::function<void(Node*, double)> setter_;
-
-  // Internal helpers
   double value_at(double t) const;
-  void link_target();  // resolves target_ → obj_ + setter_
+  TargetBinding make_target_binding(const std::string& target,
+                                    const std::string& variable,
+                                    bool required) const;
+  void apply_function_result(const py::object& result) const;
 };
-
-//==============================================================================
-// XML readers
-//==============================================================================
 
 void read_actions_xml();
 void read_actions_xml(pugi::xml_node root);

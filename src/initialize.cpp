@@ -15,6 +15,7 @@
 #include "opensd/message_passing.h"
 #include "opensd/openmp_interface.h"
 #include "opensd/output.h"
+#include "opensd/post.h"
 #include "opensd/string_utils.h"
 #include <petscsys.h>
 
@@ -267,6 +268,7 @@ void read_separate_xml_files()
   // read_conditions_xml();
 
   read_actions_xml();  // <— Add here
+  read_post_xml();
 
   for (const auto& a : opensd::model::actions) {
     std::cout << "Action: " << a->identifier()

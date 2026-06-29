@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
+#include <numeric>
 
 #include "opensd/hslab.h"
 #include "opensd/circuit.h"
@@ -466,15 +467,55 @@ void initialize_hslabs() {
   		snode->assign_prop();
   		// node->update_gues();
   	  }
-  	  for (auto& sface : layer->ifaces) {
-  		// face->assign_statevar();
-  		// face->assign_prop();
-  		// face->update_gues();
-        sface->ther_gues->update();
-  
-  	  }
-  	  for (auto& face : layer->jfaces) {
+    }
 
+    std::vector<double> reference_temps;
+    for (size_t i = 0; i < hslab->uwnodes.size(); ++i) {
+      auto& snode = hslab->uwnodes[i];
+      if ((hslab->uvar == "pipe" || hslab->uvar == "pipenl") && i < hslab->uval1.size()) {
+        snode->temp_old = hslab->uval1[i]->stemp_gues;
+      } else {
+        snode->temp_old = settings::T_ambient;
+      }
+      reference_temps.push_back(snode->temp_old);
+    }
+
+    for (size_t i = 0; i < hslab->dwnodes.size(); ++i) {
+      auto& snode = hslab->dwnodes[i];
+      if ((hslab->dvar == "pipe" || hslab->dvar == "pipenl") && i < hslab->dval1.size()) {
+        snode->temp_old = hslab->dval1[i]->stemp_gues;
+      } else {
+        snode->temp_old = settings::T_ambient;
+      }
+      reference_temps.push_back(snode->temp_old);
+    }
+
+    double tref = settings::T_ambient;
+    if (!reference_temps.empty()) {
+      tref = std::accumulate(reference_temps.begin(), reference_temps.end(), 0.0)
+             / reference_temps.size();
+    }
+
+    for (auto& layer : hslab->layers) {
+      for (auto& snode : layer->snodes) {
+        if (snode->temp_old == 0.0) {
+          snode->temp_old = tref;
+        }
+        snode->temp_gues = snode->temp_old;
+        snode->heat_transfer = 0.0;
+        snode->heat_transfer_old = 0.0;
+        snode->ther_old->update(snode->temp_old);
+        snode->ther_gues->update(snode->temp_gues);
+      }
+      for (auto& sface : layer->ifaces) {
+        sface->ther_old->update_old();
+        sface->ther_gues->update();
+        sface->update_temp();
+      }
+      for (auto& face : layer->jfaces) {
+        face->ther_old->update_old();
+        face->ther_gues->update();
+        face->update_temp();
       }
     }
   }
