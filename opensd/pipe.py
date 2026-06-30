@@ -60,10 +60,10 @@ class Pipe(object):
             # self.nodes[i].ofaces.append(self.faces[i+1])
 
         # unode.ofaces.append(self.faces[0])
-        unode.volume = unode.volume + 0.5*delx*cfarea
+        unode.volume = unode.volume + 0.5*delx*self.cfarea
 
         # dnode.ifaces.append(self.faces[-1])
-        dnode.volume = dnode.volume + 0.5*delx*cfarea
+        dnode.volume = dnode.volume + 0.5*delx*self.cfarea
         
         self.mflow = 0.
         
