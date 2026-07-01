@@ -57,6 +57,7 @@ HSlab::HSlab(pugi::xml_node hslab_node)
   dvar = get_node_value(hslab_node, "dvar");
   ucompid = get_node_value(hslab_node, "ucomp");
   dcompid = get_node_value(hslab_node, "dcomp");
+  config = hslab_node.attribute("config").as_string("");
 
 
   std::string type = get_node_value(hslab_node, "utype");
@@ -191,8 +192,7 @@ void discretize_layers() {
     std::cout << "Downstream Pipe not found." << std::endl;
   }
 
-  std::string config = "counter";
-  if (config == "counter") {
+  if (hslab->config == "counter") {
     hslab->dval1.assign(hslab->dpipe->faces.rbegin(),
                 hslab->dpipe->faces.rbegin() + hslab->dpipe->ncell);
   } else {
@@ -228,7 +228,12 @@ void discretize_layers() {
 	  	  
 	  double dely = thk_cros/ninc;
 
-      std::vector<double> AFF(ninc, 1.0 / ninc);
+      std::vector<double> AFF = layer->AFF;
+      if (AFF.empty()) {
+        AFF.assign(ninc, 1.0 / ninc);
+      } else if (static_cast<int>(AFF.size()) != ninc) {
+        fatal_error("Layer AFF length does not match hslab ninc: " + hslab->identifier);
+      }
 
       layer->snodes.clear();
       hslab->dwnodes.clear();

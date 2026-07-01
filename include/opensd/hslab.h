@@ -47,6 +47,7 @@ public:
   std::string dvar;
   std::string ucompid;
   std::string dcompid;
+  std::string config;
   Input uval;
   vector<std::shared_ptr<Face>> uval1;
   vector<std::shared_ptr<Face>> dval1;

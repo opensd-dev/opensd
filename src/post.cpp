@@ -20,8 +20,8 @@ std::unordered_map<std::string, std::function<double(const Node&)>> nodeAttribut
   {"spres_gues", &Node::spres_gues},
   {"ttemp_gues", &Node::ttemp_gues},
   {"tenth_gues", &Node::tenth_gues},
-  // {"msource", &Node::msource},
-  // {"esource", &Node::esource},
+  {"msource", &Node::msource},
+  {"esource", &Node::esource},
   // {"volume", &Node::volume},
   // {"velocity", &Node::velocity},
   // Add other mappings as needed
@@ -108,6 +108,9 @@ void writeHeader() {
       }
     }
   }
+  for (const auto& calc : Calculate::registry) {
+    f1 << "," << calc->identifier();
+  }
   f1 << '\n';
 }
 
@@ -137,6 +140,9 @@ void writeValue(double time, double delt) {
         }
       }
     }
+  }
+  for (const auto& calc : Calculate::registry) {
+    f1 << std::setprecision(8) << calc->val << ",";
   }
   f1 << '\n';
   f1.flush();

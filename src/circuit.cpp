@@ -237,7 +237,7 @@ void discretize_pipes() {
       double ufrac;
       double dfrac;
       // double delz = 0.;
-      double fricopt;
+      double fricopt = pipe->fricopt;
 
       for (int i = 0; i < pipe->ncell; ++i) {
         if (i == 0 && pipe->ncell == 1) {

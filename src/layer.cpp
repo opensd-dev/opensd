@@ -29,6 +29,9 @@ Layer::Layer(pugi::xml_node layer_node)
 	heat_input = stod(get_node_value(layer_node, "heat_input"));
     solname  = get_node_value(layer_node, "solname");
     sollib   = get_node_value(layer_node, "sollib");
+    if (layer_node.attribute("AFF") || layer_node.child("AFF")) {
+      AFF = get_node_array<double>(layer_node, "AFF");
+    }
 
   } else {
     fatal_error("Must specify layerno of hslab layer in geometry XML file.");

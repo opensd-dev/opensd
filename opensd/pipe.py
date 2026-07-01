@@ -22,6 +22,7 @@ class Pipe(object):
         self.npar = npar
         self.qcrit = qcrit
         self.Kforward_old = self.Kforward = Kforward
+        self.fricopt = fricopt
 
         delx = length/ncell
         delz = (dnode.elevation - unode.elevation)/ncell
@@ -81,8 +82,10 @@ class Pipe(object):
         subelement.set("unode",      str(self.unode.identifier))
         subelement.set("dnode",      str(self.dnode.identifier))
         subelement.set("roughness",  str(self.roughness))
+        subelement.set("fricopt",    str(self.fricopt))
         subelement.set("cfarea",     str(self.cfarea))
         subelement.set("heat_input", str(self.heat_input))
+        subelement.set("Kforward",   str(self.Kforward))
 
 class Wall(object):
     def __init__(self,thk,solname,sollib,restraint):

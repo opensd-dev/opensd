@@ -159,21 +159,18 @@ PFace::PFace(int faceno, std::shared_ptr<Pipe> pipe, std::shared_ptr<Node> unode
 
 double PFace::eqn_mom(double x, double time, double delt, bool trans_sim, double alpha_mom) {
   double delp_fr = fricfact_gues * delx * ther_gues->rhomass() * x * std::abs(x) / (2. * diameter * cfarea * cfarea);
-/*  if (faceno == 0) {
-    delp_fr += pipe.Kforward * ther_gues.rhomass() * x * std::abs(x) / (2. * cfarea * cfarea);
+  if (faceno == 0) {
+    delp_fr += pipe->Kforward * ther_gues->rhomass() * x * std::abs(x) / (2. * cfarea * cfarea);
   }
-*/
   double delp_gr = ther_gues->rhomass() * grav * delz; 
   double term_old = ((1. - alpha_mom) * ((downstream->tpres_old - upstream->tpres_old) //
                     - vflow_old * vflow_old / (2. * cfarea * cfarea) * 0. //(downstream.rhomass_old - upstream.rhomass_old)
                     + ther_old->rhomass() * grav * delz
                     + fricfact_old * delx * ther_old->rhomass() * vflow_old * std::abs(vflow_old) / (2. * diameter * cfarea * cfarea)));
 
-/*
   if (faceno == 0) {
-    Term_old += (1. - alpha_mom) * pipe.Kforward_old * ther_old.rhomass() * vflow_old * std::abs(vflow_old) / (2. * cfarea * cfarea);
+    term_old += (1. - alpha_mom) * pipe->Kforward_old * ther_old->rhomass() * vflow_old * std::abs(vflow_old) / (2. * cfarea * cfarea);
   }
-*/
 
   double y = (trans_sim * delx * ther_gues->rhomass() * (x - vflow_old) / (delt * cfarea)
             + alpha_mom * (downstream->tpres_gues - upstream->tpres_gues
@@ -223,10 +220,11 @@ void PFace::update_abcoef(double time, double delt, double trans_sim, double alp
                  (trans_sim * (vflow_gues - vflow_old) / (cfarea * delt) + 0.0 * alpha_mom * 9.81 * delz / delx + alpha_mom * (fricfact_gues / diameter) * vflow_gues * fabs(vflow_gues) / (2 * pow(cfarea, 2)))))
              / dr);
 
-    // if (faceno == 0) {
-      // aplus += (spres_gues / tpres_gues * 0.5 * ther_gues.drho_dp_consth() *
-                // alpha_mom * pipe.Kforward * vflow_gues * fabs(vflow_gues) / (2 * pow(cfarea, 2))) / dr;
-    // }
+    if (faceno == 0) {
+      aplus += (spres_gues / tpres_gues * 0.5 * ther_gues->drho_dp_consth()
+                * alpha_mom * pipe->Kforward * vflow_gues * fabs(vflow_gues)
+                / (2 * pow(cfarea, 2))) / dr;
+    }
 
     double B = 0.;
     // if (unode.ther_gues.phase() == 6) {
@@ -240,10 +238,11 @@ void PFace::update_abcoef(double time, double delt, double trans_sim, double alp
                   (trans_sim * (vflow_gues - vflow_old) / (cfarea * delt) + 0.0 * alpha_mom * 9.81 * delz / delx + alpha_mom * fricfact_gues * vflow_gues * fabs(vflow_gues) / (2 * diameter * pow(cfarea, 2)))))
               / dr);
     
-    // if (faceno == 0) {
-      // aminus -= (spres_gues / tpres_gues * 0.5 * dnode.ther_gues.drho_dp_consth() *
-                 // alpha_mom * pipe.Kforward * vflow_gues * fabs(vflow_gues) / (2 * pow(cfarea, 2))) / dr;
-    // }
+    if (faceno == 0) {
+      aminus -= (spres_gues / tpres_gues * 0.5 * ther_gues->drho_dp_consth()
+                 * alpha_mom * pipe->Kforward * vflow_gues * fabs(vflow_gues)
+                 / (2 * pow(cfarea, 2))) / dr;
+    }
 
     bplus = bminus = spres_gues / tpres_gues * 0.5 * ther_gues->drho_dp_consth();
 
@@ -295,6 +294,10 @@ void PFace::update_Re() {
 }
 
 void PFace::update_fricfact() {
+  if (fricopt > 0.0) {
+    fricfact_gues = fricopt;
+    return;
+  }
   // fricfact_gues = 0.032;
   // if (fricopt == "HW") {
     // fricfact_gues = 10.78 * M_PI * M_PI * constants::grav / 8.0 * std::pow(diameter, 0.13) /

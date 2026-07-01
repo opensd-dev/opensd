@@ -36,6 +36,7 @@ public:
   double darea;
   double heat_input;
   double delx;
+  vector<double> AFF;
 
   // double mresidue;
   vector<std::shared_ptr<SFace>> ifaces;

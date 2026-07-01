@@ -411,6 +411,8 @@ class HSlab:
         element.set("dtype",  str(self.dtype))
         element.set("uarea", str(self.uarea))
         element.set("ninc", str(self.ninc))
+        if self.config is not None:
+            element.set("config", str(self.config))
 
         # if self.solveSS:
         #     element.set("solveSS", "true")
@@ -514,6 +516,7 @@ class Layer(object):
             else:
                 self.epsbar = 1./(1./eps1+1./eps2-1.)
         self.heat_input = heat_input
+        self.AFF = np.asarray(AFF, dtype=float)
 
         self.nodes=[] #nodes creation
         self.hslab.dwnodes=[]
@@ -641,6 +644,7 @@ class Layer(object):
         subelement.set("nnodes", str(self.nnodes))
         subelement.set("darea", str(self.darea))
         subelement.set("heat_input", str(self.heat_input))
+        subelement.set("AFF", " ".join(str(x) for x in self.AFF))
 
 class Face(object):
     def __init__(self,identifier,unode,dnode,A):

@@ -45,6 +45,7 @@ public:
   double mflow;
   double cfarea;
   double roughness;
+  double fricopt;
 
   void save_to_hdf5(hid_t group_id) const;
   void load_from_hdf5(hid_t group_id);
