@@ -54,9 +54,12 @@ int opensd_run()
     bool trans_sim = settings::run_mode == RunMode::TRANSIENT;
     if (trans_sim) {
       simulation::delt = (i == 0) ? settings::tim_slot[i] : settings::tim_slot[i] - settings::tim_slot[i-1];
-	  settings::alpha_mom = 0.6;
+    } else {
+      simulation::delt = 1.0E8;
     }
-	double alpha_mom = settings::alpha_mom;
+    double alpha_mom = trans_sim ? settings::alpha_mom : 1.0;
+    double alpha_heat = trans_sim ? settings::alpha_heat : 1.0;
+    double alpha_ener = trans_sim ? settings::alpha_ener : 1.0;
     if (mpi::rank == 0) {
     if (settings::verbosity >= 1) std::cout << "time=" << std::setprecision(5) << simulation::current_time << " ";
     }
@@ -130,11 +133,11 @@ int opensd_run()
       }
 
       if (settings::temp_solve) {
-        solid::exec_energy(simulation::current_time, simulation::delt, trans_sim, settings::alpha_heat, main_iter);
-        exec_energy(simulation::current_time, simulation::delt, trans_sim, settings::alpha_ener, main_iter);
+        solid::exec_energy(simulation::current_time, simulation::delt, trans_sim, alpha_heat, main_iter);
+        exec_energy(simulation::current_time, simulation::delt, trans_sim, alpha_ener, main_iter);
         // std::exit(1);
 
-        std::tie(converged, eps_m, eps_p, eps_h, eps_t) = check_conv(simulation::current_time, simulation::delt, trans_sim, settings::alpha_mom, settings::alpha_ener, "all", settings::alpha_heat);
+        std::tie(converged, eps_m, eps_p, eps_h, eps_t) = check_conv(simulation::current_time, simulation::delt, trans_sim, alpha_mom, alpha_ener, "all", alpha_heat);
       }
 
       if (converged) {
@@ -202,9 +205,25 @@ int opensd_run()
   
       H5Gclose(group_id);
     }
-  
+
+    if (!H5Lexists(file_id, "/hslabs", H5P_DEFAULT)) {
+      hid_t hslabs_group = H5Gcreate(file_id, "/hslabs", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      if (hslabs_group < 0) throw std::runtime_error("Failed to create /hslabs group");
+      H5Gclose(hslabs_group);
+    }
+
+    for (size_t i = 0; i < model::hslabs.size(); ++i) {
+      std::string group_name = "/hslabs/hslab_" + std::to_string(i);
+      hid_t group_id = H5Gcreate(file_id, group_name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      if (group_id < 0) throw std::runtime_error("Failed to create group: " + group_name);
+
+      model::hslabs[i]->save_to_hdf5(group_id);
+
+      H5Gclose(group_id);
+    }
+   
     opensd::close_file(file_id);
-    std::cout << "Circuits saved to HDF5 successfully.\n";
+    std::cout << "Circuits and HSlabs saved to HDF5 successfully.\n";
   
   } catch (const std::exception& e) {
     std::cerr << "HDF5 error during save: " << e.what() << std::endl;

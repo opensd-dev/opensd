@@ -370,9 +370,8 @@ void PFace::save_to_hdf5(hid_t group_id) const {
   write_scalar(group_id, "heat_input_old", heat_input_old);
   write_scalar(group_id, "heat_input", heat_input);
 
-  // Vectors
-  // write_vector(group_id, "heat_hslab", heat_hslab);
-  // write_vector(group_id, "heat_hslab_old", heat_hslab_old);
+  write_vector(group_id, "heat_hslab", heat_hslab);
+  write_vector(group_id, "heat_hslab_old", heat_hslab_old);
 
   write_scalar(group_id, "choked", choked ? 1.0 : 0.0);
   write_scalar(group_id, "presidue", presidue);
@@ -412,8 +411,14 @@ void PFace::load_from_hdf5(hid_t group_id) {
   heat_input_old = read_scalar(group_id, "heat_input_old");
   heat_input = read_scalar(group_id, "heat_input");
 
-  // heat_hslab = read_vector_double(group_id, "heat_hslab");
-  // heat_hslab_old = read_vector_double(group_id, "heat_hslab_old");
+  heat_hslab.clear();
+  heat_hslab_old.clear();
+  if (H5Lexists(group_id, "heat_hslab", H5P_DEFAULT) > 0) {
+    heat_hslab = read_vector_double(group_id, "heat_hslab");
+  }
+  if (H5Lexists(group_id, "heat_hslab_old", H5P_DEFAULT) > 0) {
+    heat_hslab_old = read_vector_double(group_id, "heat_hslab_old");
+  }
 
   choked = static_cast<bool>(read_scalar(group_id, "choked"));
   presidue = read_scalar(group_id, "presidue");

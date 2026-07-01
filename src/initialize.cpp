@@ -46,6 +46,7 @@ int opensd_init(int argc, char* argv[], const void* intracomm) {
   discretize_pipes();
   discretize_layers();
   
+  bool loaded_restart = false;
   if (settings::run_mode == RunMode::TRANSIENT) {
   try {
   hid_t file_id = H5Fopen("circuits.h5", H5F_ACC_RDONLY, H5P_DEFAULT);
@@ -71,6 +72,7 @@ int opensd_init(int argc, char* argv[], const void* intracomm) {
   H5Fclose(file_id);
 
   std::cout << "Loaded data into " << index << " existing circuit(s) from HDF5.\n";
+  loaded_restart = true;
 
 } catch (const std::exception& e) {
   std::cerr << "HDF5 error during load: " << e.what() << std::endl;
@@ -79,6 +81,27 @@ int opensd_init(int argc, char* argv[], const void* intracomm) {
 
 initialize_circuits(); //assign properties
 initialize_hslabs();
+
+if (loaded_restart) {
+  try {
+    hid_t file_id = H5Fopen("circuits.h5", H5F_ACC_RDONLY, H5P_DEFAULT);
+    if (H5Lexists(file_id, "/hslabs", H5P_DEFAULT) > 0) {
+      hid_t hslabs_group = H5Gopen(file_id, "/hslabs", H5P_DEFAULT);
+      for (size_t i = 0; i < model::hslabs.size(); ++i) {
+        std::string group_name = "hslab_" + std::to_string(i);
+        if (H5Lexists(hslabs_group, group_name.c_str(), H5P_DEFAULT) <= 0) continue;
+        hid_t group_id = H5Gopen(hslabs_group, group_name.c_str(), H5P_DEFAULT);
+        model::hslabs[i]->load_from_hdf5(group_id);
+        H5Gclose(group_id);
+      }
+      H5Gclose(hslabs_group);
+      std::cout << "Loaded HSlab state from HDF5.\n";
+    }
+    H5Fclose(file_id);
+  } catch (const std::exception& e) {
+    std::cerr << "HDF5 error during HSlab load: " << e.what() << std::endl;
+  }
+}
 
 // Print to verify
 for (size_t i = 0; i < model::circuits.size(); ++i) {

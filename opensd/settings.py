@@ -255,6 +255,36 @@ class Settings:
         self._tim_slot = tim_slot
 
     @property
+    def alpha_mom(self) -> float:
+        return self._alpha_mom
+
+    @alpha_mom.setter
+    def alpha_mom(self, alpha_mom: float):
+        cv.check_type('alpha_mom', alpha_mom, Real)
+        cv.check_greater_than('alpha_mom', alpha_mom, 0)
+        self._alpha_mom = alpha_mom
+
+    @property
+    def alpha_ener(self) -> float:
+        return self._alpha_ener
+
+    @alpha_ener.setter
+    def alpha_ener(self, alpha_ener: float):
+        cv.check_type('alpha_ener', alpha_ener, Real)
+        cv.check_greater_than('alpha_ener', alpha_ener, 0)
+        self._alpha_ener = alpha_ener
+
+    @property
+    def alpha_heat(self) -> float:
+        return self._alpha_heat
+
+    @alpha_heat.setter
+    def alpha_heat(self, alpha_heat: float):
+        cv.check_type('alpha_heat', alpha_heat, Real)
+        cv.check_greater_than('alpha_heat', alpha_heat, 0)
+        self._alpha_heat = alpha_heat
+
+    @property
     def conv_crit_flow(self) -> float:
         return self._conv_crit_flow
 

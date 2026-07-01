@@ -12,6 +12,7 @@
 #include "opensd/vector.h"
 #include "opensd/memory.h"
 #include "opensd/custom_fun.h"
+#include "hdf5.h"
 // #include "hdf5_interface.h"
 // #include <petscksp.h>
 // #include <petscsnes.h>
@@ -95,8 +96,8 @@ public:
   // MPI_Comm comm;
   // int rank_in_comm, comm_size;
   //
-  // void save_to_hdf5(hid_t group_id) const;
-  // void load_from_hdf5(hid_t group_id);
+  void save_to_hdf5(hid_t group_id) const;
+  void load_from_hdf5(hid_t group_id);
   // //! Find a node by its identifier string
   // Node* get_node_by_identifier(const std::string& id) const;
 

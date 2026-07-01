@@ -98,11 +98,11 @@ initial_guess.export_to_xml('initial_guess.xml')
 settings = opensd.Settings()
 settings.verbosity = 6
 settings.temp_solve = True
-settings.run_mode = "steady"
+settings.run_mode = "transient"
 settings.no_main_iter = 200
 settings.alpha_ener = 0.6
 settings.alpha_heat = 0.6
-settings.tim_slot = [[1.0, 51.0]]
+settings.tim_slot = [[1.0, 50.0]]
 settings.export_to_xml()
 
 

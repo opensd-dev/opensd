@@ -522,135 +522,78 @@ void initialize_hslabs() {
 
 }
 
-// void Circuit::save_to_hdf5(hid_t group_id) const {
-//   write_string(group_id, "identifier", identifier);
-//   write_string(group_id, "flname", flname);
-//   write_string(group_id, "fltype", fluid_type_to_string(fltype));
-//   write_scalar(group_id, "eps_m", eps_m);
-//   write_scalar(group_id, "mean_flow", mean_flow);
-//   write_scalar(group_id, "eps_h", eps_h);
-//   write_scalar(group_id, "eps_p", eps_p);
-//   write_vector(group_id, "Pbound_ind", Pbound_ind);
-//
-//    // Save Nodes
-//   hid_t node_group = H5Gcreate(group_id, "nodes", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-//   for (size_t i = 0; i < nodes_owned.size(); ++i) {
-//     std::string name = "node_" + std::to_string(i);
-//     hid_t ngrp = H5Gcreate(node_group, name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-//     nodes_owned[i]->save_to_hdf5(ngrp);
-//     H5Gclose(ngrp);
-//   }
-//   H5Gclose(node_group);
-//
-//   // Save Pipes
-//   hid_t pipe_group = H5Gcreate(group_id, "pipes", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-//   for (size_t i = 0; i < pipes.size(); ++i) {
-//     std::string name = "pipe_" + std::to_string(i);
-//     hid_t pgrp = H5Gcreate(pipe_group, name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-//     pipes[i]->save_to_hdf5(pgrp);
-//     H5Gclose(pgrp);
-//   }
-//   H5Gclose(pipe_group);
-//
-//   // Save BCs
-//   hid_t bc_group = H5Gcreate(group_id, "bcs", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-//   for (size_t i = 0; i < bcs.size(); ++i) {
-//     std::string name = "bc_" + std::to_string(i);
-//     hid_t bcgrp = H5Gcreate(bc_group, name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-//     bcs[i].save_to_hdf5(bcgrp);
-//     H5Gclose(bcgrp);
-//   }
-//   H5Gclose(bc_group);
-//
-//   // Save Faces
-//   hid_t face_group = H5Gcreate(group_id, "faces", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-//   for (size_t i = 0; i < faces_owned.size(); ++i) {
-//     std::string name = "face_" + std::to_string(i);
-//     hid_t fgrp = H5Gcreate(face_group, name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-//     faces_owned[i]->save_to_hdf5(fgrp);
-//     H5Gclose(fgrp);
-//   }
-//    H5Gclose(face_group);
-//
-// }
-//
-// void Circuit::load_from_hdf5(hid_t group_id) {
-//   identifier = read_string(group_id, "identifier");
-//   flname = read_string(group_id, "flname");
-//   std::string fltype_str = read_string(group_id, "fltype");
-//   fltype = string_to_fluid_type(fltype_str);
-//   eps_m = read_scalar(group_id, "eps_m");
-//   mean_flow = read_scalar(group_id, "mean_flow");
-//   eps_h = read_scalar(group_id, "eps_h");
-//   eps_p = read_scalar(group_id, "eps_p");
-//   Pbound_ind = read_vector_int(group_id, "Pbound_ind");
-//
-//    // Load Nodes
-//   hid_t node_group = H5Gopen(group_id, "nodes", H5P_DEFAULT);
-//   for (size_t i = 0; i < nodes.size(); ++i) {
-//     std::string name = "node_" + std::to_string(i);
-//     if (H5Lexists(node_group, name.c_str(), H5P_DEFAULT) > 0) {
-//       hid_t ngrp = H5Gopen(node_group, name.c_str(), H5P_DEFAULT);
-//       if (nodes[i]) nodes[i]->load_from_hdf5(ngrp);
-//       H5Gclose(ngrp);
-//     }
-//   }
-//   H5Gclose(node_group);
-//
-//   // Load Pipes
-//   hid_t pipe_group = H5Gopen(group_id, "pipes", H5P_DEFAULT);
-//   for (size_t i = 0; i < pipes.size(); ++i) {
-//     std::string name = "pipe_" + std::to_string(i);
-//     if (H5Lexists(pipe_group, name.c_str(), H5P_DEFAULT) <= 0) {
-//       std::cerr << "Warning: pipe group '" << name << "' missing in HDF5\n";
-//       continue;
-//     }
-//     hid_t pgrp = H5Gopen(pipe_group, name.c_str(), H5P_DEFAULT);
-//     if (pipes[i]) {
-//       pipes[i]->load_from_hdf5(pgrp);
-//     } else {
-//       std::cerr << "Warning: pipes[" << i << "] is null\n";
-//     }
-//     H5Gclose(pgrp);
-//   }
-//   H5Gclose(pipe_group);
-//
-//   // Load BCs
-//   if (bcs.size() > 0)
-//     std::cerr << "Warning: Overwriting existing BC values\n";
-//   hid_t bc_group = H5Gopen(group_id, "bcs", H5P_DEFAULT);
-//   for (size_t i = 0; i < bcs.size(); ++i) {
-//     std::string name = "bc_" + std::to_string(i);
-//     if (H5Lexists(bc_group, name.c_str(), H5P_DEFAULT) <= 0) {
-//       std::cerr << "Warning: bc group '" << name << "' missing in HDF5\n";
-//       continue;
-//     }
-//     hid_t bcgrp = H5Gopen(bc_group, name.c_str(), H5P_DEFAULT);
-//     bcs[i].load_from_hdf5(bcgrp);
-//     H5Gclose(bcgrp);
-//   }
-//   H5Gclose(bc_group);
-//
-//   // Load Faces
-//   hid_t face_group = H5Gopen(group_id, "faces", H5P_DEFAULT);
-//   for (size_t i = 0; i < faces.size(); ++i) {
-//     std::string name = "face_" + std::to_string(i);
-//     if (H5Lexists(face_group, name.c_str(), H5P_DEFAULT) <= 0) {
-//       std::cerr << "Warning: face group '" << name << "' missing in HDF5\n";
-//       continue;
-//     }
-//     hid_t fgrp = H5Gopen(face_group, name.c_str(), H5P_DEFAULT);
-//     if (faces[i]) {
-//       faces[i]->load_from_hdf5(fgrp);
-//     } else {
-//       std::cerr << "Warning: faces[" << i << "] is null\n";
-//     }
-//     H5Gclose(fgrp);
-//   }
-//   H5Gclose(face_group);
-//
-//
-// }
+void HSlab::save_to_hdf5(hid_t group_id) const {
+  write_string(group_id, "identifier", identifier);
+  write_scalar(group_id, "mean_ht", mean_ht);
+  write_scalar(group_id, "uheat_transfer", uheat_transfer);
+  write_scalar(group_id, "dheat_transfer", dheat_transfer);
+
+  hid_t layers_group = H5Gcreate(group_id, "layers", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  for (size_t i = 0; i < layers.size(); ++i) {
+    std::string layer_name = "layer_" + std::to_string(i);
+    hid_t layer_group = H5Gcreate(layers_group, layer_name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    write_scalar(layer_group, "layerno", layers[i]->layerno);
+
+    hid_t snodes_group = H5Gcreate(layer_group, "snodes", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    for (size_t j = 0; j < layers[i]->snodes.size(); ++j) {
+      std::string snode_name = "snode_" + std::to_string(j);
+      hid_t snode_group = H5Gcreate(snodes_group, snode_name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      auto& snode = layers[i]->snodes[j];
+      write_string(snode_group, "identifier", snode->identifier);
+      write_scalar(snode_group, "temp_gues", snode->temp_gues);
+      write_scalar(snode_group, "temp_old", snode->temp_old);
+      write_scalar(snode_group, "heat_transfer", snode->heat_transfer);
+      write_scalar(snode_group, "heat_transfer_old", snode->heat_transfer_old);
+      write_scalar(snode_group, "heat_input", snode->heat_input);
+      write_scalar(snode_group, "heat_input_old", snode->heat_input_old);
+      H5Gclose(snode_group);
+    }
+    H5Gclose(snodes_group);
+    H5Gclose(layer_group);
+  }
+  H5Gclose(layers_group);
+}
+
+void HSlab::load_from_hdf5(hid_t group_id) {
+  if (H5Aexists(group_id, "mean_ht") > 0) mean_ht = read_scalar(group_id, "mean_ht");
+  if (H5Aexists(group_id, "uheat_transfer") > 0) uheat_transfer = read_scalar(group_id, "uheat_transfer");
+  if (H5Aexists(group_id, "dheat_transfer") > 0) dheat_transfer = read_scalar(group_id, "dheat_transfer");
+  if (H5Lexists(group_id, "layers", H5P_DEFAULT) <= 0) return;
+
+  hid_t layers_group = H5Gopen(group_id, "layers", H5P_DEFAULT);
+  for (size_t i = 0; i < layers.size(); ++i) {
+    std::string layer_name = "layer_" + std::to_string(i);
+    if (H5Lexists(layers_group, layer_name.c_str(), H5P_DEFAULT) <= 0) continue;
+
+    hid_t layer_group = H5Gopen(layers_group, layer_name.c_str(), H5P_DEFAULT);
+    if (H5Lexists(layer_group, "snodes", H5P_DEFAULT) <= 0) {
+      H5Gclose(layer_group);
+      continue;
+    }
+
+    hid_t snodes_group = H5Gopen(layer_group, "snodes", H5P_DEFAULT);
+    for (size_t j = 0; j < layers[i]->snodes.size(); ++j) {
+      std::string snode_name = "snode_" + std::to_string(j);
+      if (H5Lexists(snodes_group, snode_name.c_str(), H5P_DEFAULT) <= 0) continue;
+
+      hid_t snode_group = H5Gopen(snodes_group, snode_name.c_str(), H5P_DEFAULT);
+      auto& snode = layers[i]->snodes[j];
+      snode->temp_gues = read_scalar(snode_group, "temp_gues");
+      snode->temp_old = read_scalar(snode_group, "temp_old");
+      snode->heat_transfer = read_scalar(snode_group, "heat_transfer");
+      snode->heat_transfer_old = read_scalar(snode_group, "heat_transfer_old");
+      snode->heat_input = read_scalar(snode_group, "heat_input");
+      snode->heat_input_old = read_scalar(snode_group, "heat_input_old");
+      if (snode->ther_old) snode->ther_old->update(snode->temp_old);
+      if (snode->ther_gues) snode->ther_gues->update(snode->temp_gues);
+      H5Gclose(snode_group);
+    }
+    H5Gclose(snodes_group);
+    H5Gclose(layer_group);
+  }
+  H5Gclose(layers_group);
+}
+
 //
 // Node* Circuit::get_node_by_identifier(const std::string& id) const
 // {
