@@ -5,7 +5,9 @@
 #include "opensd/file_utils.h"
 #include "opensd/settings.h"
 
+#include <deque>
 #include <iostream>
+#include <unordered_map>
 
 namespace opensd {
 
@@ -13,6 +15,11 @@ namespace py = pybind11;
 
 std::ofstream f1;
 std::vector<std::unique_ptr<Calculate>> Calculate::registry;
+const std::vector<std::string> node_items = {"tpres_gues", "spres_gues", "ttemp_gues", "tenth_gues", "rhomass", "msource", "esource"};
+const std::vector<std::string> pipe_node_items = {"tpres_gues", "spres_gues", "ttemp_gues", "tenth_gues", "rhomass"};
+const std::vector<std::string> pipe_items = {"vflow", "velocity", "mflow"};
+const std::vector<std::string> face_items = {"vflow", "velocity", "mflow"};
+bool output_has_header = false;
 
 // Map to access Node attributes by string
 std::unordered_map<std::string, std::function<double(const Node&)>> nodeAttributeMap = {
@@ -27,10 +34,94 @@ std::unordered_map<std::string, std::function<double(const Node&)>> nodeAttribut
   // Add other mappings as needed
 };
 
+double mean_pipe_face_value(const Pipe& pipe, const std::function<double(const PFace&)>& getter)
+{
+  if (pipe.faces.empty()) return 0.0;
+
+  double total = 0.0;
+  for (const auto& face : pipe.faces) {
+    if (face) total += getter(*face);
+  }
+  return total / pipe.faces.size();
+}
+
+// Map to access pipe-level output attributes by string
+std::unordered_map<std::string, std::function<double(const Pipe&)>> pipeAttributeMap = {
+  {"vflow", [](const Pipe& pipe) {
+    return mean_pipe_face_value(pipe, [](const PFace& face) { return face.vflow_gues; });
+  }},
+  {"velocity", [](const Pipe& pipe) {
+    return mean_pipe_face_value(pipe, [](const PFace& face) { return face.velocity; });
+  }},
+  {"mflow", &Pipe::mflow}
+};
+
+std::unordered_map<std::string, std::function<double(const Face&)>> faceAttributeMap = {
+  {"vflow", &Face::vflow_gues},
+  {"velocity", &Face::velocity},
+  {"mflow", &Face::mflow}
+};
+
+double nodeAttributeValue(const Node& node, const std::string& item)
+{
+  if (item == "rhomass") return node.ther_gues ? node.ther_gues->rhomass() : 0.0;
+
+  auto it = nodeAttributeMap.find(item);
+  return it != nodeAttributeMap.end() ? it->second(node) : 0.0;
+}
+
+std::string faceIdentifier(const Face& face)
+{
+  if (const auto* pface = dynamic_cast<const PFace*>(&face)) {
+    return pface->pipe ? pface->pipe->identifier + "_face" + std::to_string(face.faceno) : "face" + std::to_string(face.faceno);
+  }
+  return "face" + std::to_string(face.faceno);
+}
+
+void writeCell(const std::string& value)
+{
+  f1 << "," << value;
+}
+
+void writeCell(double value)
+{
+  f1 << "," << std::setprecision(7) << value;
+}
+
+std::vector<std::string> readLastNonEmptyRows(const std::string& path, std::size_t row_count)
+{
+  std::ifstream fin(path);
+  std::deque<std::string> rows;
+  std::string line;
+
+  while (std::getline(fin, line)) {
+    if (line.empty()) continue;
+    rows.push_back(line);
+    if (rows.size() > row_count) rows.pop_front();
+  }
+
+  return {rows.begin(), rows.end()};
+}
+
 void openFile(const std::string& outputFile) {
+  (void)outputFile;
   std::string fixedOutputFile = "output.res";
   std::string bPath = std::string(getenv("PWD")) + "/" + fixedOutputFile;
-  f1.open(bPath, std::ios::out | std::ios::app);  // append mode
+
+  std::vector<std::string> retained_rows;
+  if (settings::run_mode == RunMode::TRANSIENT) {
+    retained_rows = readLastNonEmptyRows(bPath, 2);
+  }
+
+  f1.open(bPath, std::ios::out | std::ios::trunc);
+  output_has_header = false;
+
+  if (retained_rows.size() == 2 && retained_rows.front().find("time") != std::string::npos) {
+    for (const auto& row : retained_rows) {
+      f1 << row << '\n';
+    }
+    output_has_header = true;
+  }
 }
 
 
@@ -79,7 +170,7 @@ void Calculate::update(double time, double delt)
 }
 
 void writeOutput(double time, double delt) {
-  if (time == 0.) {
+  if (time == 0. && !output_has_header) {
     writeHeader();
   }
   writeValue(time, delt);
@@ -87,62 +178,73 @@ void writeOutput(double time, double delt) {
 
 void writeHeader() {
   f1 << " time(s)";
-  
-  // Placeholder for the items in the original code
-  // std::vector<std::string> pipe_items = {"mflow"};
-  std::vector<std::vector<std::string>> node_items = {{"tpres_gues"}, {"spres_gues"}, {"ttemp_gues"}, {"tenth_gues"}, {"ther_gues", "rhomass"}, {"msource"}, {"esource"} };
-  
+
   for (const auto& circuit : model::circuits_owned) {
     for (const auto& ger : circuit->gers) {
-      // for (const auto& item : ger_items) {
-        f1 << "," << "vflow_gues" << ":" << ger->identifier;
-      // }
+      writeCell("vflow_gues:" + ger->identifier);
+    }
+    for (const auto& item : pipe_items) {
+      for (const auto& pipe : circuit->pipes) {
+        writeCell(item + ":" + pipe->identifier);
+      }
+    }
+    for (const auto& item : face_items) {
+      for (const auto& face : circuit->faces) {
+        writeCell(item + ":" + faceIdentifier(*face));
+      }
+    }
+    for (const auto& item : pipe_node_items) {
+      for (const auto& pipe : circuit->pipes) {
+        writeCell(item + ":" + pipe->identifier + "_upstream");
+        writeCell(item + ":" + pipe->identifier + "_downstream");
+      }
     }
     for (const auto& item : node_items) {
       for (const auto& node : circuit->nodes) {
-        if (item.size() == 1) {
-          f1 << "," << item[0] << ":" << node->identifier;
-        } else if (item.size() == 2) {
-          f1 << "," << item[1] << ":" << node->identifier;
-        }
+        writeCell(item + ":" + node->identifier);
       }
     }
   }
   for (const auto& calc : Calculate::registry) {
-    f1 << "," << calc->identifier();
+    writeCell(calc->identifier());
   }
   f1 << '\n';
+  output_has_header = true;
 }
 
 void writeValue(double time, double delt) {
-  f1 << std::setw(10) << std::setprecision(4) << time << ",";
-
-  // Placeholder for the items in the original code
-  std::vector<std::string> pipe_items = {"mflow"};
-  std::vector<std::vector<std::string>> node_items = {{"tpres_gues"}, {"spres_gues"}, {"ttemp_gues"}, {"tenth_gues"}, {"ther_gues", "rhomass"}, {"msource"}, {"esource"} };
+  f1 << std::setw(10) << std::setprecision(4) << time;
 
   for (const auto& circuit : model::circuits_owned) {
     for (const auto& ger : circuit->gers) {
-      // for (const auto& item : pipe_items) {
-        f1 << "," << std::setw(7) << std::setprecision(7) << ger->vflow_gues*ger->ther_gues->rhomass(); // Replace 0.0 with the actual value
-      // }
+      writeCell(ger->vflow_gues * ger->ther_gues->rhomass());
+    }
+    for (const auto& item : pipe_items) {
+      auto it = pipeAttributeMap.find(item);
+      for (const auto& pipe : circuit->pipes) {
+        writeCell(it != pipeAttributeMap.end() ? it->second(*pipe) : 0.0);
+      }
+    }
+    for (const auto& item : face_items) {
+      auto it = faceAttributeMap.find(item);
+      for (const auto& face : circuit->faces) {
+        writeCell(it != faceAttributeMap.end() ? it->second(*face) : 0.0);
+      }
+    }
+    for (const auto& item : pipe_node_items) {
+      for (const auto& pipe : circuit->pipes) {
+        writeCell(pipe->unode ? nodeAttributeValue(*pipe->unode, item) : 0.0);
+        writeCell(pipe->dnode ? nodeAttributeValue(*pipe->dnode, item) : 0.0);
+      }
     }
     for (const auto& item : node_items) {
       for (const auto& node : circuit->nodes) {
-        if (item.size() == 1) {
-          auto it = nodeAttributeMap.find(item[0]);
-          if (it != nodeAttributeMap.end()) {
-            double value = it->second(*node);
-            f1 << std::setprecision(7) << value << ",";
-          }
-        } else if (item.size() == 2) {
-          f1 << "," << std::setw(7) << std::setprecision(7) << 0.0; // Replace 0.0 with the actual value
-        }
+        writeCell(nodeAttributeValue(*node, item));
       }
     }
   }
   for (const auto& calc : Calculate::registry) {
-    f1 << std::setprecision(8) << calc->val << ",";
+    writeCell(calc->val);
   }
   f1 << '\n';
   f1.flush();

@@ -10,9 +10,11 @@ import ReactFlow, {
 
 import BcNode from "./BcNode.jsx";
 import FlowNode from "./FlowNode.jsx";
+import PartialDashEdge from "./PartialDashEdge.jsx";
 import PipeNode from "./PipeNode.jsx";
 
 const nodeTypes = { flow: FlowNode, pipe: PipeNode, bc: BcNode };
+const edgeTypes = { partialDashStraight: PartialDashEdge };
 
 function ModelFlowInner({
   nodes,
@@ -126,6 +128,7 @@ function ModelFlowInner({
       </div>
       <ReactFlow
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}

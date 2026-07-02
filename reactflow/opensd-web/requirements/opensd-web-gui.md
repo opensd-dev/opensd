@@ -432,11 +432,11 @@ The Help workspace should provide sidebar navigation generated from the bundled 
 
 ## 9. Postprocess view
 
-### GUI-070 — Circuit and pipe selection (Must)
+### GUI-070 — HDF5 circuit, pipe, and component selection (Must)
 
-Postprocess shall allow selecting **circuit**, **pipe filter**, and **node variable** for HDF5 line plots.
+Postprocess shall allow selecting **circuit**, **component type** (including nodes), **component filter**, and **attribute** for HDF5 line plots.
 
-**Acceptance:** HDF5 selection controls appear in the Postprocessor sidebar and the plot updates without tab or sidebar resizing.
+**Acceptance:** HDF5 selection controls appear in the Postprocessor sidebar and the plot updates without tab or sidebar resizing. Component selection includes a text filter with type-ahead suggestions so large component lists can be narrowed without scrolling a long dropdown. There is no separate source dropdown; nodes are selectable as a component type.
 
 **Implementation:** [src/App.jsx](../src/App.jsx) postprocess controls.
 
@@ -454,7 +454,7 @@ When enthalpy is available, GUI may plot **temperature from total enthalpy** usi
 
 Postprocess plots should expose formatting controls suitable for publication and report figures.
 
-**Acceptance:** Users can edit x- and y-axis titles; choose display units for supported variables, including pressure in Pa/kPa/bar/MPa; show or hide major and minor gridlines; adjust line thickness and marker interval; show/hide markers and legend; keep markers off by default; overlay the legend inside the plot and choose left/middle/right plus top/middle/bottom placement; control x- and y-axis decimal places; choose a figure aspect ratio including an A4 two-figures option for two plots with captions on one A4 portrait page; and save the current plot as an SVG file.
+**Acceptance:** Users can edit x- and y-axis titles; choose display units for supported variables, including pressure in Pa/kPa/bar/MPa; show or hide major and minor gridlines; adjust line thickness and marker interval; show/hide markers and legend; keep markers off by default; overlay the legend inside the plot and choose left/middle/right plus top/middle/bottom placement; control x- and y-axis decimal places; choose a figure aspect ratio including an A4 two-figures option for two plots with captions on one A4 portrait page; and save the current plot as an SVG file. Defaults are A4 two-figures, line width 1.5, one decimal place, and overlaid legend at right-middle.
 
 **Implementation:** `defaultPlotFormat`, unit conversion helpers, `exportPlotSvg`, and `LinePlot` in [src/App.jsx](../src/App.jsx), plot styles in [src/App.css](../src/App.css).
 
@@ -464,9 +464,9 @@ Postprocess plots should expose formatting controls suitable for publication and
 
 Postprocess shall import OpenSD transient `output.res` files and plot selected signals against time.
 
-**Acceptance:** File picker accepts `.res`; comma-separated and whitespace-separated result tables are parsed; users can select transient variable and signal in the Postprocessor sidebar; transient plots do not show a tabulated value list below the plot.
+**Acceptance:** File picker accepts `.res`; comma-separated and whitespace-separated result tables are parsed; pipe-level and face-level transient attributes such as `vflow`, `velocity`, and `mflow` are emitted and selectable; pipe endpoint aliases such as `ttemp_gues:pipe22_downstream` can be selected; users can select component type, component/signal filter with type-ahead suggestions, and attribute in the Postprocessor sidebar; validation `.txt`, `.csv`, or `.dat` tables can be imported and overlaid as comparison lines; transient plots do not show a tabulated value list below the plot.
 
-**Implementation:** `parseResResults`, transient postprocess state, and `LinePlot` in [src/App.jsx](../src/App.jsx).
+**Implementation:** `writeOutput` in [src/post.cpp](../../../src/post.cpp), `parseResResults`, transient postprocess state, and `LinePlot` in [src/App.jsx](../src/App.jsx).
 
 ---
 
@@ -538,7 +538,7 @@ Internal hslab layer networks shall not be expanded on the main canvas (see GUI-
 | GUI-064 | Layers in tooltip | `App.jsx` |
 | GUI-080 | Browser requirements management | `App.jsx`, `App.css` |
 | GUI-081 | Help heading navigation | `App.jsx`, `App.css` |
-| GUI-070 | HDF5 circuit/pipe/variable selection | `App.jsx` |
+| GUI-070 | HDF5 circuit/component/attribute selection | `App.jsx` |
 | GUI-071 | Derived temperature from enthalpy | `App.jsx` |
 | GUI-072 | Plot format controls | `App.jsx`, `App.css` |
 | GUI-073 | Multiple plotted lines | `App.jsx`, `App.css` |

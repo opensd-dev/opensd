@@ -290,13 +290,13 @@ Node HDF5 output shall include primary solution guesses (e.g. temperature, press
 
 ---
 
-### SOL-072 â€” Optional CSV / plotting (Should)
+### SOL-072 — Transient output.res fields (Must)
 
-Python utilities may plot time series from CSV-style result files where that workflow is supported.
+Transient runs shall write a fresh `output.res` for the latest run only, rather than appending across runs.
 
-**Acceptance:** `opensd.result.Result` provides plotting helper for columnar output.
+**Acceptance:** `output.res` contains time, node solution fields, pipe-level `vflow`/`velocity`/`mflow`, face-level `vflow`/`velocity`/`mflow`, and pipe upstream/downstream endpoint fields such as `ttemp_gues:<pipe>_downstream` for postprocessing. `opensd.result.Result` can read the columnar output.
 
-**Implementation:** [opensd/result.py](../opensd/result.py).
+**Implementation:** [src/post.cpp](../src/post.cpp), [opensd/result.py](../opensd/result.py).
 
 ---
 

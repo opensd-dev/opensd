@@ -67,6 +67,9 @@ const unitFamilies = {
   massFlow: [
     { value: "kg/s", label: "kg/s", factor: 1 }
   ],
+  volumeFlow: [
+    { value: "m3/s", label: "m3/s", factor: 1 }
+  ],
   generic: [
     { value: "base", label: "Base", factor: 1 }
   ]
@@ -75,17 +78,17 @@ const defaultPlotFormat = {
   xAxisTitle: "Node",
   yAxisTitle: "",
   yUnit: "",
-  xDecimals: 3,
-  yDecimals: 3,
-  aspectRatio: "default",
+  xDecimals: 1,
+  yDecimals: 1,
+  aspectRatio: "a4TwoUp",
   showGrid: true,
   showMinorGrid: false,
   showLegend: true,
-  overlayLegend: false,
+  overlayLegend: true,
   legendX: "right",
-  legendY: "top",
+  legendY: "middle",
   showMarkers: false,
-  lineThickness: 3,
+  lineThickness: 1.5,
   pointerInterval: 1
 };
 const plotColors = ["#1f6feb", "#d92d20", "#039855", "#7a5af8", "#dc6803", "#0086c9", "#c11574", "#4e5ba6"];
@@ -107,6 +110,7 @@ function unitFamilyForVariable(variable) {
   if (normalized.includes("temp") || normalized.includes("temperature")) return "temperature";
   if (normalized.includes("enth") || normalized.includes("enthalpy")) return "enthalpy";
   if (normalized.includes("velo") || normalized.includes("velocity")) return "velocity";
+  if (normalized === "vflow" || normalized === "vflow_gues" || normalized.includes("volumetric")) return "volumeFlow";
   if (normalized.includes("flow") || normalized.includes("msource")) return "massFlow";
   return "generic";
 }
@@ -136,12 +140,37 @@ function formatAxisValue(value, decimals) {
   return Number.isFinite(value) ? value.toFixed(places) : "";
 }
 
-function hdf5SeriesId({ circuitKey, pipeFilter, variable }) {
-  return `hdf5:${circuitKey}:${pipeFilter}:${variable}`;
+function hdf5SeriesId({ circuitKey, componentGroup, componentFilter, variable }) {
+  return `hdf5:${circuitKey}:${componentGroup ?? ""}:${componentFilter ?? ""}:${variable}`;
 }
 
 function resSeriesId({ variable, entity }) {
   return `res:${variable}:${entity}`;
+}
+
+function validationSeriesId({ sourceId, column }) {
+  return `validation:${sourceId}:${column}`;
+}
+
+function resEntityGroup(entity, variable = "") {
+  const value = String(entity ?? "");
+  const attribute = String(variable ?? "").toLowerCase();
+  if (/^.+_face\d+$/i.test(value)) return "faces";
+  if (["vflow", "vflow_gues", "velocity", "mflow"].includes(attribute)) return "pipes";
+  if (/^.+_(?:upstream|downstream)$/i.test(value)) return "pipes";
+  if (/^.+_node\d+$/i.test(value)) return "pipes";
+  if (/node/i.test(value)) return "nodes";
+  return "components";
+}
+
+function resEntityMatchesGroup(entity, group, variable = "") {
+  if (!group || group === "components") return true;
+  return resEntityGroup(entity, variable) === group;
+}
+
+function matchesTextFilter(value, filter) {
+  const normalized = String(filter ?? "").trim().toLowerCase();
+  return !normalized || String(value ?? "").toLowerCase().includes(normalized);
 }
 
 function componentKindForType(type) {
@@ -414,7 +443,7 @@ function nodeCenter(node) {
   };
 }
 
-function segmentIntersectsRect(start, end, rect) {
+function segmentRectIntersectionRange(start, end, rect) {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   let enter = 0;
@@ -428,15 +457,15 @@ function segmentIntersectsRect(start, end, rect) {
 
   for (const [direction, distance] of boundaries) {
     if (direction === 0) {
-      if (distance < 0) return false;
+      if (distance < 0) return null;
       continue;
     }
     const ratio = distance / direction;
     if (direction < 0) enter = Math.max(enter, ratio);
     else exit = Math.min(exit, ratio);
-    if (enter > exit) return false;
+    if (enter > exit) return null;
   }
-  return true;
+  return enter < exit ? { start: Math.max(0, enter), end: Math.min(1, exit) } : null;
 }
 
 function revealConnectionsBehindComponents(nodes, edges) {
@@ -447,23 +476,24 @@ function revealConnectionsBehindComponents(nodes, edges) {
     if (!source || !target) return edge;
     const start = nodeCenter(source);
     const end = nodeCenter(target);
-    const isOccluded = nodes.some((node) => {
+    const dashRanges = nodes.map((node) => {
       if (node.id === edge.source || node.id === edge.target) return false;
       const size = nodeSize(node);
-      return segmentIntersectsRect(start, end, {
+      return segmentRectIntersectionRange(start, end, {
         left: node.position.x - 2,
         right: node.position.x + size.width + 2,
         top: node.position.y - 2,
         bottom: node.position.y + size.height + 2
       });
-    });
-    if (!isOccluded) return edge;
+    }).filter(Boolean);
+    if (!dashRanges.length) return edge;
     return {
       ...edge,
+      type: "partialDashStraight",
       zIndex: 1,
-      style: {
-        ...edge.style,
-        strokeDasharray: "5 4"
+      data: {
+        ...edge.data,
+        dashRanges
       }
     };
   });
@@ -1507,20 +1537,42 @@ function getNodeValue(record, variable, cp) {
   return Number.isFinite(value) ? value : null;
 }
 
-function getPipeNodeSeries(circuit, variable, pipeFilter, cp) {
-  if (!circuit) return [];
+function isPlottableHdf5Value(value) {
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "string" && value.trim() !== "") return Number.isFinite(Number(value));
+  return false;
+}
 
-  return circuit.nodes
-    .filter((node) => {
-      const id = String(node.identifier ?? "");
-      if (pipeFilter === "__all__") return true;
-      return id === pipeFilter || id.startsWith(`${pipeFilter}_node`);
-    })
-    .map((node) => ({
-      label: String(node.identifier ?? node.key),
-      value: getNodeValue(node, variable, cp)
+function hdf5AttributeLabel(attribute) {
+  const nodeVariable = nodeVariables.find((variable) => variable.value === attribute);
+  if (nodeVariable) return nodeVariable.label;
+  return String(attribute ?? "").replace(/_/g, " ");
+}
+
+function componentRecordLabel(record) {
+  return String(record?.identifier ?? record?.key ?? "");
+}
+
+function componentMatchesFilter(record, filter) {
+  const normalized = String(filter ?? "").trim().toLowerCase();
+  if (!normalized) return true;
+
+  const label = componentRecordLabel(record).toLowerCase();
+  const key = String(record?.key ?? "").toLowerCase();
+  return label.includes(normalized) || key.includes(normalized);
+}
+
+function getComponentAttributeSeries(circuit, groupName, variable, componentFilter, cp) {
+  const records = circuit?.[groupName] ?? [];
+  if (!variable) return [];
+
+  return records
+    .filter((record) => componentMatchesFilter(record, componentFilter))
+    .map((record) => ({
+      label: componentRecordLabel(record),
+      value: groupName === "nodes" ? getNodeValue(record, variable, cp) : Number(record[variable])
     }))
-    .filter((point) => point.value != null)
+    .filter((point) => point.label && Number.isFinite(point.value))
     .sort((a, b) => naturalCompare(a.label, b.label));
 }
 
@@ -1569,6 +1621,60 @@ function parseResResults(fileText) {
     skipped,
     timeIndex: timeIndex >= 0 ? timeIndex : 0,
     columns: columns.filter((column, index) => index < maxWidth && index !== (timeIndex >= 0 ? timeIndex : 0))
+  };
+}
+
+function parseValidationResults(fileText, fileName) {
+  const rawLines = fileText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#") && !line.startsWith("//") && !line.startsWith(";"));
+
+  if (!rawLines.length) {
+    throw new Error(`${fileName} is empty.`);
+  }
+
+  const splitLine = (line) => line.split(line.includes(",") ? /\s*,\s*/ : /\s+/).filter(Boolean);
+  const firstFields = splitLine(rawLines[0]);
+  const firstValues = firstFields.map((value) => Number(value));
+  const hasHeader = firstFields.some((field, index) => !Number.isFinite(firstValues[index]));
+  const headers = hasHeader
+    ? firstFields
+    : firstFields.map((_, index) => (index === 0 ? "x" : `series${index}`));
+  const dataLines = hasHeader ? rawLines.slice(1) : rawLines;
+  const xIndex = headers.findIndex((header) => /^(time|time\(s\)|t|x)$/i.test(header));
+  const resolvedXIndex = xIndex >= 0 ? xIndex : 0;
+  const rows = [];
+  let skipped = 0;
+  let maxWidth = 0;
+
+  for (const line of dataLines) {
+    const values = splitLine(line).map((value) => Number(value));
+    if (values.length < 2 || !Number.isFinite(values[resolvedXIndex])) {
+      skipped += 1;
+      continue;
+    }
+    maxWidth = Math.max(maxWidth, values.length);
+    rows.push(values.slice(0, headers.length));
+  }
+
+  const columns = headers
+    .map((header, index) => ({ index, header: header || `series${index}`, variable: header || `series${index}` }))
+    .filter((column, index) => index < maxWidth && index !== resolvedXIndex);
+
+  if (!rows.length || !columns.length) {
+    throw new Error(`${fileName} does not contain plottable validation data.`);
+  }
+
+  return {
+    kind: "validation",
+    sourceId: `${fileName}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+    sourceName: fileName,
+    headers,
+    rows,
+    skipped,
+    xIndex: resolvedXIndex,
+    columns
   };
 }
 
@@ -2725,6 +2831,7 @@ export default function App() {
   const fileInput = useRef(null);
   const hdf5Input = useRef(null);
   const resInput = useRef(null);
+  const validationInput = useRef(null);
   const layoutInput = useRef(null);
   const graphClipboard = useRef(null);
   const plotSvgRef = useRef(null);
@@ -2738,11 +2845,17 @@ export default function App() {
   const [resultsStatus, setResultsStatus] = useState("No results loaded");
   const [results, setResults] = useState(null);
   const [selectedCircuit, setSelectedCircuit] = useState("");
-  const [selectedPipe, setSelectedPipe] = useState("__all__");
-  const [selectedVariable, setSelectedVariable] = useState("ttemp_gues");
+  const [selectedComponentGroup, setSelectedComponentGroup] = useState("nodes");
+  const [selectedComponentFilter, setSelectedComponentFilter] = useState("");
+  const [selectedComponentAttribute, setSelectedComponentAttribute] = useState("");
   const [resResults, setResResults] = useState(null);
+  const [selectedResComponentGroup, setSelectedResComponentGroup] = useState("pipes");
+  const [selectedResComponentFilter, setSelectedResComponentFilter] = useState("");
   const [selectedResVariable, setSelectedResVariable] = useState("");
   const [selectedResEntity, setSelectedResEntity] = useState("");
+  const [validationResults, setValidationResults] = useState([]);
+  const [selectedValidationSourceId, setSelectedValidationSourceId] = useState("");
+  const [selectedValidationSeries, setSelectedValidationSeries] = useState("");
   const [plotMode, setPlotMode] = useState("hdf5");
   const [plotSeriesSelections, setPlotSeriesSelections] = useState([]);
   const [plotFormat, setPlotFormat] = useState(defaultPlotFormat);
@@ -3234,15 +3347,17 @@ export default function App() {
       setPlotMode("hdf5");
       setPlotSeriesSelections([]);
       setSelectedCircuit(firstCircuit);
-      setSelectedPipe("__all__");
       const nextVariable = parsed.circuits[0]?.nodes.some((node) => Object.hasOwn(node, "ttemp_gues"))
         ? "ttemp_gues"
         : "temperature_from_tenth";
-      setSelectedVariable(nextVariable);
+      const firstPipeAttribute = Object.keys(parsed.circuits[0]?.pipes?.[0] ?? {}).find((key) => !["key", "identifier"].includes(key) && isPlottableHdf5Value(parsed.circuits[0]?.pipes?.[0]?.[key])) ?? "";
+      setSelectedComponentGroup("nodes");
+      setSelectedComponentFilter("");
+      setSelectedComponentAttribute(nextVariable || firstPipeAttribute);
       setPlotFormat((current) => ({
         ...current,
-        xAxisTitle: "Node",
-        yAxisTitle: parsed.circuits[0]?.nodes.some((node) => Object.hasOwn(node, "ttemp_gues")) ? "Total temperature" : "Temperature",
+        xAxisTitle: "Component",
+        yAxisTitle: parsed.circuits[0]?.nodes.some((node) => Object.hasOwn(node, "ttemp_gues")) ? "Temperature" : "Temperature",
         yUnit: defaultUnitForVariable(nextVariable)
       }));
       setResultsStatus(`Loaded ${file.name}`);
@@ -3265,13 +3380,21 @@ export default function App() {
       setResults(null);
       setPlotMode("res");
       setPlotSeriesSelections([]);
-      setSelectedResVariable(firstColumn?.variable ?? "");
-      setSelectedResEntity(firstColumn?.entity ?? "");
+      const fftfPipe22DownstreamTemperature = parsed.columns.find((column) =>
+        column.variable === "ttemp_gues" && column.entity === "pipe22_downstream"
+      );
+      const firstPipeColumn = parsed.columns.find((column) => resEntityGroup(column.entity, column.variable) === "pipes");
+      const defaultColumn = fftfPipe22DownstreamTemperature ?? firstPipeColumn ?? firstColumn;
+      const defaultGroup = firstPipeColumn ? "pipes" : resEntityGroup(defaultColumn?.entity, defaultColumn?.variable);
+      setSelectedResComponentGroup(defaultGroup);
+      setSelectedResComponentFilter(defaultColumn?.entity ?? "");
+      setSelectedResVariable(defaultColumn?.variable ?? "");
+      setSelectedResEntity(defaultColumn?.entity ?? "");
       setPlotFormat((current) => ({
         ...current,
         xAxisTitle: "Time (s)",
-        yAxisTitle: firstColumn?.variable ?? "",
-        yUnit: defaultUnitForVariable(firstColumn?.variable ?? "")
+        yAxisTitle: hdf5AttributeLabel(defaultColumn?.variable ?? ""),
+        yUnit: defaultUnitForVariable(defaultColumn?.variable ?? "")
       }));
       setResultsStatus(
         `Loaded ${file.name}: ${parsed.rows.length} time step${parsed.rows.length === 1 ? "" : "s"}, ${parsed.columns.length} signal${parsed.columns.length === 1 ? "" : "s"}${parsed.skipped ? `, skipped ${parsed.skipped} malformed row${parsed.skipped === 1 ? "" : "s"}` : ""}`
@@ -3283,6 +3406,31 @@ export default function App() {
     } finally {
       if (resInput.current) {
         resInput.current.value = "";
+      }
+    }
+  }, []);
+
+  const importValidationResults = useCallback(async (files) => {
+    const selectedFiles = Array.from(files ?? []);
+    if (!selectedFiles.length) return;
+
+    try {
+      setResultsStatus("Reading validation data...");
+      const parsedFiles = await Promise.all(selectedFiles.map(async (file) => parseValidationResults(await file.text(), file.name)));
+      setValidationResults((current) => [...current, ...parsedFiles]);
+      const firstParsed = parsedFiles[0];
+      const firstColumn = firstParsed.columns[0];
+      setSelectedValidationSourceId(firstParsed.sourceId);
+      setSelectedValidationSeries(firstColumn?.header ?? "");
+      setResultsStatus(
+        `Loaded ${parsedFiles.map((item) => item.sourceName).join(", ")}: ${parsedFiles.reduce((count, item) => count + item.rows.length, 0)} validation point${parsedFiles.reduce((count, item) => count + item.rows.length, 0) === 1 ? "" : "s"}`
+      );
+      setActiveWorkspace("postprocess");
+    } catch (error) {
+      setResultsStatus(error.message);
+    } finally {
+      if (validationInput.current) {
+        validationInput.current.value = "";
       }
     }
   }, []);
@@ -3370,71 +3518,174 @@ export default function App() {
     return results?.circuits.find((circuit) => circuit.key === selectedCircuit) ?? null;
   }, [results, selectedCircuit]);
 
-  const pipeOptions = useMemo(() => {
+  const componentGroupOptions = useMemo(() => {
     if (!activeCircuit) return [];
-
-    const pipeNames = new Set();
-    activeCircuit.nodes.forEach((node) => {
-      const id = String(node.identifier ?? "");
-      const match = id.match(/^(.+)_node\d+$/);
-      if (match) pipeNames.add(match[1]);
-    });
-
-    activeCircuit.pipes.forEach((pipe) => {
-      if (pipe.identifier) pipeNames.add(String(pipe.identifier));
-    });
-
-    return Array.from(pipeNames).sort(naturalCompare);
+    return [
+      { value: "nodes", label: "Nodes" },
+      { value: "faces", label: "Faces" },
+      { value: "pipes", label: "Pipes" }
+    ].filter((option) => (activeCircuit[option.value] ?? []).length);
   }, [activeCircuit]);
 
-  const availableVariables = useMemo(() => {
-    if (!activeCircuit) return nodeVariables;
+  const effectiveSelectedComponentGroup = componentGroupOptions.some((option) => option.value === selectedComponentGroup)
+    ? selectedComponentGroup
+    : componentGroupOptions[0]?.value ?? "";
 
-    const keys = new Set(activeCircuit.nodes.flatMap((node) => Object.keys(node)));
-    return nodeVariables.filter((variable) => {
-      return variable.value === "temperature_from_tenth" || keys.has(variable.value);
+  const activeComponentRecords = useMemo(() => {
+    return activeCircuit?.[effectiveSelectedComponentGroup] ?? [];
+  }, [activeCircuit, effectiveSelectedComponentGroup]);
+
+  const componentSuggestions = useMemo(() => {
+    const filter = selectedComponentFilter.trim().toLowerCase();
+    return activeComponentRecords
+      .map((record) => componentRecordLabel(record))
+      .filter(Boolean)
+      .filter((label) => !filter || label.toLowerCase().includes(filter))
+      .sort(naturalCompare)
+      .slice(0, 40);
+  }, [activeComponentRecords, selectedComponentFilter]);
+
+  const availableComponentAttributes = useMemo(() => {
+    const keys = new Set();
+    activeComponentRecords.forEach((record) => {
+      Object.entries(record).forEach(([key, value]) => {
+        if (["key", "identifier"].includes(key)) return;
+        if (isPlottableHdf5Value(value)) keys.add(key);
+      });
     });
-  }, [activeCircuit]);
+    if (effectiveSelectedComponentGroup === "nodes" && activeComponentRecords.length) {
+      nodeVariables.forEach((variable) => {
+        if (variable.value === "temperature_from_tenth" || activeComponentRecords.some((record) => Object.hasOwn(record, variable.value))) {
+          keys.add(variable.value);
+        }
+      });
+    }
+    return Array.from(keys).sort(naturalCompare).map((key) => ({
+      value: key,
+      label: hdf5AttributeLabel(key)
+    }));
+  }, [activeComponentRecords, effectiveSelectedComponentGroup]);
+
+  const effectiveSelectedComponentAttribute = availableComponentAttributes.some((option) => option.value === selectedComponentAttribute)
+    ? selectedComponentAttribute
+    : availableComponentAttributes[0]?.value ?? "";
+
+  const resComponentGroupOptions = useMemo(() => {
+    if (!resResults) return [];
+    return [
+      { value: "pipes", label: "Pipes" },
+      { value: "faces", label: "Faces" },
+      { value: "nodes", label: "Nodes" },
+      { value: "components", label: "All signals" }
+    ].filter((option) => resResults.columns.some((column) => resEntityMatchesGroup(column.entity, option.value, column.variable)));
+  }, [resResults]);
+
+  const effectiveSelectedResComponentGroup = resComponentGroupOptions.some((option) => option.value === selectedResComponentGroup)
+    ? selectedResComponentGroup
+    : resComponentGroupOptions[0]?.value ?? "components";
 
   const resVariableOptions = useMemo(() => {
     if (!resResults) return [];
-    return Array.from(new Set(resResults.columns.map((column) => column.variable))).sort(naturalCompare);
-  }, [resResults]);
+    return Array.from(new Set(resResults.columns
+      .filter((column) => resEntityMatchesGroup(column.entity, effectiveSelectedResComponentGroup, column.variable))
+      .filter((column) => matchesTextFilter(column.entity, selectedResComponentFilter))
+      .map((column) => column.variable))).sort(naturalCompare);
+  }, [effectiveSelectedResComponentGroup, resResults, selectedResComponentFilter]);
 
-  const resEntityOptions = useMemo(() => {
-    if (!resResults || !selectedResVariable) return [];
-    return resResults.columns
-      .filter((column) => column.variable === selectedResVariable)
-      .map((column) => column.entity)
-      .sort(naturalCompare);
-  }, [resResults, selectedResVariable]);
+  const resComponentSuggestions = useMemo(() => {
+    const entities = new Set();
+    resResults?.columns
+      .filter((column) => resEntityMatchesGroup(column.entity, effectiveSelectedResComponentGroup, column.variable))
+      .forEach((column) => entities.add(column.entity));
+
+    return Array.from(entities)
+      .filter((entity) => matchesTextFilter(entity, selectedResComponentFilter))
+      .sort(naturalCompare)
+      .slice(0, 40);
+  }, [effectiveSelectedResComponentGroup, resResults, selectedResComponentFilter]);
+
+  const effectiveSelectedResEntity = useMemo(() => {
+    if (!resResults) return "";
+    const exact = resResults.columns.find((column) =>
+      column.entity === selectedResEntity &&
+      resEntityMatchesGroup(column.entity, effectiveSelectedResComponentGroup, column.variable) &&
+      matchesTextFilter(column.entity, selectedResComponentFilter)
+    );
+    if (exact) return exact.entity;
+
+    const filterExact = resResults.columns.find((column) =>
+      column.entity === selectedResComponentFilter &&
+      resEntityMatchesGroup(column.entity, effectiveSelectedResComponentGroup, column.variable)
+    );
+    if (filterExact) return filterExact.entity;
+
+    return resComponentSuggestions[0] ?? "";
+  }, [effectiveSelectedResComponentGroup, resComponentSuggestions, resResults, selectedResComponentFilter, selectedResEntity]);
+
+  const effectiveSelectedResVariable = resVariableOptions.includes(selectedResVariable)
+    ? selectedResVariable
+    : resVariableOptions[0] ?? "";
+
+  const selectedValidationResult = useMemo(() => {
+    return validationResults.find((result) => result.sourceId === selectedValidationSourceId) ?? validationResults[0] ?? null;
+  }, [selectedValidationSourceId, validationResults]);
+
+  const validationSeriesOptions = useMemo(() => {
+    return selectedValidationResult?.columns.map((column) => column.header) ?? [];
+  }, [selectedValidationResult]);
+
+  const effectiveSelectedValidationSeries = validationSeriesOptions.includes(selectedValidationSeries)
+    ? selectedValidationSeries
+    : validationSeriesOptions[0] ?? "";
 
   const currentPlotSelection = useMemo(() => {
     if (plotMode === "res") {
-      if (!selectedResVariable || !selectedResEntity) return null;
+      if (!effectiveSelectedResVariable || !effectiveSelectedResEntity) return null;
       return {
         mode: "res",
-        id: resSeriesId({ variable: selectedResVariable, entity: selectedResEntity }),
-        variable: selectedResVariable,
-        entity: selectedResEntity,
-        label: `${selectedResVariable}: ${selectedResEntity}`
+        componentGroup: effectiveSelectedResComponentGroup,
+        componentFilter: selectedResComponentFilter.trim(),
+        id: resSeriesId({ variable: effectiveSelectedResVariable, entity: effectiveSelectedResEntity }),
+        variable: effectiveSelectedResVariable,
+        entity: effectiveSelectedResEntity,
+        label: `${effectiveSelectedResVariable}: ${effectiveSelectedResEntity}`
       };
     }
 
-    if (!selectedCircuit || !selectedVariable) return null;
-    const variableLabel = nodeVariables.find((variable) => variable.value === selectedVariable)?.label ?? selectedVariable;
+    if (!selectedCircuit) return null;
+    if (!effectiveSelectedComponentGroup || !effectiveSelectedComponentAttribute) return null;
+    const groupLabel = componentGroupOptions.find((group) => group.value === effectiveSelectedComponentGroup)?.label ?? effectiveSelectedComponentGroup;
+    const attributeLabel = hdf5AttributeLabel(effectiveSelectedComponentAttribute);
+    const filterLabel = selectedComponentFilter.trim() ? `: ${selectedComponentFilter.trim()}` : "";
     return {
       mode: "hdf5",
-      id: hdf5SeriesId({ circuitKey: selectedCircuit, pipeFilter: selectedPipe, variable: selectedVariable }),
+      id: hdf5SeriesId({
+        circuitKey: selectedCircuit,
+        componentGroup: effectiveSelectedComponentGroup,
+        componentFilter: selectedComponentFilter.trim(),
+        variable: effectiveSelectedComponentAttribute
+      }),
       circuitKey: selectedCircuit,
-      pipeFilter: selectedPipe,
-      variable: selectedVariable,
-      label: selectedPipe === "__all__" ? variableLabel : `${variableLabel}: ${selectedPipe}`
+      componentGroup: effectiveSelectedComponentGroup,
+      componentFilter: selectedComponentFilter.trim(),
+      variable: effectiveSelectedComponentAttribute,
+      label: `${attributeLabel} (${groupLabel}${filterLabel})`
     };
-  }, [plotMode, selectedCircuit, selectedPipe, selectedResEntity, selectedResVariable, selectedVariable]);
+  }, [componentGroupOptions, effectiveSelectedComponentAttribute, effectiveSelectedComponentGroup, effectiveSelectedResComponentGroup, effectiveSelectedResEntity, effectiveSelectedResVariable, plotMode, selectedCircuit, selectedComponentFilter, selectedResComponentFilter]);
+
+  const currentValidationSelection = useMemo(() => {
+    if (!selectedValidationResult || !effectiveSelectedValidationSeries) return null;
+    return {
+      mode: "validation",
+      id: validationSeriesId({ sourceId: selectedValidationResult.sourceId, column: effectiveSelectedValidationSeries }),
+      sourceId: selectedValidationResult.sourceId,
+      variable: effectiveSelectedValidationSeries,
+      label: `${selectedValidationResult.sourceName}: ${effectiveSelectedValidationSeries}`
+    };
+  }, [effectiveSelectedValidationSeries, selectedValidationResult]);
 
   const activeSeriesSelections = useMemo(() => {
-    return plotSeriesSelections.filter((selection) => selection.mode === plotMode);
+    return plotSeriesSelections.filter((selection) => selection.mode === plotMode || selection.mode === "validation");
   }, [plotMode, plotSeriesSelections]);
 
   const effectiveSeriesSelections = useMemo(() => {
@@ -3459,17 +3710,32 @@ export default function App() {
         return { ...selection, color: plotColors[index % plotColors.length], data };
       }
 
+      if (selection.mode === "validation") {
+        const source = validationResults.find((result) => result.sourceId === selection.sourceId);
+        const column = source?.columns.find((item) => item.header === selection.variable);
+        const data = !source || !column
+          ? []
+          : source.rows
+            .map((row) => ({
+              label: String(row[source.xIndex]),
+              xValue: row[source.xIndex],
+              value: row[column.index]
+            }))
+            .filter((point) => Number.isFinite(point.xValue) && Number.isFinite(point.value));
+        return { ...selection, color: plotColors[index % plotColors.length], data };
+      }
+
       const circuit = results?.circuits.find((item) => item.key === selection.circuitKey) ?? null;
       return {
         ...selection,
         color: plotColors[index % plotColors.length],
-        data: getPipeNodeSeries(circuit, selection.variable, selection.pipeFilter, cpValue)
+        data: getComponentAttributeSeries(circuit, selection.componentGroup, selection.variable, selection.componentFilter, cpValue)
       };
     });
-  }, [cpValue, effectiveSeriesSelections, resResults, results]);
+  }, [cpValue, effectiveSeriesSelections, resResults, results, validationResults]);
 
   const plotPointCount = plotSeries.reduce((count, item) => count + item.data.length, 0);
-  const selectedPlotVariable = currentPlotSelection?.variable ?? (plotMode === "res" ? selectedResVariable : selectedVariable);
+  const selectedPlotVariable = currentPlotSelection?.variable ?? currentValidationSelection?.variable ?? (plotMode === "res" ? effectiveSelectedResVariable : effectiveSelectedComponentAttribute);
   const selectedUnitOptions = useMemo(() => unitOptionsForVariable(selectedPlotVariable), [selectedPlotVariable]);
   const selectedUnit = selectedUnitOptions.some((option) => option.value === plotFormat.yUnit)
     ? plotFormat.yUnit
@@ -3487,11 +3753,15 @@ export default function App() {
 
   const selectedVariableLabel = useMemo(() => {
     if (plotMode === "res") {
-      return selectedResVariable && selectedResEntity ? `${selectedResVariable}: ${selectedResEntity}` : "Transient result";
+      return effectiveSelectedResVariable && effectiveSelectedResEntity ? `${effectiveSelectedResVariable}: ${effectiveSelectedResEntity}` : "Transient result";
     }
 
-    return nodeVariables.find((variable) => variable.value === selectedVariable)?.label ?? selectedVariable;
-  }, [plotMode, selectedResEntity, selectedResVariable, selectedVariable]);
+    if (plotMode === "hdf5" && effectiveSelectedComponentAttribute) {
+      return hdf5AttributeLabel(effectiveSelectedComponentAttribute);
+    }
+
+    return currentValidationSelection?.label ?? "Component attribute";
+  }, [currentValidationSelection, effectiveSelectedComponentAttribute, effectiveSelectedResEntity, effectiveSelectedResVariable, plotMode]);
 
   const displayYAxisTitle = labelWithUnit(plotFormat.yAxisTitle || selectedVariableLabel, selectedUnit);
   const addCurrentPlotLine = () => {
@@ -3499,6 +3769,13 @@ export default function App() {
     setPlotSeriesSelections((current) => {
       if (current.some((selection) => selection.id === currentPlotSelection.id)) return current;
       return [...current, currentPlotSelection];
+    });
+  };
+  const addValidationPlotLine = () => {
+    if (!currentValidationSelection) return;
+    setPlotSeriesSelections((current) => {
+      if (current.some((selection) => selection.id === currentValidationSelection.id)) return current;
+      return [...current, currentValidationSelection];
     });
   };
   const removePlotLine = (id) => {
@@ -3568,11 +3845,11 @@ export default function App() {
             <button className="primary-button" onClick={() => fileInput.current?.click()} title="Import an OpenSD geometry XML file">
               Import XML
             </button>
-            <button className="primary-button" onClick={() => layoutInput.current?.click()} disabled={!nodes.length} title="Import component positions from layout JSON">
-              Import Layout
-            </button>
             <button className="secondary-button secondary-button--inline" onClick={exportGeometry} disabled={!nodes.length} title="Export current geometry and connectivity as XML">
               Export XML
+            </button>
+            <button className="primary-button" onClick={() => layoutInput.current?.click()} disabled={!nodes.length} title="Import component positions from layout JSON">
+              Import Layout
             </button>
             <button className="secondary-button secondary-button--inline" onClick={exportLayout} disabled={!nodes.length} title="Export component positions as layout JSON">
               Export Layout
@@ -3613,16 +3890,16 @@ export default function App() {
               Move &darr;
             </button>
             <button type="button" title="Move horizontally aligned components closer" onClick={() => changeSelectedSpacing("horizontal", "closer")} disabled={!canAlignSelection}>
-              Closer H
+              &rarr;&larr;
             </button>
             <button type="button" title="Move horizontally aligned components farther apart" onClick={() => changeSelectedSpacing("horizontal", "farther")} disabled={!canAlignSelection}>
-              Farther H
+              &larr;&rarr;
             </button>
             <button type="button" title="Move vertically aligned components closer" onClick={() => changeSelectedSpacing("vertical", "closer")} disabled={!canAlignSelection}>
-              Closer V
+              &darr;&uarr;
             </button>
             <button type="button" title="Move vertically aligned components farther apart" onClick={() => changeSelectedSpacing("vertical", "farther")} disabled={!canAlignSelection}>
-              Farther V
+              &uarr;&darr;
             </button>
             <button
               type="button"
@@ -3698,6 +3975,14 @@ export default function App() {
               accept=".res,text/plain"
               onChange={(event) => importTransientResults(event.target.files?.[0])}
             />
+            <input
+              ref={validationInput}
+              className="file-input"
+              type="file"
+              accept=".txt,.csv,.dat,text/plain,text/csv"
+              multiple
+              onChange={(event) => importValidationResults(event.target.files)}
+            />
 
             <section className="panel sidebar-panel">
               <div className="panel-title">Postprocessor</div>
@@ -3706,6 +3991,9 @@ export default function App() {
               </button>
               <button className="secondary-button secondary-button--inline" onClick={() => resInput.current?.click()}>
                 Import output.res
+              </button>
+              <button className="secondary-button secondary-button--inline" onClick={() => validationInput.current?.click()}>
+                Import validation
               </button>
               <div className="status-text">{resultsStatus}</div>
             </section>
@@ -3716,7 +4004,10 @@ export default function App() {
                 <div className="post-controls post-controls--sidebar">
                   <label>
                     Circuit
-                    <select value={selectedCircuit} onChange={(event) => setSelectedCircuit(event.target.value)}>
+                    <select value={selectedCircuit} onChange={(event) => {
+                      setSelectedCircuit(event.target.value);
+                      setSelectedComponentFilter("");
+                    }}>
                       {results.circuits.map((circuit) => (
                         <option key={circuit.key} value={circuit.key}>
                           {circuit.identifier}
@@ -3726,40 +4017,66 @@ export default function App() {
                   </label>
 
                   <label>
-                    Pipe
-                    <select value={selectedPipe} onChange={(event) => setSelectedPipe(event.target.value)}>
-                      <option value="__all__">All nodes</option>
-                      {pipeOptions.map((pipe) => (
-                        <option key={pipe} value={pipe}>
-                          {pipe}
+                    Component type
+                    <select
+                      value={effectiveSelectedComponentGroup}
+                      onChange={(event) => {
+                        setSelectedComponentGroup(event.target.value);
+                        setSelectedComponentFilter("");
+                        setPlotFormat((current) => ({
+                          ...current,
+                          xAxisTitle: "Component",
+                          yAxisTitle: ""
+                        }));
+                      }}
+                    >
+                      {componentGroupOptions.map((group) => (
+                        <option key={group.value} value={group.value}>
+                          {group.label}
                         </option>
                       ))}
                     </select>
                   </label>
 
                   <label>
-                    Variable
+                    Filter
+                    <input
+                      value={selectedComponentFilter}
+                      list="hdf5-component-suggestions"
+                      placeholder="Type a component id"
+                      onChange={(event) => setSelectedComponentFilter(event.target.value)}
+                    />
+                    <datalist id="hdf5-component-suggestions">
+                      {componentSuggestions.map((component) => (
+                        <option key={component} value={component} />
+                      ))}
+                    </datalist>
+                  </label>
+
+                  <label>
+                    Attribute
                     <select
-                      value={selectedVariable}
+                      value={effectiveSelectedComponentAttribute}
                       onChange={(event) => {
-                        const nextVariable = event.target.value;
-                        setSelectedVariable(nextVariable);
+                        const nextAttribute = event.target.value;
+                        setSelectedComponentAttribute(nextAttribute);
                         setPlotFormat((current) => ({
                           ...current,
-                          yAxisTitle: nodeVariables.find((variable) => variable.value === nextVariable)?.label ?? nextVariable,
-                          yUnit: defaultUnitForVariable(nextVariable)
+                          yAxisTitle: hdf5AttributeLabel(nextAttribute),
+                          yUnit: defaultUnitForVariable(nextAttribute)
                         }));
                       }}
+                      disabled={!availableComponentAttributes.length}
                     >
-                      {availableVariables.map((variable) => (
-                        <option key={variable.value} value={variable.value}>
-                          {variable.label}
+                      {availableComponentAttributes.map((attribute) => (
+                        <option key={attribute.value} value={attribute.value}>
+                          {attribute.label}
                         </option>
                       ))}
                     </select>
                   </label>
 
-                  {selectedVariable === "temperature_from_tenth" && (
+                  {effectiveSelectedComponentGroup === "nodes" && effectiveSelectedComponentAttribute === "temperature_from_tenth" && (
                     <label>
                       Cp
                       <input
@@ -3781,41 +4098,113 @@ export default function App() {
                 <div className="panel-title">Selection</div>
                 <div className="post-controls post-controls--sidebar">
                   <label>
-                    Variable
+                    Component type
                     <select
-                      value={selectedResVariable}
+                      value={effectiveSelectedResComponentGroup}
                       onChange={(event) => {
-                        const nextVariable = event.target.value;
-                        const nextEntity = resResults.columns.find((column) => column.variable === nextVariable)?.entity ?? "";
-                        setSelectedResVariable(nextVariable);
-                        setSelectedResEntity(nextEntity);
+                        setSelectedResComponentGroup(event.target.value);
+                        setSelectedResComponentFilter("");
+                        setSelectedResEntity("");
                         setPlotFormat((current) => ({
                           ...current,
-                          yAxisTitle: nextVariable,
-                          yUnit: defaultUnitForVariable(nextVariable)
+                          xAxisTitle: "Time (s)",
+                          yAxisTitle: ""
                         }));
                       }}
                     >
-                      {resVariableOptions.map((variable) => (
-                        <option key={variable} value={variable}>
-                          {variable}
+                      {resComponentGroupOptions.map((group) => (
+                        <option key={group.value} value={group.value}>
+                          {group.label}
                         </option>
                       ))}
                     </select>
                   </label>
 
                   <label>
-                    Signal
-                    <select value={selectedResEntity} onChange={(event) => setSelectedResEntity(event.target.value)}>
-                      {resEntityOptions.map((entity) => (
-                        <option key={entity} value={entity}>
-                          {entity}
+                    Filter
+                    <input
+                      value={selectedResComponentFilter}
+                      list="res-component-suggestions"
+                      placeholder="Type a signal id"
+                      onChange={(event) => {
+                        setSelectedResComponentFilter(event.target.value);
+                        setSelectedResEntity(event.target.value);
+                      }}
+                    />
+                    <datalist id="res-component-suggestions">
+                      {resComponentSuggestions.map((entity) => (
+                        <option key={entity} value={entity} />
+                      ))}
+                    </datalist>
+                  </label>
+
+                  <label>
+                    Attribute
+                    <select
+                      value={effectiveSelectedResVariable}
+                      onChange={(event) => {
+                        const nextVariable = event.target.value;
+                        setSelectedResVariable(nextVariable);
+                        setSelectedResEntity(effectiveSelectedResEntity);
+                        setPlotFormat((current) => ({
+                          ...current,
+                          yAxisTitle: hdf5AttributeLabel(nextVariable),
+                          yUnit: defaultUnitForVariable(nextVariable)
+                        }));
+                      }}
+                      disabled={!resVariableOptions.length}
+                    >
+                      {resVariableOptions.map((variable) => (
+                        <option key={variable} value={variable}>
+                          {hdf5AttributeLabel(variable)}
                         </option>
                       ))}
                     </select>
                   </label>
                   <button type="button" className="secondary-button secondary-button--inline" onClick={addCurrentPlotLine}>
                     Add line
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {validationResults.length > 0 && (
+              <section className="panel sidebar-panel">
+                <div className="panel-title">Validation</div>
+                <div className="post-controls post-controls--sidebar">
+                  <label>
+                    File
+                    <select
+                      value={selectedValidationResult?.sourceId ?? ""}
+                      onChange={(event) => {
+                        setSelectedValidationSourceId(event.target.value);
+                        const nextResult = validationResults.find((result) => result.sourceId === event.target.value);
+                        setSelectedValidationSeries(nextResult?.columns[0]?.header ?? "");
+                      }}
+                    >
+                      {validationResults.map((result) => (
+                        <option key={result.sourceId} value={result.sourceId}>
+                          {result.sourceName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Series
+                    <select
+                      value={effectiveSelectedValidationSeries}
+                      onChange={(event) => setSelectedValidationSeries(event.target.value)}
+                      disabled={!validationSeriesOptions.length}
+                    >
+                      {validationSeriesOptions.map((series) => (
+                        <option key={series} value={series}>
+                          {series}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button type="button" className="secondary-button secondary-button--inline" onClick={addValidationPlotLine}>
+                    Add validation line
                   </button>
                 </div>
               </section>
@@ -3834,7 +4223,7 @@ export default function App() {
                       </button>
                     </div>
                   ))}
-                  <button type="button" className="secondary-button secondary-button--inline" onClick={() => setPlotSeriesSelections((current) => current.filter((selection) => selection.mode !== plotMode))}>
+                  <button type="button" className="secondary-button secondary-button--inline" onClick={() => setPlotSeriesSelections((current) => current.filter((selection) => selection.mode !== plotMode && selection.mode !== "validation"))}>
                     Clear lines
                   </button>
                 </div>

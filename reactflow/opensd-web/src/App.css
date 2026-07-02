@@ -1643,6 +1643,12 @@ button {
   stroke-width: 2;
 }
 
+.react-flow__edge path.partial-dash-edge__segment {
+  stroke-dasharray: 5 4;
+  stroke-width: 4;
+  stroke-linecap: butt;
+}
+
 .react-flow__handle.handle-heat {
   width: 14px;
   height: 14px;

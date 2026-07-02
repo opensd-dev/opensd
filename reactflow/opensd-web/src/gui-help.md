@@ -6,7 +6,7 @@ Press **F1** at any time to open this help page.
 
 - **Pre-processor** imports, edits, lays out, and exports OpenSD geometry.
 - **Solver** edits settings and runs the OpenSD executable in an allowed WSL working directory.
-- **Postprocessor** imports HDF5 results and plots circuit variables.
+- **Postprocessor** imports HDF5 results and plots circuit variables or component attributes.
 - **Help** displays this document.
 - **Requirements** displays the bundled GUI requirements.
 
@@ -50,7 +50,9 @@ Press **F1** at any time to open this help page.
 
 ## Postprocessor
 
-- Import an `.h5` or `.hdf5` result, then choose circuit, pipe filter, and variable.
+- Import an `.h5`, `.hdf5`, or `output.res` result, then choose circuit, component type, filter, and attribute. Nodes, pipes, and faces use the same selection controls.
+- Import validation `.txt`, `.csv`, or `.dat` tables from the same run folder to overlay reference series on the active plot.
+- For regenerated transient results, pipe endpoint signals such as `pipe22_downstream` can be selected directly.
 - Temperature-from-enthalpy plots also expose the Cp value used for conversion.
 
 ## Mouse and keyboard summary
