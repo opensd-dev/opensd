@@ -7,6 +7,7 @@
 
 #include <deque>
 #include <iostream>
+#include <sstream>
 #include <unordered_map>
 
 namespace opensd {
@@ -83,9 +84,52 @@ void writeCell(const std::string& value)
   f1 << "," << value;
 }
 
+void appendHeaderCell(std::ostringstream& out, const std::string& value)
+{
+  out << "," << value;
+}
+
 void writeCell(double value)
 {
   f1 << "," << std::setprecision(7) << value;
+}
+
+std::string buildHeader()
+{
+  std::ostringstream out;
+  out << " time(s)";
+
+  for (const auto& circuit : model::circuits_owned) {
+    for (const auto& ger : circuit->gers) {
+      appendHeaderCell(out, "vflow_gues:" + ger->identifier);
+    }
+    for (const auto& item : pipe_items) {
+      for (const auto& pipe : circuit->pipes) {
+        appendHeaderCell(out, item + ":" + pipe->identifier);
+      }
+    }
+    for (const auto& item : face_items) {
+      for (const auto& face : circuit->faces) {
+        appendHeaderCell(out, item + ":" + faceIdentifier(*face));
+      }
+    }
+    for (const auto& item : pipe_node_items) {
+      for (const auto& pipe : circuit->pipes) {
+        appendHeaderCell(out, item + ":" + pipe->identifier + "_upstream");
+        appendHeaderCell(out, item + ":" + pipe->identifier + "_downstream");
+      }
+    }
+    for (const auto& item : node_items) {
+      for (const auto& node : circuit->nodes) {
+        appendHeaderCell(out, item + ":" + node->identifier);
+      }
+    }
+  }
+  for (const auto& calc : Calculate::registry) {
+    appendHeaderCell(out, calc->identifier());
+  }
+
+  return out.str();
 }
 
 std::vector<std::string> readLastNonEmptyRows(const std::string& path, std::size_t row_count)
@@ -116,7 +160,8 @@ void openFile(const std::string& outputFile) {
   f1.open(bPath, std::ios::out | std::ios::trunc);
   output_has_header = false;
 
-  if (retained_rows.size() == 2 && retained_rows.front().find("time") != std::string::npos) {
+  const std::string expected_header = buildHeader();
+  if (retained_rows.size() == 2 && retained_rows.front() == expected_header) {
     for (const auto& row : retained_rows) {
       f1 << row << '\n';
     }
@@ -170,45 +215,14 @@ void Calculate::update(double time, double delt)
 }
 
 void writeOutput(double time, double delt) {
-  if (time == 0. && !output_has_header) {
+  if (!output_has_header) {
     writeHeader();
   }
   writeValue(time, delt);
 }
 
 void writeHeader() {
-  f1 << " time(s)";
-
-  for (const auto& circuit : model::circuits_owned) {
-    for (const auto& ger : circuit->gers) {
-      writeCell("vflow_gues:" + ger->identifier);
-    }
-    for (const auto& item : pipe_items) {
-      for (const auto& pipe : circuit->pipes) {
-        writeCell(item + ":" + pipe->identifier);
-      }
-    }
-    for (const auto& item : face_items) {
-      for (const auto& face : circuit->faces) {
-        writeCell(item + ":" + faceIdentifier(*face));
-      }
-    }
-    for (const auto& item : pipe_node_items) {
-      for (const auto& pipe : circuit->pipes) {
-        writeCell(item + ":" + pipe->identifier + "_upstream");
-        writeCell(item + ":" + pipe->identifier + "_downstream");
-      }
-    }
-    for (const auto& item : node_items) {
-      for (const auto& node : circuit->nodes) {
-        writeCell(item + ":" + node->identifier);
-      }
-    }
-  }
-  for (const auto& calc : Calculate::registry) {
-    writeCell(calc->identifier());
-  }
-  f1 << '\n';
+  f1 << buildHeader() << '\n';
   output_has_header = true;
 }
 
