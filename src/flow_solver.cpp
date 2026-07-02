@@ -824,7 +824,8 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
       A_local_node = trans_sim * C / delt;
       b_local = node->tenth_old * (trans_sim * C / delt)
                 + trans_sim * E * (node->spres_gues - node->spres_old) / delt
-                + node->heat_input; // + std::accumulate(node.heat_hslab.begin(), node.heat_hslab.end(), 0.0);
+                + node->heat_input
+                + std::accumulate(node->heat_hslab.begin(), node->heat_hslab.end(), 0.0);
       b_local = b_local - node->tenth_old * node->msource * trans_sim;
 
       for (auto& iface : node->ifaces) {

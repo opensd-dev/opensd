@@ -46,8 +46,11 @@ Node::Node(pugi::xml_node flnode_node)
   } else {
     fatal_error("Must specify identifier of flow node in geometry XML file.");
   }
+  esource = 0.0;
+  hresidue = 0.0;
   mresidue = 0.;
   mflow_in = 1.E-4;
+  mflow_out = 0.0;
 }
 
 

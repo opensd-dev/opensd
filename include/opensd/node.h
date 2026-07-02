@@ -30,46 +30,46 @@ class Face;
 class Node {
 public:
   std::string identifier; //!< User-defined identifier
-  double mresidue;
-  double msource;
+  double mresidue = 0.0;
+  double msource = 0.0;
   vector<std::shared_ptr<Face>> ifaces;
   vector<std::shared_ptr<Face>> ofaces;
-  double mflow_in;
-  double mflow_out;
-  Circuit* circuit;
-  int node_ind;
+  double mflow_in = 1.0E-4;
+  double mflow_out = 0.0;
+  Circuit* circuit = nullptr;
+  int node_ind = -1;
   
-  double tpres_old;
-  double ttemp_old;
-  double tenth_old;
-  double tpres_gues;
-  double ttemp_gues;
-  double tenth_gues;
+  double tpres_old = 0.0;
+  double ttemp_old = 0.0;
+  double tenth_old = 0.0;
+  double tpres_gues = 0.0;
+  double ttemp_gues = 0.0;
+  double tenth_gues = 0.0;
 
-  double spres_old;
-  double stemp_old;
-  double senth_old;
-  double spres_gues;
-  double stemp_gues;
-  double senth_gues;
+  double spres_old = 0.0;
+  double stemp_old = 0.0;
+  double senth_old = 0.0;
+  double spres_gues = 0.0;
+  double stemp_gues = 0.0;
+  double senth_gues = 0.0;
   
-  double heat_input;
-  double elevation;
+  double heat_input = 0.0;
+  double elevation = 0.0;
   
   std::set<std::string> fixed_var;
-  double esource;
-  double hresidue;
-  double volume;
+  double esource = 0.0;
+  double hresidue = 0.0;
+  double volume = 0.0;
   shared_ptr<FluidFrame> ther_gues;
   shared_ptr<FluidFrame> ther_old;
-  double velocity;
-  double B1;
+  double velocity = 0.0;
+  double B1 = 0.0;
   
-  double _heat_input_esource;
-  double _heat_input_msource;
-  double _heat_input_faceconv;
-  double _heat_input_faceconv2;
-  double _heat_input_facegen;
+  double _heat_input_esource = 0.0;
+  double _heat_input_msource = 0.0;
+  double _heat_input_faceconv = 0.0;
+  double _heat_input_faceconv2 = 0.0;
+  double _heat_input_facegen = 0.0;
   std::vector<double> heat_hslab;
   std::vector<PetscScalar> Acols;
   std::vector<PetscScalar> Avals;
