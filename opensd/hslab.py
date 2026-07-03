@@ -2,6 +2,7 @@ import numpy as np
 import lxml.etree as ET
 import sys,os
 from opensd.pipe import Pipe
+from opensd.node import Node
 comps = {}
 
 def add_SNode(identifier,Ai,Aj,vol,solname,sollib,heat_frac,layer):
@@ -294,42 +295,21 @@ class HSlab:
     def find_comps(self,ucomp,dcomp,config,ninc):
         from opensd.project import get_comp
 
-        try:
-            self.ucomp = get_comp(ucomp)
-            if isinstance(self.ucomp,Pipe):
-                pipe = self.ucomp
-                uninc = pipe.ncell #no of increments in the upstream pipe
-                # self.uval.append([pipe.faces[i] for i in range(pipe.ncell)])
-                # for i in range(pipe.ncell):
-                #     self.ufaces.append(pipe.faces[i])
+        self.ucomp = get_comp(ucomp)
+        if isinstance(self.ucomp,Pipe):
+            uninc = self.ucomp.ncell #no of increments in the upstream pipe
+        elif isinstance(self.ucomp,Node):
+            self.uval.append(self.ucomp)
+        elif ucomp not in comps:
+            sys.exit("ucomp connection not defined. stopping" + str(ucomp))
 
-            elif isinstance(self.ucomp,comp.Node):
-                self.uval.append(self.ucomp)
-            else:
-                sys.exit("ucomp connection not defined. stopping" + self.ucomp.identifier)
-        except:
-            pass
-
-        try:
-            self.dcomp = get_comp(dcomp)
-            if isinstance(self.dcomp,Pipe):
-                pipe = self.dcomp
-                dninc = pipe.ncell #no of increments in the downstream pipe
-                # self.dval.append([])
-                # if config == "counter":
-                #     for i in range(pipe.ncell):
-                #         self.dval[1].append(pipe.faces[pipe.ncell-i-1])
-                #         self.dfaces.append(pipe.faces[i])
-                # else:
-                #     for i in range(pipe.ncell):
-                #         self.dval[1].append(pipe.faces[i])
-                #         self.dfaces.append(pipe.faces[i])
-            elif isinstance(self.dcomp,comp.Node):
-                self.dval.append(self.dcomp)
-            else:
-                sys.exit("dcomp connection not defined. stopping" + self.dcomp.identifier)
-        except:
-            pass
+        self.dcomp = get_comp(dcomp)
+        if isinstance(self.dcomp,Pipe):
+            dninc = self.dcomp.ncell #no of increments in the downstream pipe
+        elif isinstance(self.dcomp,Node):
+            self.dval.append(self.dcomp)
+        elif dcomp not in comps:
+            sys.exit("dcomp connection not defined. stopping" + str(dcomp))
 
         for key,value in comps.items():
             if key == ucomp:

@@ -373,6 +373,14 @@ class Circuit:
             print ("input_pair not recognized. stopping",input_pair)
             sys.exit()
 
+    def calc_temp(self,input_pair,val1,val2):
+        if input_pair == CoolProp.HmassP_INPUTS:
+            self.flstate.update(input_pair,val1,val2)
+            return self.flstate.T()
+        else:
+            print ("input_pair not recognized. stopping",input_pair)
+            sys.exit()
+
     def plot(self):
         """Display the flow circuit.
 

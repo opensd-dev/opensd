@@ -6,6 +6,9 @@ from pathlib import Path
 import pytest
 
 import opensd
+from opensd.circuit import Circuit
+from opensd.hslab import HSlab, LumpedMass
+from opensd import hslab
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -26,30 +29,6 @@ def _tutorial_entrypoints():
         for candidate in candidates:
             if candidate.exists():
                 marks = []
-                if candidate == TUTORIALS_ROOT / "tutorial11" / "tutorial.py":
-                    marks.append(
-                        pytest.mark.xfail(
-                            raises=NameError,
-                            reason="tutorial11 uses the legacy PINET/comp API.",
-                            strict=True,
-                        )
-                    )
-                elif candidate == TUTORIALS_ROOT / "tutorial13" / "tutorial.py":
-                    marks.append(
-                        pytest.mark.xfail(
-                            raises=SystemExit,
-                            reason="tutorial13 AFF length does not match the hslab increment count.",
-                            strict=True,
-                        )
-                    )
-                elif candidate == TUTORIALS_ROOT / "tutorial2" / "tutorial.ipynb":
-                    marks.append(
-                        pytest.mark.xfail(
-                            raises=AttributeError,
-                            reason="tutorial2 reaches the legacy Circuit.calc_temp path.",
-                            strict=True,
-                        )
-                    )
                 entrypoints.append(pytest.param(candidate, id=candidate.parent.name, marks=marks))
                 break
 
@@ -76,6 +55,13 @@ def _run_notebook_until_solver_call(notebook_path):
             break
 
 
+def _reset_opensd_registries():
+    Circuit._registry.clear()
+    HSlab._registry.clear()
+    LumpedMass._registry.clear()
+    hslab.comps.clear()
+
+
 @pytest.mark.parametrize("entrypoint", _tutorial_entrypoints())
 def test_tutorial_builds_inputs_and_reaches_solver(monkeypatch, tmp_path, entrypoint):
     run_calls = []
@@ -88,6 +74,7 @@ def test_tutorial_builds_inputs_and_reaches_solver(monkeypatch, tmp_path, entryp
     monkeypatch.chdir(tmp_path)
     monkeypatch.syspath_prepend(str(ROOT))
     monkeypatch.syspath_prepend(str(entrypoint.parent))
+    _reset_opensd_registries()
     sys.modules.pop("scripts", None)
 
     for data_file in entrypoint.parent.glob("*.csv"):
