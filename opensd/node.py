@@ -1,3 +1,6 @@
+import math
+import sys
+
 import CoolProp
 import lxml.etree as ET
 

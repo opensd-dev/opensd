@@ -228,6 +228,54 @@ pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python,c++,cmake
 
-# Tutorial inputs
-*.xml
-*.res
+# Local Codex scratch space
+.codex_tmp/
+
+# Local scratch scripts
+tmp_*
+
+# Downloaded binary packages
+*.deb
+
+# Solver run outputs
+output.res
+
+# Tutorial generated solver inputs/outputs
+tutorials/**/*.xml
+tutorials/**/*.res
+tutorials/**/*.res2
+tutorials/**/*.h5
+tutorials/**/output.res
+tutorials/**/circuit_rank*.h5
+tutorials/**/circuits.h5
+tutorials/**/convergence_rank_*.txt
+tutorials/**/enth_output.txt
+tutorials/**/face_reindex*.txt
+tutorials/**/faces_owned*.txt
+tutorials/**/ghosts*.txt
+tutorials/**/matrix_A*.txt
+tutorials/**/partition*.txt
+tutorials/**/pc_array*.txt
+tutorials/**/pc_output*.txt
+tutorials/**/tenth_rank_*.txt
+tutorials/**/tpres_rank_*.txt
+tutorials/**/vector_b.txt
+tutorials/**/vflow*.txt
+tutorials/**/data.txt
+tutorials/**/fluidframe.py
+tutorials/**/solidframe.py
+tutorials/**/Na*.py
+tutorials/**/SS*.py
+tutorials/**/MOX*.py
+tutorials/**/gap*.py
+tutorials/**/Water.py
+tutorials/**/water*.py
+tutorials/**/glass.py
+
+# Keep curated tutorial sources, figures, layouts, and data visible.
+!tutorials/**/tutorial.py
+!tutorials/**/build_xml.py
+!tutorials/**/*.ipynb
+!tutorials/**/*.png
+!tutorials/**/*.csv
+!tutorials/**/geometry.layout.json

@@ -36,6 +36,8 @@ adapter. On WSL/Linux, run `hostname -I`.
 - **Solver** — Edit/import/export `settings.xml` and run `/mnt/c/codes/opensd/build/opensd` in a selected OpenSD working directory.
 - **Postprocess** — Import HDF5, plot node variables along pipes.
 
+- **Help** - Press `F1` for browser tutorials covering tutorial import, browser model building, solver runs, and postprocessing.
+
 ## Requirements
 
 Solver working directories may be anywhere under `/mnt/c` by default. Set `OPENSD_WORKING_ROOTS` to a comma-separated list of absolute WSL roots to narrow or extend the allowed locations.

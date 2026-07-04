@@ -13,6 +13,7 @@ OpenSD is system dynamics code. It is developed with a similar outline structure
 
    quickinstall
    tutorials
+   browser_gui_tutorials
    theory/index
    usersguide/index
    devguide/index

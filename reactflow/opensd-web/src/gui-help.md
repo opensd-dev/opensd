@@ -10,6 +10,44 @@ Press **F1** at any time to open this help page.
 - **Help** displays this document.
 - **Requirements** displays the bundled GUI requirements.
 
+## Browser tutorial: inspect an existing tutorial
+
+1. Open **Pre-processor**.
+2. Select **Import XML** and choose a tutorial `geometry.xml`, for example `tutorials/tutorial10/geometry.xml`.
+3. Select **Fit view** to frame the model.
+4. Use **Project information** to review component counts, circuit groups, and layout status.
+5. Double-click a node, pipe, hslab, pump, or BC to inspect its exported XML attributes.
+6. Use **Export layout** to save the component positions as `geometry.layout.json`.
+7. Use **Export XML** to save the current browser model back to `geometry.xml`.
+
+This workflow is useful for reviewing Python-created tutorials in the browser before running or editing them.
+
+## Browser tutorial: build a single-pipe model
+
+1. Open **Pre-processor** and select **Clear layout**.
+2. Add two **Node** components and one **Pipe** component from the palette.
+3. Drag from the first node to the pipe, then from the pipe to the second node.
+4. Add two **BC** components. Connect one BC to the inlet node and one BC to the outlet node.
+5. Double-click the pipe and set diameter, length, roughness, friction option, and cell count.
+6. Double-click each BC and set the pressure, temperature, or mass-source condition needed by the circuit.
+7. Select the connected components and use the alignment tools to make the flow path readable.
+8. Export `geometry.xml` and `geometry.layout.json`.
+
+The exported XML can be used directly by the solver. The layout JSON is optional, but keeps the same browser arrangement when the model is reopened.
+
+## Browser tutorial: run and review results
+
+1. Open **Solver**.
+2. Set the working directory to the tutorial folder that contains `geometry.xml`.
+3. Import or edit settings, then select **Run solver**.
+4. When the run completes, open **Postprocessor**.
+5. Import the generated HDF5 result, or import `output.res` for legacy text output.
+6. Choose a circuit, component type, component filter, and attribute.
+7. Import a validation `.txt`, `.csv`, or `.dat` file from the same run folder to overlay reference data.
+8. Export the plot SVG for reports or documentation.
+
+Solver working directories are restricted by the server configuration. If a valid folder is rejected, check `OPENSD_WORKING_ROOTS`.
+
 ## Geometry and layout
 
 - **Import XML** loads an OpenSD geometry file. **Export XML** writes current attributes and connectivity.
