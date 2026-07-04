@@ -1,14 +1,14 @@
-=====================
-Browser GUI Tutorials
-=====================
+=========
+GUI Guide
+=========
 
-The OpenSD web GUI provides a browser workflow for inspecting tutorial models,
-editing geometry, running the solver, and plotting results. The in-app Help
-workspace contains the most up-to-date click-by-click instructions and can be
-opened with ``F1``.
+The OpenSD web GUI provides a browser workflow for building and inspecting
+models, editing geometry, running the solver, and plotting results. The in-app
+Help workspace contains the most up-to-date click-by-click instructions and can
+be opened with ``F1``.
 
 Starting the GUI
-================
+----------------
 
 From ``reactflow/opensd-web``:
 
@@ -23,7 +23,7 @@ authentication is enabled, use the username and password configured in
 ``.env``.
 
 Inspect an existing tutorial
-============================
+----------------------------
 
 1. Open the **Pre-processor** workspace.
 2. Select **Import XML** and choose a tutorial ``geometry.xml`` file.
@@ -33,7 +33,7 @@ Inspect an existing tutorial
 6. Export ``geometry.xml`` and ``geometry.layout.json`` after edits.
 
 Build a simple browser model
-============================
+----------------------------
 
 1. Clear the layout.
 2. Add two nodes, a pipe, and boundary conditions from the component palette.
@@ -44,7 +44,7 @@ Build a simple browser model
 7. Export geometry and layout files.
 
 Run and postprocess
-===================
+-------------------
 
 1. Open the **Solver** workspace.
 2. Set the working directory to a folder containing ``geometry.xml``.
@@ -55,9 +55,9 @@ Run and postprocess
 7. Overlay validation tables when available.
 8. Export plot SVGs for reports.
 
-Tutorial decks
-==============
+Tutorial models
+---------------
 
-The Python tutorial decks under ``tutorials/`` can be used to generate
-``geometry.xml`` inputs, then opened in the browser GUI. The browser workflow is
-especially useful for inspecting PINET-derived decks before running them.
+The tutorial pages describe the problem data, model-building steps, and result
+checks. Use this guide for the shared GUI operations that are common to all
+tutorials.
