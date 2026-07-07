@@ -76,6 +76,10 @@ class VSPump(Pump):
         subelement.set("Nop", str(self.Nop))
         subelement.set("unode",      str(self.unode.identifier))
         subelement.set("dnode",      str(self.dnode.identifier))
+        for speed, filename in self.curves:
+            curve = ET.SubElement(subelement, "curve")
+            curve.set("speed", str(speed))
+            curve.set("file", str(filename))
 
 class HPump(Pump):
     WH = np.array([0.634,0.643,0.646,0.640,0.629,0.613,0.595,0.575,0.552,0.533,.516,.505,0.504,0.51,0.512,0.522,0.539,0.559,\

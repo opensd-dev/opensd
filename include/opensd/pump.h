@@ -27,7 +27,7 @@ public:
   // double delp_fr;
   // double delp_gr;
 
-  int Nop;
+  double Nop;
   // double ufrac;
   // double dfrac;
   // int flowreg;
@@ -40,7 +40,7 @@ public:
       double ufrac,
       double dfrac,
       double delz,
-      int Nop); //int flowreg
+      double Nop); //int flowreg
 
   Pump() = default;
   virtual ~Pump() = default;
@@ -50,8 +50,8 @@ public:
   // virtual double dHdQfuncs(double Q);
 
 
-  // void save_to_hdf5(hid_t group_id) const override;
-  // void load_from_hdf5(hid_t group_id) override;
+  void save_to_hdf5(hid_t group_id) const override;
+  void load_from_hdf5(hid_t group_id) override;
 
 };
 

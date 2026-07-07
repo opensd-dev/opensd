@@ -1,7 +1,7 @@
 # Closed loop with pump problem
 
 import opensd
-import math
+from pathlib import Path
 
 # Define sodium
 Na6 = opensd.Fluid(name="Na6")
@@ -32,38 +32,40 @@ node2 = circuit1.add_node("node2")
 
 pipe1 = circuit1.add_pipe("pipe1",0.0174,2.5,"node1","node2",'DW',30.,5)
 
-bc1 = circuit1.add_BC("bc1","node1",'P',5.E5)
-bc2 = circuit1.add_BC("bc2","node1",'T',673.)
+bc1 = circuit1.add_BC("bc1","node1",'P',5.E5,trans=False)
+bc2 = circuit1.add_BC("bc2","node1",'T',673.,trans=False)
 
-# bc3 = circuit1.add_BC("bc3","node2",'msource',-1.6)
-# bc3 = circuit1.add_BC("bc3","node2",'P',367231.4161161)
-
-# def fun1(time,delt):
-#     if time <= 5:
-#         y = 100*(10.-time)/10.
-#     else:
-#         y = 50.
-#     pump1.Nop = y
-#
-# action_setup.Action(None,None,fun1)
-
-pump1 = circuit1.add_pump("pump1","node2","node1",[[100.,"speed1.csv"]],100.)
+pump1 = circuit1.add_pump(
+    "pump1",
+    "node2",
+    "node1",
+    [[50., "speed2.csv"], [100., "speed1.csv"]],
+    100.,
+)
 
 geometry = opensd.Geometry([circuit1])
 geometry.export_to_xml()
 
-# conditions = opensd.Conditions([bc1,bc2,bc3,bc4,bc5,bc6])
-# conditions.export_to_xml('conditions.xml')
-#
-# initial_guess = opensd.InitialGuess(geometry,conditions)
-# initial_guess.export_to_xml('initial_guess.xml')
+conditions = opensd.Conditions([bc1, bc2])
+conditions.export_to_xml()
 
 settings = opensd.Settings()
-settings.verbosity = 6
-settings.temp_solve = True
+settings.temp_solve = False
+settings.relax_pres = 0.2
 settings.run_mode = "steady"
-settings.no_main_iter = 200
-settings.conv_crit_flow = 1.E-7
+settings.conv_crit_flow = 1.0e-8
+settings.export_to_xml()
+
+Path("actions.xml").unlink(missing_ok=True)
+opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/c/codes/opensd/build/opensd',threads=1)
+
+pump_speed = opensd.Tabular([0.0, 5.0, 20.0], [100.0, 50.0, 50.0])
+actions = opensd.Actions([
+    opensd.Action("pump1_speed", "pump1", "Nop", pump_speed),
+])
+actions.export_to_xml()
+settings.run_mode = "transient"
+settings.tim_slot = [[0.1, 20.0]]
 settings.export_to_xml()
 
 opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/c/codes/opensd/build/opensd',threads=1)

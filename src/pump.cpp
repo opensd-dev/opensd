@@ -5,6 +5,7 @@
 #include <algorithm>
 
 #include "opensd/error.h"
+#include "opensd/hdf5_interface.h"
 #include "opensd/xml_interface.h"
 // #include "opensd/vector.h"
 #include "opensd/constants.h"
@@ -30,8 +31,9 @@ Pump::Pump(const std::string& identifier,
            double ufrac,
            double dfrac,
 		   double delz,
-           int Nop)
+           double Nop)
   : Face(0, nullptr, ufrac, nullptr, dfrac, delz),
+    identifier(identifier),
     Nop(Nop)
     // flowreg(flowreg)
 {
@@ -57,9 +59,38 @@ static void read_csv(const std::string& file,
     std::stringstream ss(line);
     double q, h;
     char comma;
-    ss >> q >> comma >> h;
+    if (!(ss >> q >> comma >> h)) {
+      continue;
+    }
     Q.push_back(q);
     H.push_back(h);
+  }
+}
+
+void Pump::save_to_hdf5(hid_t group_id) const
+{
+  write_string_attribute(group_id, "identifier", identifier);
+  write_double_attribute(group_id, "Nop", Nop);
+  write_double_attribute(group_id, "vflow_old", vflow_old);
+  write_double_attribute(group_id, "vflow_gues", vflow_gues);
+  write_double_attribute(group_id, "mflow", mflow);
+  write_double_attribute(group_id, "velocity", velocity);
+}
+
+void Pump::load_from_hdf5(hid_t group_id)
+{
+  if (H5Aexists(group_id, "Nop") > 0) {
+    Nop = read_double_attribute(group_id, "Nop");
+  }
+  if (H5Aexists(group_id, "vflow_gues") > 0) {
+    vflow_old = read_double_attribute(group_id, "vflow_gues");
+    vflow_gues = read_double_attribute(group_id, "vflow_gues");
+  }
+  if (H5Aexists(group_id, "mflow") > 0) {
+    mflow = read_double_attribute(group_id, "mflow");
+  }
+  if (H5Aexists(group_id, "velocity") > 0) {
+    velocity = read_double_attribute(group_id, "velocity");
   }
 }
 
@@ -82,33 +113,32 @@ gradient(const std::vector<double>& y,
 
 VSPump::VSPump(pugi::xml_node vsp_node)
 : Pump(
-      "pump1",//get_node_value(vsp_node, "identifier")
+      get_node_value(vsp_node, "identifier"),
       0.0,
       0.0,
 	  0.0,
-      0 //std::stod(get_node_value(vsp_node, "Nop"))
+      stod(get_node_value(vsp_node, "Nop"))
     )
 {
-
-  // if (check_for_node(vsp_node, "identifier")) {
-  //   this->identifier = get_node_value(vsp_node, "identifier");
-  // } else {
-  //   fatal_error("Must specify identifier of vsp in geometry XML file.");
-  // }
-
-  // this->Nop         = stod(get_node_value(vsp_node, "Nop"));
-  this->curve_file  = get_node_value(vsp_node, "curve_file");
-  this->curve_speed = stod(get_node_value(vsp_node, "curve_speed"));
   this->dnode_str = get_node_value(vsp_node, "dnode");
   this->unode_str = get_node_value(vsp_node, "unode");
-  // this->heat_input= stod(get_node_value(pipe_node, "heat_input"));
-  // this->unode = nullptr;
-  // this->dnode = nullptr;
-  // double ufrac;
-  // double dfrac;
-  // double delz;
 
-  // for (const auto& c : curves) {
+  for (pugi::xml_node curve : vsp_node.children("curve")) {
+    speeds.push_back(stod(get_node_value(curve, "speed")));
+    std::string curve_file = get_node_value(curve, "file");
+
+    std::vector<double> Q, H;
+    read_csv(curve_file, Q, H);
+
+    auto dHdQ = gradient(H, Q);
+
+    QH_funcs.emplace_back(Q, H);
+    dHdQ_funcs.emplace_back(Q, dHdQ);
+  }
+
+  if (speeds.empty()) {
+    curve_file  = get_node_value(vsp_node, "curve_file");
+    curve_speed = stod(get_node_value(vsp_node, "curve_speed"));
     speeds.push_back(curve_speed);
 
     std::vector<double> Q, H;
@@ -118,7 +148,7 @@ VSPump::VSPump(pugi::xml_node vsp_node)
 
     QH_funcs.emplace_back(Q, H);
     dHdQ_funcs.emplace_back(Q, dHdQ);
-  // }
+  }
 }
 
 double VSPump::interp_speed(const std::vector<Interp1D>& funcs,

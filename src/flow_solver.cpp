@@ -83,6 +83,11 @@ double solve_face(FaceWrapper& fw, double x_guess) {
   // Initial bracket: you must provide [x_lo, x_hi] that contains the root
   double x_lo = -1.E5;
   double x_hi = 1.E5;
+  bool is_vspump = static_cast<bool>(std::dynamic_pointer_cast<VSPump>(fw.face));
+  if (is_vspump) {
+    x_lo = -0.01;
+    x_hi = 0.01;
+  }
 
 
   // auto* pump = dynamic_cast<VSPump*>(fw.face.get());
@@ -93,9 +98,17 @@ double solve_face(FaceWrapper& fw, double x_guess) {
   //     return x_guess;
   //   }
 
-
-
-  gsl_root_fsolver_set(s, &F, x_lo, x_hi);
+  int set_status = gsl_root_fsolver_set(s, &F, x_lo, x_hi);
+  if (set_status != GSL_SUCCESS) {
+    gsl_root_fsolver_free(s);
+    if (is_vspump) {
+      double f_lo = face_residual(x_lo, &fw);
+      double f_hi = face_residual(x_hi, &fw);
+      throw std::runtime_error("Pump root solver could not bracket the root: f_lo="
+        + std::to_string(f_lo) + " f_hi=" + std::to_string(f_hi));
+    }
+    return x_guess;
+  }
 
   int status;
   int iter = 0, max_iter = 100;
@@ -642,7 +655,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     #pragma omp parallel for
     for (size_t n = 0; n < circuit->nodes_owned.size(); ++n) {
       auto& node = circuit->nodes_owned[n];
-      double relax = 0.6;
+      double relax = settings::relax_pres;
       node->tpres_gues += relax * pc_array[n];
       // if (node->identifier == "node2") {
       //  std::cout << "rank " << mpi::rank << " tpres " << node->tpres_gues << std::endl;
@@ -651,10 +664,6 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       // if (node.flowreg == "Slug") continue;
       // node->msource = m_array[i];
       // fout << "node " << node->identifier << "msource " << node->msource << std::endl;
-      // if (solver::relax_pres) {
-        // relax = solver::relax_pres;
-      // }
-    
       // fout << "node " << i
       //      << " tpres " << node->tpres_gues << "\n";
       if (node->tpres_gues < 0.0) {
@@ -706,7 +715,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     // #pragma omp parallel for
     for (size_t i = 0; i < circuit->ghost_nodes_owned1.size(); ++i) {
       auto& node = circuit->ghost_nodes_owned1[i];
-      double relax = 0.6;
+      double relax = settings::relax_pres;
       node->tpres_gues = node->tpres_gues + relax * pc_array[circuit->nodes_owned.size()+i];
       // std::cout << std::defaultfloat << std::setprecision(15) << "flag2 rank " << mpi::rank << " tpres_gues " << node->tpres_gues << " tpres_old " << node->tpres_old << std::endl;
       node->update_staticvar(node->velocity);

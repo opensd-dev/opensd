@@ -5,6 +5,7 @@
 
 #include "opensd/file_utils.h"
 #include "opensd/hslab.h"
+#include "opensd/pump.h"
 #include "opensd/settings.h"
 
 namespace opensd {
@@ -57,10 +58,12 @@ Action::Action(pugi::xml_node node)
   for (auto tgt : node.children("target")) {
     std::string target = tgt.attribute("id").as_string();
     std::string variable = tgt.attribute("variable").as_string();
-    if (!target_.empty()) target_ += ",";
-    if (!variable_.empty()) variable_ += ",";
-    target_ += target;
-    variable_ += variable;
+    if (!(target_ == target && variable_ == variable)) {
+      if (!target_.empty()) target_ += ",";
+      if (!variable_.empty()) variable_ += ",";
+      target_ += target;
+      variable_ += variable;
+    }
     targets_.push_back(make_target_binding(
       target, variable, distribution_type_ == DistributionType::TABULAR));
   }
@@ -128,6 +131,18 @@ Action::TargetBinding Action::make_target_binding(
           binding.setter = [pipe](double val) { pipe->Kforward = val; };
         } else {
           throw std::runtime_error("Unknown pipe action variable: " + variable);
+        }
+        return binding;
+      }
+    }
+
+    for (auto& face : circuit->faces) {
+      auto pump = std::dynamic_pointer_cast<Pump>(face);
+      if (pump && target == pump->identifier) {
+        if (variable == "Nop") {
+          binding.setter = [pump](double val) { pump->Nop = val; };
+        } else {
+          throw std::runtime_error("Unknown pump action variable: " + variable);
         }
         return binding;
       }
