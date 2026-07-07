@@ -296,7 +296,9 @@ void read_separate_xml_files()
   read_geometry_xml();
   // read_conditions_xml();
 
-  read_actions_xml();  // <— Add here
+  if (settings::run_mode == RunMode::TRANSIENT) {
+    read_actions_xml();
+  }
   read_post_xml();
 
   for (const auto& a : opensd::model::actions) {

@@ -1,7 +1,6 @@
 # Closed loop with pump problem
 
 import opensd
-from pathlib import Path
 
 # Define sodium
 Na6 = opensd.Fluid(name="Na6")
@@ -56,7 +55,6 @@ settings.run_mode = "steady"
 settings.conv_crit_flow = 1.0e-8
 settings.export_to_xml()
 
-Path("actions.xml").unlink(missing_ok=True)
 opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/c/codes/opensd/build/opensd',threads=1)
 
 pump_speed = opensd.Tabular([0.0, 5.0, 20.0], [100.0, 50.0, 50.0])
