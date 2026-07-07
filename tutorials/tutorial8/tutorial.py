@@ -1,6 +1,12 @@
 # Two phase fluid simulation, Collier example 2.1
 
+from pathlib import Path
+
 import opensd
+
+actions_path = Path("actions.xml")
+if actions_path.exists():
+    actions_path.unlink()
 
 circuit1 = opensd.Circuit(identifier="circuit1")
 circuit1.assign_fluid("Water", fltype="two_phase")
@@ -30,13 +36,20 @@ geometry.export_to_xml()
 conditions = opensd.Conditions([bc1, bc2, bc3])
 conditions.export_to_xml()
 
+settings = opensd.Settings()
+settings.verbosity = 3
+settings.temp_solve = True
+settings.run_mode = "steady"
+settings.export_to_xml()
+
+opensd.run(mpi_args=["mpiexec", "-n", "1"], opensd_exec="/mnt/c/codes/opensd/build/opensd")
+
 heat_input = opensd.Tabular([0., 400.], [100000., 100000.])
 actions = opensd.Actions([
     opensd.Action("pipe1_heat_input", pipe1, "heat_input", heat_input),
 ])
 actions.export_to_xml()
 
-settings = opensd.Settings()
 settings.verbosity = 3
 settings.temp_solve = True
 settings.run_mode = "transient"

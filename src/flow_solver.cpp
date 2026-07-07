@@ -853,9 +853,9 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
         
         b_local = (b_local
                   + alpha_ener * (iface->heat_input + std::accumulate(iface->heat_hslab.begin(), iface->heat_hslab.end(), 0.0))
-                    * std::max(static_cast<double>(!std::signbit(iface->vflow_gues)), 0.0)
+                    * (iface->vflow_gues > 0.0 ? 1.0 : 0.0)
                   + (1.0 - alpha_ener) * (iface->heat_input_old + std::accumulate(iface->heat_hslab_old.begin(), iface->heat_hslab_old.end(), 0.0))
-                    * std::max(static_cast<double>(!std::signbit(iface->vflow_old)), 0.0));
+                    * (iface->vflow_old > 0.0 ? 1.0 : 0.0));
         
         b_local = (b_local 
                   - node->tenth_old * alpha_ener * iface->ther_gues->rhomass() 
@@ -892,9 +892,9 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
         
         b_local = (b_local 
                   + alpha_ener * (oface->heat_input + std::accumulate(oface->heat_hslab.begin(), oface->heat_hslab.end(), 0.0))
-                    * std::max(static_cast<double>(!std::signbit(-oface->vflow_gues)), 0.0)
+                    * (oface->vflow_gues < 0.0 ? 1.0 : 0.0)
                   + (1.0 - alpha_ener) * (oface->heat_input_old + std::accumulate(oface->heat_hslab_old.begin(), oface->heat_hslab_old.end(), 0.0))
-                    * std::max(static_cast<double>(!std::signbit(-oface->vflow_old)), 0.0));
+                    * (oface->vflow_old < 0.0 ? 1.0 : 0.0));
         
         b_local = (b_local 
                   + node->tenth_old * alpha_ener * oface->ther_gues->rhomass() 
@@ -966,6 +966,10 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
         PetscScalar diag = 1.0;
         MatZeroRows(Ah, 1, &row, diag, bh, nullptr);
         VecSetValue(bh, row, node->tenth_gues, INSERT_VALUES);
+        MatAssemblyBegin(Ah, MAT_FINAL_ASSEMBLY);
+        MatAssemblyEnd(Ah, MAT_FINAL_ASSEMBLY);
+        VecAssemblyBegin(bh);
+        VecAssemblyEnd(bh);
       }
     
       // --- Case 2: Enthalpy fixed ---
@@ -1015,6 +1019,10 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
         PetscScalar diag = 1.0;
         MatZeroRows(Ah, 1, &row, diag, bh, nullptr);
         VecSetValue(bh, row, node->tenth_gues, INSERT_VALUES);
+        MatAssemblyBegin(Ah, MAT_FINAL_ASSEMBLY);
+        MatAssemblyEnd(Ah, MAT_FINAL_ASSEMBLY);
+        VecAssemblyBegin(bh);
+        VecAssemblyEnd(bh);
       }
 	  else if (node->fixed_var.count("msource") || node->fixed_var.count("P")) {
 		if (node->msource > 0.0) {
@@ -1033,6 +1041,8 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
           MatGetValues(Ah, 1, &row, 1, &col, &Aii);
           Aii = Aii - node->msource;
 		  MatSetValue(Ah, row, col, Aii, INSERT_VALUES);
+          MatAssemblyBegin(Ah, MAT_FINAL_ASSEMBLY);
+          MatAssemblyEnd(Ah, MAT_FINAL_ASSEMBLY);
           if (Aii < 0.0) {
             std::cerr << "negative coef. in energy solver. stopping" << std::endl;
             exit(EXIT_FAILURE);
@@ -1121,7 +1131,14 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
     // PCSetType(pc, PCLU);  // direct LU
     // KSPSetFromOptions(ksp);
   
-    // VecDuplicate(b, &enth);
+    // Refresh the KSP operator after rebuilding Ah. The energy matrix changes
+    // every nonlinear iteration; PINET solves this freshly assembled system.
+    KSPSetOperators(circuit->ksph, Ah, Ah);
+    KSPSetType(circuit->ksph, KSPPREONLY);
+    PC pc;
+    KSPGetPC(circuit->ksph, &pc);
+    PCSetType(pc, PCLU);
+    KSPSetUp(circuit->ksph);
     KSPSolve(circuit->ksph, bh, enth);
   
   // } else {

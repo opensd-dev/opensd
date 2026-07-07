@@ -64,7 +64,7 @@ solids.export_to_xml()
 
 snode1 = opensd.SNode("snode1")
 
-hslab1 = opensd.HSlab("hslab1",ucomp="pipe1",uvar="pipe",uval="script1",dcomp="snode1",dvar="conv",dval=0.0,uarea=3.642,nlayers=3)
+hslab1 = opensd.HSlab("hslab1",ucomp="pipe1",uvar="pipe",uval="script1",dcomp="snode1",dvar="conv",dval=0.0,uarea=3.642,nlayers=3,ninc=10)
 hslab1.add_layer(thk_elem=3.81E-4,thk_cros=0.9144,nnodes=2,darea=3.167,solname='SS13',sollib="User")
 hslab1.add_layer(thk_elem=7.5E-5,thk_cros=0.9144,nnodes=2,darea=3.079,solname='gap13',sollib="User",heat_input=0.)
 hslab1.add_layer(thk_elem=0.00247,thk_cros=0.9144,nnodes=2,darea=3.079,solname='MOX13',sollib="User",heat_input=3174806.,AFF=[0.0740, 0.0937, 0.1107, 0.1222, 0.1271, 0.1248,0.1156, 0.0999, 0.0786, 0.0534])
@@ -89,5 +89,5 @@ settings.run_mode = "steady"
 settings.no_main_iter = 200
 settings.export_to_xml()
 
-opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/d/codes/opensd/build/opensd',threads=1)
+opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/c/codes/opensd/build/opensd',threads=1)
 

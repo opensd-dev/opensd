@@ -1,4 +1,5 @@
 from numbers import Integral
+import os
 import subprocess
 
 def _process_CLI_arguments(opensd_exec='opensd', mpi_args=None, petsc_args = None, threads = None):
@@ -38,10 +39,21 @@ def _process_CLI_arguments(opensd_exec='opensd', mpi_args=None, petsc_args = Non
 
     return args
 
-def _run(args, output, cwd):
+def _run(args, output, cwd, opensd_exec='opensd'):
+    env = os.environ.copy()
+    python_paths = [os.path.abspath(cwd)]
+    exec_dir = os.path.dirname(os.path.abspath(opensd_exec))
+    if exec_dir:
+        python_paths.append(exec_dir)
+    existing_pythonpath = env.get('PYTHONPATH')
+    if existing_pythonpath:
+        python_paths.append(existing_pythonpath)
+    env['PYTHONPATH'] = os.pathsep.join(python_paths)
+
     # Launch a subprocess
     p = subprocess.Popen(args, cwd=cwd, stdout=subprocess.PIPE,
-                         stderr=subprocess.STDOUT, universal_newlines=True)
+                         stderr=subprocess.STDOUT, universal_newlines=True,
+                         env=env)
 
     # Capture and re-print OpenSD output in real-time
     lines = []
@@ -56,19 +68,17 @@ def _run(args, output, cwd):
             # If user requested output, print to screen
             print(line, end='')
 
-    # # Raise an exception if return status is non-zero
-    # if p.returncode != 0:
-        # # Get error message from output and simplify whitespace
-        # output = ''.join(lines)
-        # if 'ERROR: ' in output:
-            # _, _, error_msg = output.partition('ERROR: ')
-        # elif 'what()' in output:
-            # _, _, error_msg = output.partition('what(): ')
-        # else:
-            # error_msg = 'OpenSD aborted unexpectedly.'
-        # error_msg = ' '.join(error_msg.split())
+    if p.returncode != 0:
+        output_text = ''.join(lines)
+        if 'ERROR: ' in output_text:
+            _, _, error_msg = output_text.partition('ERROR: ')
+        elif 'what()' in output_text:
+            _, _, error_msg = output_text.partition('what(): ')
+        else:
+            error_msg = 'OpenSD aborted unexpectedly.'
+        error_msg = ' '.join(error_msg.split())
 
-        # raise RuntimeError(error_msg)
+        raise RuntimeError(error_msg)
 
 def run(output=True, cwd='.', opensd_exec='opensd', mpi_args=None, petsc_args=None, threads=None):
     """Run an OpenSD simulation.
@@ -99,4 +109,4 @@ def run(output=True, cwd='.', opensd_exec='opensd', mpi_args=None, petsc_args=No
     """
     args = _process_CLI_arguments(opensd_exec=opensd_exec, mpi_args=mpi_args, petsc_args=petsc_args, threads=threads)
 
-    _run(args, output, cwd)
+    _run(args, output, cwd, opensd_exec=opensd_exec)

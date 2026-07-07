@@ -6,6 +6,7 @@
 #include "opensd/settings.h"
 
 #include <deque>
+#include <filesystem>
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
@@ -150,7 +151,7 @@ std::vector<std::string> readLastNonEmptyRows(const std::string& path, std::size
 void openFile(const std::string& outputFile) {
   (void)outputFile;
   std::string fixedOutputFile = "output.res";
-  std::string bPath = std::string(getenv("PWD")) + "/" + fixedOutputFile;
+  std::string bPath = (std::filesystem::current_path() / fixedOutputFile).string();
 
   std::vector<std::string> retained_rows;
   if (settings::run_mode == RunMode::TRANSIENT) {

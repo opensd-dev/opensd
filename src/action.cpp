@@ -132,6 +132,17 @@ Action::TargetBinding Action::make_target_binding(
         return binding;
       }
     }
+
+    if (Node* node_ptr = circuit->get_node_by_identifier(target)) {
+      if (variable == "heat_input") {
+        binding.setter = [node_ptr](double val) { node_ptr->heat_input = val; };
+      } else if (variable == "msource") {
+        binding.setter = [node_ptr](double val) { node_ptr->msource = val; };
+      } else {
+        throw std::runtime_error("Unknown node action variable: " + variable);
+      }
+      return binding;
+    }
   }
 
   const std::string layer_marker = ".layer";

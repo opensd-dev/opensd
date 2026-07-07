@@ -22,6 +22,8 @@ class BC(object):
         subelement.set("node", self.node.identifier)
         subelement.set("var", self.var)
         subelement.set("val", str(self.val))
+        subelement.set("trans", str(self.trans).lower())
+        subelement.set("enabled", str(self.enabled).lower())
 
         return subelement
 

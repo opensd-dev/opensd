@@ -43,5 +43,5 @@ settings.temp_solve = False
 settings.run_mode = "steady"
 settings.export_to_xml()
 
-opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/home/vikram/Codes/opensd/build/opensd')
+opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/c/codes/opensd/build/opensd')
 

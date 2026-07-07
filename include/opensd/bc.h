@@ -25,6 +25,8 @@ public:
   std::string node_;
   std::string var_;
   double val_; //!< value in [SI]
+  bool trans_ {true};
+  bool enabled_ {true};
   explicit BC(pugi::xml_node bc_node);
   BC() = default;
   

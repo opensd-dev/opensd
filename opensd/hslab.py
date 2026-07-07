@@ -294,10 +294,12 @@ class HSlab:
 
     def find_comps(self,ucomp,dcomp,config,ninc):
         from opensd.project import get_comp
+        inferred_ninc = ninc
 
         self.ucomp = get_comp(ucomp)
         if isinstance(self.ucomp,Pipe):
             uninc = self.ucomp.ncell #no of increments in the upstream pipe
+            inferred_ninc = uninc
         elif isinstance(self.ucomp,Node):
             self.uval.append(self.ucomp)
         elif ucomp not in comps:
@@ -306,6 +308,7 @@ class HSlab:
         self.dcomp = get_comp(dcomp)
         if isinstance(self.dcomp,Pipe):
             dninc = self.dcomp.ncell #no of increments in the downstream pipe
+            inferred_ninc = dninc
         elif isinstance(self.dcomp,Node):
             self.dval.append(self.dcomp)
         elif dcomp not in comps:
@@ -330,15 +333,7 @@ class HSlab:
                 sys.exit()
         except:
             pass
-        try:
-            ninc = uninc
-        except:
-            pass
-        try:
-            ninc = dninc
-        except:
-            pass
-        self.ninc = ninc
+        self.ninc = inferred_ninc
 
     def add_layer(self,thk_elem,thk_cros,nnodes,darea,solname,sollib,ninc=None,heat_input=0.,AFF=None,gap=False,cyl=False,eps1=0.,eps2=0.):
         if self.layers==[]:
@@ -383,11 +378,11 @@ class HSlab:
         element.set("identifier", str(self.identifier))
         element.set("ucomp", str(self.ucompid))
         element.set("uvar",  str(self.uvar))
-        element.set("uval",  str(self.uval))
+        element.set("uval",  self._xml_scalar_or_text(self.uval))
         element.set("utype",  str(self.utype))
         element.set("dcomp", str(self.dcompid))
         element.set("dvar",  str(self.dvar))
-        element.set("dval",  str(self.dval))
+        element.set("dval",  self._xml_scalar_or_text(self.dval))
         element.set("dtype",  str(self.dtype))
         element.set("uarea", str(self.uarea))
         element.set("ninc", str(self.ninc))
@@ -406,6 +401,12 @@ class HSlab:
         #         bc.to_xml_element(element)
 
         return element
+
+    @staticmethod
+    def _xml_scalar_or_text(value):
+        if isinstance(value, (list, tuple, np.ndarray)) and len(value) == 1:
+            return str(value[0])
+        return str(value)
 
     def get_reference_prop(self):
         pass

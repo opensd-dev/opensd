@@ -1,6 +1,21 @@
 # Two phase tank energy source transient
 
+from pathlib import Path
+import shutil
+
 import opensd
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+scripts_source = SCRIPT_DIR / "scripts.py"
+scripts_target = Path.cwd() / "scripts.py"
+if scripts_source.exists() and scripts_source.resolve() != scripts_target.resolve():
+    shutil.copyfile(scripts_source, scripts_target)
+
+bindings_source = SCRIPT_DIR.parents[1] / "build" / "bindings.so"
+bindings_target = Path.cwd() / "bindings.so"
+if bindings_source.exists() and bindings_source.resolve() != bindings_target.resolve():
+    shutil.copyfile(bindings_source, bindings_target)
 
 circuit1 = opensd.Circuit(identifier="circuit1")
 circuit1.assign_fluid("Water", fltype="two_phase")

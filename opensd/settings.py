@@ -78,6 +78,10 @@ class Settings:
         cv.check_greater_than('no_main_iter', no_main_iter, 0)
         self._no_main_iter = no_main_iter
 
+    @property
+    def p_ambient(self) -> float:
+        return self._p_ambient
+
     def export_to_xml(self, path: PathLike = 'settings.xml'):
         """Export simulation settings to an XML file.
 

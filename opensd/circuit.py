@@ -194,7 +194,7 @@ class Circuit:
 
         if len(plist) == 0:
             print ("warning: ambient pressure assumed as reference pressure for the circuit")
-            pref = solver_settings.p_ambient
+            pref = Settings().p_ambient
         else:
             pmax = max(plist)
             pref = pmax #pmean = sum(plist)/len(plist) didn't converge for validation case 6
@@ -381,41 +381,3 @@ class Circuit:
             print ("input_pair not recognized. stopping",input_pair)
             sys.exit()
 
-    def plot(self):
-        """Display the flow circuit.
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-
-        """
-
-        import networkx as nx
-        import matplotlib.pyplot as plt
-        
-        G = nx.DiGraph()
-        
-        for pipe in self.pipes:
-            G.add_edge(pipe.unode.identifier, pipe.dnode.identifier, label=pipe.identifier)
-        
-        pos = nx.kamada_kawai_layout(G)
-        
-        plt.figure(figsize=(12, 8))
-        
-        # Draw the nodes
-        nx.draw_networkx_nodes(G, pos, node_size=500)
-        
-        # Draw the edges
-        nx.draw_networkx_edges(G, pos, arrowstyle='->', arrowsize=20)
-        
-        # Draw the labels for nodes
-        nx.draw_networkx_labels(G, pos, font_size=12, font_family='sans-serif')
-        
-        # Draw the labels for edges (pipe identifiers)
-        edge_labels = nx.get_edge_attributes(G, 'label')
-        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=10)
-        
-        plt.axis('off')  # Turn off the axis
-        plt.show()

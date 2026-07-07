@@ -181,7 +181,6 @@ Circuit::Circuit(pugi::xml_node cir_node) : fltype(FluidType::UNSET)
     }
   }
 
-  
   this->eps_m = this->mean_flow = this->eps_h = this->eps_p = 0;
 
 }
@@ -270,7 +269,7 @@ void initialize_circuits() {
 for (auto& circuit : model::circuits) {
   for (auto& node : circuit->nodes) {
 	bool trans_sim = settings::run_mode == RunMode::TRANSIENT;
-	if (not trans_sim) {
+	if (not trans_sim || node->spres_old == 0.0 || node->senth_old == 0.0) {
       node->assign_staticvar();
 	}
     node->assign_prop();

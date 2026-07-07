@@ -48,35 +48,41 @@ int opensd_init(int argc, char* argv[], const void* intracomm) {
   
   bool loaded_restart = false;
   if (settings::run_mode == RunMode::TRANSIENT) {
-  try {
-  hid_t file_id = H5Fopen("circuits.h5", H5F_ACC_RDONLY, H5P_DEFAULT);
+    try {
+      if (file_exists("circuits.h5")) {
+        hid_t file_id = H5Fopen("circuits.h5", H5F_ACC_RDONLY, H5P_DEFAULT);
+        if (file_id >= 0) {
+          size_t index = 0;
+          for (auto& circuit : model::circuits) {
+            std::string group_name = "/circuits/circuit_" + std::to_string(index);
+            if (H5Lexists(file_id, group_name.c_str(), H5P_DEFAULT) <= 0) {
+              std::cerr << "Warning: Expected circuit group not found: " << group_name << "\n";
+              break;
+            }
 
-  size_t index = 0;
-  for (auto& circuit : model::circuits) {
-    std::string group_name = "/circuits/circuit_" + std::to_string(index);
-    if (H5Lexists(file_id, group_name.c_str(), H5P_DEFAULT) <= 0) {
-      std::cerr << "Warning: Expected circuit group not found: " << group_name << "\n";
-      break;
+            hid_t group_id = H5Gopen(file_id, group_name.c_str(), H5P_DEFAULT);
+            if (!circuit) {
+              std::cerr << "Error: model::circuits[" << index << "] is null. Skipping.\n";
+            } else {
+              circuit->load_from_hdf5(group_id);  // update existing object
+            }
+            H5Gclose(group_id);
+            ++index;
+          }
+
+          H5Fclose(file_id);
+
+          std::cout << "Loaded data into " << index << " existing circuit(s) from HDF5.\n";
+          loaded_restart = true;
+        } else {
+          std::cout << "No restart state found; initializing transient run from XML.\n";
+        }
+      } else {
+        std::cout << "No restart state found; initializing transient run from XML.\n";
+      }
+    } catch (const std::exception& e) {
+      std::cerr << "HDF5 error during load: " << e.what() << std::endl;
     }
-
-    hid_t group_id = H5Gopen(file_id, group_name.c_str(), H5P_DEFAULT);
-    if (!circuit) {
-      std::cerr << "Error: model::circuits[" << index << "] is null. Skipping.\n";
-    } else {
-      circuit->load_from_hdf5(group_id);  // update existing object
-    }
-    H5Gclose(group_id);
-    ++index;
-  }
-
-  H5Fclose(file_id);
-
-  std::cout << "Loaded data into " << index << " existing circuit(s) from HDF5.\n";
-  loaded_restart = true;
-
-} catch (const std::exception& e) {
-  std::cerr << "HDF5 error during load: " << e.what() << std::endl;
-}
   }
 
 initialize_circuits(); //assign properties

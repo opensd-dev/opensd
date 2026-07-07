@@ -12,10 +12,10 @@ circuit2 = opensd.Circuit(identifier="circuit2")
 circuit2.assign_fluid("Water")
 
 # node inputs
-circuit1.add_node("node1", elevation=0., ttemp_old=330.)
+circuit1.add_node("node1", elevation=0.)
 circuit1.add_node("node2", elevation=2.2, ttemp_old=325.)
-circuit1.add_node("node3", elevation=2.2, ttemp_old=325.)
-circuit1.add_node("node4", elevation=0., ttemp_old=330.)
+circuit1.add_node("node3", elevation=2.2)
+circuit1.add_node("node4", elevation=0.)
 
 circuit2.add_node("node5")
 circuit2.add_node("node6")
@@ -57,9 +57,18 @@ conditions.export_to_xml()
 settings = opensd.Settings()
 settings.T_ambient = 283.
 settings.temp_solve = True
-settings.run_mode = "steady"
+settings.run_mode = "transient"
 settings.conv_crit_temp_SS = 1.E-8
-settings.conv_crit_flow = 1.E-8
+settings.conv_crit_temp_trans = 1.E-6
+# settings.conv_crit_flow = 1.E-2
+# settings.conv_crit_ht = 1.E-4
+settings.tim_slot = [[4.0, 10000.0]]
+
+heat_input = opensd.Tabular([0.0, 1.0, 10000.0], [1000.0, 0.0, 0.0])
+actions = opensd.Actions([
+    opensd.Action("pipe4_heat_input", "pipe4", "heat_input", heat_input),
+])
+actions.export_to_xml()
 settings.export_to_xml()
 
 opensd.run(mpi_args=['mpiexec', '-n', '1'], opensd_exec='/mnt/c/codes/opensd/build/opensd')
