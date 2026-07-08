@@ -37,17 +37,18 @@ std::tuple<bool, double, double, double, double> check_conv(double time, double 
     simulation::time_conv_mass.stop();
 
     simulation::time_conv_mom.start();
-    circuit->eps_p = 0.0;
+    double eps_p_sum = 0.0;
     std::vector<double> e_mass;
 
-    #pragma omp parallel for
+    #pragma omp parallel for reduction(+:eps_p_sum)
     for (size_t i = 0; i < circuit->faces_owned.size(); ++i) {
       auto& face = circuit->faces_owned[i];
       face->presidue = face->eqn_mom(face->vflow_gues, time, delt, trans_sim, alpha_mom);
       // std::cout << "rank " << mpi::rank << " " << std::setprecision(12) << std::fixed << " face " << face->faceno << " " << face->presidue << std::endl;
-      circuit->eps_p += std::abs(face->presidue) / face->tpres_gues;
+      eps_p_sum += std::abs(face->presidue) / face->tpres_gues;
       face->mflow = face->vflow_gues * face->ther_gues->rhomass();
     }
+    circuit->eps_p = eps_p_sum;
 
     for (auto& face : circuit->faces_owned) {
       if (std::abs(face->mflow) > 1.0E-5) {

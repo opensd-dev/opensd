@@ -16,6 +16,7 @@
 #include "opensd/vector.h"
 #include "opensd/xml_interface.h"
 #include "opensd/constants.h"
+#include "opensd/settings.h"
 
 namespace opensd {
 
@@ -168,6 +169,18 @@ Circuit::Circuit(pugi::xml_node cir_node) : fltype(FluidType::UNSET)
 
   for (pugi::xml_node bc : cir_node.children("bc")) {
     this->bcs.push_back(BC(bc));
+  }
+
+  if (settings::run_mode == RunMode::TRANSIENT) {
+    for (const auto& bc : this->bcs) {
+      if (bc.trans_) continue;
+      for (auto& node : this->nodes) {
+        if (node->identifier == bc.node_) {
+          node->fixed_var.erase(bc.var_);
+          break;
+        }
+      }
+    }
   }
 
 

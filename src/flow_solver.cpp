@@ -6,7 +6,10 @@
 #include <iostream>
 #include <iomanip>
 #include <Eigen/Dense>   // For matrix manipulations
+#include <Eigen/SVD>
 #include <cstdlib>
+#include <limits>
+#include <numeric>
 #include "opensd/hslab.h"
 #include "opensd/pump.h"
 #include "opensd/vector.h"
@@ -121,7 +124,7 @@ double solve_face(FaceWrapper& fw, double x_guess) {
     x_lo = gsl_root_fsolver_x_lower(s);
     x_hi = gsl_root_fsolver_x_upper(s);
 
-    status = gsl_root_test_interval(x_lo, x_hi, 1e-8, 0.0);
+    status = gsl_root_test_interval(x_lo, x_hi, 1e-12, 0.0);
   } while (status == GSL_CONTINUE && iter < max_iter);
 
   gsl_root_fsolver_free(s);
@@ -135,6 +138,78 @@ double solve_face(FaceWrapper& fw, double x_guess) {
   }
 
   return r;
+}
+
+void solve_energy_like_pinet(std::shared_ptr<Circuit> circuit, Mat A, Vec b, Vec x) {
+  const PetscInt n = static_cast<PetscInt>(circuit->nodes.size());
+  const double omega = 0.8;
+  const double tolerance = 1.0e-8;
+  const int max_iterations = 25;
+  std::vector<PetscScalar> phi(n, 0.0);
+  std::vector<PetscScalar> rhs(n, 0.0);
+  Eigen::MatrixXd dense = Eigen::MatrixXd::Zero(n, n);
+  Eigen::VectorXd rhs_vec = Eigen::VectorXd::Zero(n);
+
+  for (auto& node : circuit->nodes) {
+    PetscInt row = circuit->old2new[node->node_ind];
+    phi[row] = node->tenth_gues;
+    VecGetValues(b, 1, &row, &rhs[row]);
+    rhs_vec(row) = rhs[row];
+  }
+
+  for (PetscInt i = 0; i < n; ++i) {
+    PetscInt ncols = 0;
+    const PetscInt* cols = nullptr;
+    const PetscScalar* vals = nullptr;
+
+    MatGetRow(A, i, &ncols, &cols, &vals);
+    for (PetscInt j = 0; j < ncols; ++j) {
+      dense(i, cols[j]) = vals[j];
+    }
+    MatRestoreRow(A, i, &ncols, &cols, &vals);
+  }
+
+  Eigen::JacobiSVD<Eigen::MatrixXd> svd(dense);
+  auto singular = svd.singularValues();
+  double cond = std::numeric_limits<double>::infinity();
+  if (singular.size() > 0 && singular(singular.size() - 1) > 0.0) {
+    cond = singular(0) / singular(singular.size() - 1);
+  }
+
+  if (std::isfinite(cond) && cond < 1.0e8) {
+    Eigen::VectorXd sol = dense.partialPivLu().solve(rhs_vec);
+    for (PetscInt i = 0; i < n; ++i) {
+      phi[i] = sol(i);
+    }
+  } else {
+    for (int iter = 0; iter < max_iterations; ++iter) {
+      for (PetscInt i = 0; i < n; ++i) {
+        double diag = dense(i, i);
+        double sigma = 0.0;
+        for (PetscInt j = 0; j < n; ++j) {
+          if (j != i) {
+            sigma += dense(i, j) * phi[j];
+          }
+        }
+
+        if (diag != 0.0) {
+          phi[i] = (1.0 - omega) * phi[i] + (omega / diag) * (rhs[i] - sigma);
+        }
+      }
+
+      double residual = (dense * Eigen::Map<Eigen::VectorXd>(phi.data(), n) - rhs_vec).norm();
+      if (residual < tolerance) {
+        break;
+      }
+    }
+  }
+
+  VecZeroEntries(x);
+  for (PetscInt i = 0; i < n; ++i) {
+    VecSetValue(x, i, phi[i], INSERT_VALUES);
+  }
+  VecAssemblyBegin(x);
+  VecAssemblyEnd(x);
 }
 
 /* // Solve nonlinear equation for one face using GSL
@@ -549,6 +624,12 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     // PetscViewerDestroy(&viewerB);
 
     simulation::time_pc_solve.start();
+    KSPSetOperators(circuit->ksp, A, A);
+    KSPSetType(circuit->ksp, KSPPREONLY);
+    PC pc_solver;
+    KSPGetPC(circuit->ksp, &pc_solver);
+    PCSetType(pc_solver, PCLU);
+    KSPSetUp(circuit->ksp);
     KSPSolve(circuit->ksp, b, pc);
     simulation::time_pc_solve.stop();
 
@@ -1140,15 +1221,28 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
     // PCSetType(pc, PCLU);  // direct LU
     // KSPSetFromOptions(ksp);
   
-    // Refresh the KSP operator after rebuilding Ah. The energy matrix changes
-    // every nonlinear iteration; PINET solves this freshly assembled system.
-    KSPSetOperators(circuit->ksph, Ah, Ah);
-    KSPSetType(circuit->ksph, KSPPREONLY);
-    PC pc;
-    KSPGetPC(circuit->ksph, &pc);
-    PCSetType(pc, PCLU);
-    KSPSetUp(circuit->ksph);
-    KSPSolve(circuit->ksph, bh, enth);
+    bool has_fixed_enthalpy = false;
+    for (auto& node : circuit->nodes) {
+      if (node->fixed_var.count("T") || node->fixed_var.count("H")) {
+        has_fixed_enthalpy = true;
+        break;
+      }
+    }
+
+    if (!trans_sim && !has_fixed_enthalpy) {
+      solve_energy_like_pinet(circuit, Ah, bh, enth);
+    } else {
+      // Refresh the KSP operator after rebuilding Ah. The energy matrix changes
+      // every nonlinear iteration; PINET solves this freshly assembled system.
+      KSPSetOperators(circuit->ksph, Ah, Ah);
+      PC pc;
+      KSPGetPC(circuit->ksph, &pc);
+      KSPSetType(circuit->ksph, KSPPREONLY);
+      PCSetType(pc, PCLU);
+      KSPSetInitialGuessNonzero(circuit->ksph, PETSC_FALSE);
+      KSPSetUp(circuit->ksph);
+      KSPSolve(circuit->ksph, bh, enth);
+    }
   
   // } else {
     // (3) Else -> fallback to SOR iteration

@@ -61,7 +61,7 @@ Modeling steps
 
 15. Set convergence criteria
 
-16. Note that for natural circulation, since it is difficult to get convergence with default convergence criteria (residue ~10-10), higher residue values (~10-7) are used in the convergence criteria. However, the results obtained are in general accurate enough for practical purposes.
+16. Use the PINET tutorial convergence criteria: ``conv_crit_temp_SS = 1e-8``, ``conv_crit_temp_trans = 1e-6``, and ``conv_crit_flow = 1e-8``.
 
 17. Run steady state simulation
 

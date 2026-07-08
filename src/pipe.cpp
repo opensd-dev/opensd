@@ -1,7 +1,11 @@
 //! \file pipe.cpp
 #include "opensd/pipe.h"
 
+#include <algorithm>
+#include <cctype>
 #include <iostream>
+#include <stdexcept>
+#include <string>
 
 #include "opensd/error.h"
 #include "opensd/xml_interface.h"
@@ -57,7 +61,22 @@ Pipe::Pipe(pugi::xml_node pipe_node)
   double delx;
   double delz;
   this->roughness = stod(get_node_value(pipe_node, "roughness"));
-  this->fricopt = pipe_node.attribute("fricopt").as_double(0.0);
+  std::string fricopt_str = pipe_node.attribute("fricopt").value();
+  std::transform(fricopt_str.begin(), fricopt_str.end(), fricopt_str.begin(),
+                 [](unsigned char c) { return std::toupper(c); });
+  if (fricopt_str == "DW" || fricopt_str.empty()) {
+    this->fricopt = 0.0;
+  } else if (fricopt_str == "BL") {
+    this->fricopt = -1.0;
+  } else if (fricopt_str == "HW") {
+    this->fricopt = -2.0;
+  } else {
+    try {
+      this->fricopt = std::stod(fricopt_str);
+    } catch (const std::invalid_argument&) {
+      fatal_error("Unrecognized friction option '" + fricopt_str + "' in pipe '" + this->identifier + "'.");
+    }
+  }
 
 }
 

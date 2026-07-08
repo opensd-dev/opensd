@@ -38,9 +38,12 @@ bc4 = circuit1.add_BC("bc4", "node1", 'P', 70.E5, trans=False)
 glass = opensd.Solid(name="glass")
 glass.rhomass = 2500.0
 glass.cpmass = 840.0
-glass.conductivity = 1.0
+glass.conductivity = 1.05
 solids = opensd.Solids([glass])
 solids.export_to_xml()
+
+settings = opensd.Settings()
+settings.T_ambient = 283.
 
 # heat slabs
 Au = math.pi*0.026*0.8
@@ -54,17 +57,14 @@ geometry.export_to_xml()
 conditions = opensd.Conditions([bc1, bc2, bc3, bc4])
 conditions.export_to_xml()
 
-settings = opensd.Settings()
-settings.T_ambient = 283.
 settings.temp_solve = True
-settings.run_mode = "transient"
+settings.run_mode = "steady"
+settings.conv_crit_flow = 1.E-8
 settings.conv_crit_temp_SS = 1.E-8
 settings.conv_crit_temp_trans = 1.E-6
-# settings.conv_crit_flow = 1.E-2
-# settings.conv_crit_ht = 1.E-4
 settings.tim_slot = [[4.0, 10000.0]]
 
-heat_input = opensd.Tabular([0.0, 1.0, 10000.0], [1000.0, 0.0, 0.0])
+heat_input = opensd.Tabular([0.0, 4.0, 10000.0], [1000.0, 0.0, 0.0])
 actions = opensd.Actions([
     opensd.Action("pipe4_heat_input", "pipe4", "heat_input", heat_input),
 ])

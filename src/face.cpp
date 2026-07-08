@@ -164,7 +164,7 @@ double PFace::eqn_mom(double x, double time, double delt, bool trans_sim, double
   }
   double delp_gr = ther_gues->rhomass() * grav * delz; 
   double term_old = ((1. - alpha_mom) * ((downstream->tpres_old - upstream->tpres_old) //
-                    - vflow_old * vflow_old / (2. * cfarea * cfarea) * 0. //(downstream.rhomass_old - upstream.rhomass_old)
+                    - vflow_old * vflow_old / (2. * cfarea * cfarea) * (downstream->rhomass_old - upstream->rhomass_old)
                     + ther_old->rhomass() * grav * delz
                     + fricfact_old * delx * ther_old->rhomass() * vflow_old * std::abs(vflow_old) / (2. * diameter * cfarea * cfarea)));
 
@@ -174,7 +174,7 @@ double PFace::eqn_mom(double x, double time, double delt, bool trans_sim, double
 
   double y = (trans_sim * delx * ther_gues->rhomass() * (x - vflow_old) / (delt * cfarea)
             + alpha_mom * (downstream->tpres_gues - upstream->tpres_gues
-                          - vflow_gues * vflow_gues / (2. * cfarea * cfarea) * 0. //(downstream.rhomass_gues - upstream.rhomass_gues) 
+                          - vflow_gues * vflow_gues / (2. * cfarea * cfarea) * (downstream->rhomass_gues - upstream->rhomass_gues)
                           + delp_gr 
                           + delp_fr) 
             + term_old);
@@ -298,12 +298,27 @@ void PFace::update_fricfact() {
     fricfact_gues = fricopt;
     return;
   }
-  // fricfact_gues = 0.032;
-  // if (fricopt == "HW") {
-    // fricfact_gues = 10.78 * M_PI * M_PI * constants::grav / 8.0 * std::pow(diameter, 0.13) /
-                    // (std::pow(roughness, 1.852) * std::pow(std::abs(vflow_gues), 0.148));
-  // } 
-  // else if (fricopt == "DW") {
+
+  if (fricopt == -2.0) {
+    fricfact_gues = 10.78 * M_PI * M_PI * grav / 8.0 * std::pow(diameter, 0.13) /
+                    (std::pow(roughness, 1.852) * std::pow(std::abs(vflow_gues), 0.148));
+  } else if (fricopt == -1.0) {
+    update_Re();
+    if (Re < 1.0E-6) {
+      fricfact_gues = 64.0 / 1.0E-6;
+    }
+    else if (Re < 2300.0) {
+      fricfact_gues = 64.0 / Re;
+    }
+    else if (Re > 5000.0) {
+      fricfact_gues = 0.316 / std::pow(Re, 0.25);
+    }
+    else {
+      double f1 = 64.0 / 2300.0;
+      double f2 = 0.316 / std::pow(5000.0, 0.25);
+      fricfact_gues = (Re - 2300.0) * (f2 - f1) / (5000.0 - 2300.0) + f1;
+    }
+  } else {
     update_Re();
     if (Re < 1.0E-6) {
       fricfact_gues = 64.0 / 1.0E-6;
@@ -321,24 +336,7 @@ void PFace::update_fricfact() {
     }
     // std::cout<<"flag1 "<<ther_gues->rhomass()<<std::endl;
     // fricfact_gues=0.035111;
-  // } 
-  // else if (fricopt == "BL") {
-    // update_Re();
-    // if (Re < 1.0E-6) {
-      // fricfact_gues = 64.0 / 1.0E-6;
-    // } 
-    // else if (Re < 2300.0) {
-      // fricfact_gues = 64.0 / Re;
-    // } 
-    // else if (Re > 5000.0) {
-      // fricfact_gues = 0.316 / std::pow(Re, 0.25);
-    // } 
-    // else {
-      // double f1 = 64.0 / 2300.0;
-      // double f2 = 0.316 / std::pow(5000.0, 0.25);
-      // fricfact_gues = (Re - 2300.0) * (f2 - f1) / (5000.0 - 2300.0) + f1;
-    // }
-  // } 
+  }
   // else if (std::holds_alternative<double>(fricopt)) {
     // fricfact_gues = std::get<double>(fricopt);
   // } 

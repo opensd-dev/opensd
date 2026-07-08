@@ -69,6 +69,11 @@ class Settings:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+    def __setattr__(self, name, value):
+        if name == "T_ambient":
+            type(self).T_ambient = value
+        super().__setattr__(name, value)
+
     @property
     def no_main_iter(self) -> int:
         return self._no_main_iter
