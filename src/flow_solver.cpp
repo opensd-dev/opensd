@@ -2,6 +2,7 @@
 #include "opensd/flow_solver.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>         // For std::isinf and other math functions
 #include <iostream>
 #include <iomanip>
@@ -10,6 +11,7 @@
 #include <cstdlib>
 #include <limits>
 #include <numeric>
+#include <utility>
 #include "opensd/hslab.h"
 #include "opensd/pump.h"
 #include "opensd/vector.h"
@@ -70,7 +72,7 @@ double face_residual(double x, void* params) {
                                     fw->trans_sim, fw->alpha_mom);
 }
 
-double solve_face_unbracketed(FaceWrapper& fw, double x_guess) {
+std::pair<double, double> solve_face_unbracketed_once(FaceWrapper& fw, double x_guess) {
   const gsl_multiroot_fsolver_type* solver_type = gsl_multiroot_fsolver_hybrids;
   gsl_multiroot_fsolver* solver = gsl_multiroot_fsolver_alloc(solver_type, 1);
 
@@ -97,12 +99,29 @@ double solve_face_unbracketed(FaceWrapper& fw, double x_guess) {
   gsl_vector_free(x);
   gsl_multiroot_fsolver_free(solver);
 
-  if (status != GSL_SUCCESS) {
-    throw std::runtime_error(
-      "Face multiroot solver failed. Last value = " + std::to_string(root));
+  return {root, std::abs(face_residual(root, &fw))};
+}
+
+double solve_face_unbracketed(FaceWrapper& fw, double x_guess) {
+  const double seed = 1.0e-4;
+  std::array<double, 5> guesses = {
+    x_guess,
+    std::copysign(std::max(std::abs(x_guess), seed), x_guess == 0.0 ? 1.0 : x_guess),
+    -std::copysign(std::max(std::abs(x_guess), seed), x_guess == 0.0 ? 1.0 : x_guess),
+    10.0 * seed,
+    -10.0 * seed
+  };
+
+  auto best = solve_face_unbracketed_once(fw, guesses[0]);
+  for (size_t i = 1; i < guesses.size(); ++i) {
+    if (best.second < 1.0e-8) break;
+    auto candidate = solve_face_unbracketed_once(fw, guesses[i]);
+    if (candidate.second < best.second) {
+      best = candidate;
+    }
   }
 
-  return root;
+  return best.first;
 }
 
 double solve_vspump_face_bracketed(FaceWrapper& fw, double x_guess) {
