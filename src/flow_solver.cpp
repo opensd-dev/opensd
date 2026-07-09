@@ -70,101 +70,94 @@ double face_residual(double x, void* params) {
                                     fw->trans_sim, fw->alpha_mom);
 }
 
-// Solve nonlinear equation for one face using GSL
-double solve_face(FaceWrapper& fw, double x_guess) {
-  bool is_vspump = static_cast<bool>(std::dynamic_pointer_cast<VSPump>(fw.face));
-  if (!is_vspump) {
-    const gsl_multiroot_fsolver_type* T = gsl_multiroot_fsolver_hybrids;
-    gsl_multiroot_fsolver* s = gsl_multiroot_fsolver_alloc(T, 1);
+double solve_face_unbracketed(FaceWrapper& fw, double x_guess) {
+  const gsl_multiroot_fsolver_type* solver_type = gsl_multiroot_fsolver_hybrids;
+  gsl_multiroot_fsolver* solver = gsl_multiroot_fsolver_alloc(solver_type, 1);
 
-    gsl_multiroot_function F;
-    F.f = &face_residual_vec;
-    F.n = 1;
-    F.params = &fw;
+  gsl_multiroot_function F;
+  F.f = &face_residual_vec;
+  F.n = 1;
+  F.params = &fw;
 
-    gsl_vector* x = gsl_vector_alloc(1);
-    gsl_vector_set(x, 0, x_guess);
-    gsl_multiroot_fsolver_set(s, &F, x);
+  gsl_vector* x = gsl_vector_alloc(1);
+  gsl_vector_set(x, 0, x_guess);
+  gsl_multiroot_fsolver_set(solver, &F, x);
 
-    int status = GSL_CONTINUE;
-    int iter = 0;
-    int max_iter = 100;
-    do {
-      ++iter;
-      status = gsl_multiroot_fsolver_iterate(s);
-      if (status) break;
-      status = gsl_multiroot_test_residual(s->f, 1.0e-8);
-    } while (status == GSL_CONTINUE && iter < max_iter);
+  int status = GSL_CONTINUE;
+  int iter = 0;
+  const int max_iter = 100;
+  do {
+    ++iter;
+    status = gsl_multiroot_fsolver_iterate(solver);
+    if (status) break;
+    status = gsl_multiroot_test_residual(solver->f, 1.0e-8);
+  } while (status == GSL_CONTINUE && iter < max_iter);
 
-    double root = gsl_vector_get(s->x, 0);
-    gsl_vector_free(x);
-    gsl_multiroot_fsolver_free(s);
-    return root;
+  double root = gsl_vector_get(solver->x, 0);
+  gsl_vector_free(x);
+  gsl_multiroot_fsolver_free(solver);
+
+  if (status != GSL_SUCCESS) {
+    throw std::runtime_error(
+      "Face multiroot solver failed. Last value = " + std::to_string(root));
   }
 
-  const gsl_root_fsolver_type* T;
-  gsl_root_fsolver* s;
+  return root;
+}
+
+double solve_vspump_face_bracketed(FaceWrapper& fw, double x_guess) {
+  constexpr double x_lo_init = -0.01;
+  constexpr double x_hi_init = 0.01;
+  constexpr int max_iter = 100;
 
   gsl_function F;
   F.function = &face_residual;
   F.params = &fw;
 
-  // Choose solver type
-  T = gsl_root_fsolver_brent;
-  s = gsl_root_fsolver_alloc(T);
-
-  // Initial bracket: you must provide [x_lo, x_hi] that contains the root
-  double x_lo = -1.E5;
-  double x_hi = 1.E5;
-  x_lo = -0.01;
-  x_hi = 0.01;
-
-
-  // auto* pump = dynamic_cast<VSPump*>(fw.face.get());
-  // const bool is_pump = (pump != nullptr);
-  //
-  // if (is_pump and fw.main_iter == 0) {
-  //   std::cout<<"flag2 "<<x_guess<<::endl;
-  //     return x_guess;
-  //   }
-
-  int set_status = gsl_root_fsolver_set(s, &F, x_lo, x_hi);
-  if (set_status != GSL_SUCCESS) {
-    gsl_root_fsolver_free(s);
-    if (is_vspump) {
-      double f_lo = face_residual(x_lo, &fw);
-      double f_hi = face_residual(x_hi, &fw);
-      throw std::runtime_error("Pump root solver could not bracket the root: f_lo="
-        + std::to_string(f_lo) + " f_hi=" + std::to_string(f_hi));
-    }
-    return x_guess;
+  gsl_root_fsolver* solver = gsl_root_fsolver_alloc(gsl_root_fsolver_brent);
+  int status = gsl_root_fsolver_set(solver, &F, x_lo_init, x_hi_init);
+  if (status != GSL_SUCCESS) {
+    gsl_root_fsolver_free(solver);
+    double f_lo = face_residual(x_lo_init, &fw);
+    double f_hi = face_residual(x_hi_init, &fw);
+    throw std::runtime_error(
+      "VSPump root solver could not bracket the root: f_lo=" +
+      std::to_string(f_lo) + " f_hi=" + std::to_string(f_hi));
   }
 
-  int status;
-  int iter = 0, max_iter = 100;
-  double r = x_guess;
+  int iter = 0;
+  double root = x_guess;
+  double x_lo = x_lo_init;
+  double x_hi = x_hi_init;
 
   do {
-    iter++;
-    status = gsl_root_fsolver_iterate(s);
-    r = gsl_root_fsolver_root(s);
-    x_lo = gsl_root_fsolver_x_lower(s);
-    x_hi = gsl_root_fsolver_x_upper(s);
-
-    status = gsl_root_test_interval(x_lo, x_hi, 1e-12, 0.0);
+    ++iter;
+    status = gsl_root_fsolver_iterate(solver);
+    root = gsl_root_fsolver_root(solver);
+    x_lo = gsl_root_fsolver_x_lower(solver);
+    x_hi = gsl_root_fsolver_x_upper(solver);
+    status = gsl_root_test_interval(x_lo, x_hi, 1.0e-12, 0.0);
   } while (status == GSL_CONTINUE && iter < max_iter);
 
-  gsl_root_fsolver_free(s);
+  gsl_root_fsolver_free(solver);
 
-  // Throw exception if not converged
   if (status != GSL_SUCCESS) {
     throw std::runtime_error(
-      "Face root solver did not converge within " + std::to_string(max_iter) +
-      " iterations. Last approximate root: " + std::to_string(r)
-    );
+      "VSPump root solver did not converge within " +
+      std::to_string(max_iter) + " iterations. Last approximate root: " +
+      std::to_string(root));
   }
 
-  return r;
+  return root;
+}
+
+// PINET uses an unbracketed fsolve for normal faces. VSPump is kept bounded.
+double solve_face(FaceWrapper& fw, double x_guess) {
+  if (std::dynamic_pointer_cast<VSPump>(fw.face)) {
+    return solve_vspump_face_bracketed(fw, x_guess);
+  }
+
+  return solve_face_unbracketed(fw, x_guess);
 }
 
 void solve_energy_like_pinet(std::shared_ptr<Circuit> circuit, Mat A, Vec b, Vec x) {
@@ -291,77 +284,6 @@ void solve_energy_like_pinet(std::shared_ptr<Circuit> circuit, Mat A, Vec b, Vec
   VecAssemblyBegin(x);
   VecAssemblyEnd(x);
 }
-
-/* // Solve nonlinear equation for one face using GSL
-double solve_face(FaceWrapper& fw, double x_guess) {
-  const gsl_multiroot_fsolver_type* T;
-   gsl_multiroot_fsolver* s;
-
-  gsl_multiroot_function F;
-  F.f = &face_residual_vec;
-  F.params = &fw;
-  F.n = 1;
-
-  // Choose solver type
-  T = gsl_multiroot_fsolver_hybrids;
-  s = gsl_multiroot_fsolver_alloc(T, 1);
-
-  // Initial bracket: you must provide [x_lo, x_hi] that contains the root
-  // double x_lo = -1.E5;
-  // double x_hi = 1.E5;
-
-
-  // auto* pump = dynamic_cast<VSPump*>(fw.face.get());
-  // const bool is_pump = (pump != nullptr);
-  //
-  // if (is_pump and fw.main_iter == 0) {
-  //   std::cout<<"flag2 "<<x_guess<<::endl;
-  //     return x_guess;
-  //   }
-
-  gsl_vector* x = gsl_vector_alloc(1);
-  gsl_vector_set(x, 0, x_guess);
-
-  gsl_multiroot_fsolver_set(s, &F, x);
-
-  int status;
-  int iter = 0, max_iter = 100;
-  // double r = x_guess;
-
-  do {
-    iter++;
-    status = gsl_multiroot_fsolver_iterate(s);
-
-    if (status) break;
-
-    status = gsl_multiroot_test_residual(s->f, 1e-8);
-
-  } while (status == GSL_CONTINUE && iter < max_iter);
-
-  double root = gsl_vector_get(s->x, 0);
-
-  gsl_vector_free(x);
-  gsl_multiroot_fsolver_free(s);
-
-//   double r = gsl_vector_get(s->x, 0);
-// double fres = fw.face->eqn_mom(
-//   r, fw.time, fw.delt, fw.trans_sim, fw.alpha_mom);
-//
-// std::cout << "root = " << r
-//           << " residual = " << fres << std::endl;
-
-  // Throw exception if not converged
-  if (status != GSL_SUCCESS) {
-    throw std::runtime_error(
-      "Multiroot solver failed. Last value = "
-      + std::to_string(root));
-  }
-
-
-  return root;
-}
- */
-
 
 void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int main_iter, std::shared_ptr<Circuit> circuit) {
   std::ofstream fout;
