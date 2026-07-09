@@ -62,6 +62,12 @@ settings.run_mode = "steady"
 settings.conv_crit_flow = 1.E-8
 settings.conv_crit_temp_SS = 1.E-8
 settings.conv_crit_temp_trans = 1.E-6
+settings.tim_slot = [[0.0, 0.0]]
+settings.export_to_xml()
+
+opensd.run(mpi_args=['mpiexec', '-n', '1'], opensd_exec='/mnt/c/codes/opensd/build/opensd')
+
+settings.run_mode = "transient"
 settings.tim_slot = [[4.0, 10000.0]]
 
 heat_input = opensd.Tabular([0.0, 4.0, 10000.0], [1000.0, 0.0, 0.0])

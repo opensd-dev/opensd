@@ -21,6 +21,7 @@ namespace settings {
   double alpha_ener;
   double alpha_heat;
   double relax_pres {0.6};
+  double relax_enth {1.0};
   vector<double> tim_slot;
   int no_main_iter;
   int no_flow_iter;
@@ -110,6 +111,9 @@ void read_settings_xml(pugi::xml_node root)
   alpha_heat = stod(get_node_value(root, "alpha_heat"));
   if (check_for_node(root, "relax_pres")) {
     relax_pres = stod(get_node_value(root, "relax_pres"));
+  }
+  if (check_for_node(root, "relax_enth")) {
+    relax_enth = stod(get_node_value(root, "relax_enth"));
   }
   T_ambient = stod(get_node_value(root, "T_ambient"));
   tim_slot = get_node_array<double>(root, "tim_slot");

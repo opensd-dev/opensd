@@ -27,6 +27,7 @@ extern double alpha_mom; //!< relaxation factor
 extern double alpha_ener; //!< relaxation factor
 extern double alpha_heat; //!< relaxation factor
 extern double relax_pres; //!< pressure correction relaxation factor
+extern double relax_enth; //!< enthalpy relaxation factor
 extern double T_ambient;
 extern vector<double> tim_slot;
 extern int no_main_iter;

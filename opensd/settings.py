@@ -64,6 +64,7 @@ class Settings:
         self._alpha_ener = np.array(0.6)
         self._alpha_heat = np.array(0.6)
         self._relax_pres = 0.6
+        self._relax_enth = 1.0
 
         
         for key, value in kwargs.items():
@@ -122,6 +123,7 @@ class Settings:
         self._create_alpha_ener_subelement(element)
         self._create_alpha_heat_subelement(element)
         self._create_relax_pres_subelement(element)
+        self._create_relax_enth_subelement(element)
         self._create_main_iter_subelement(element)
         self._create_flow_iter_subelement(element)
         self._create_temp_solve_subelement(element)
@@ -187,6 +189,10 @@ class Settings:
     def _create_relax_pres_subelement(self, root):
         elem = ET.SubElement(root, "relax_pres")
         elem.text = str(self._relax_pres)
+
+    def _create_relax_enth_subelement(self, root):
+        elem = ET.SubElement(root, "relax_enth")
+        elem.text = str(self._relax_enth)
 
     def _create_main_iter_subelement(self, root):
         elem = ET.SubElement(root, "no_main_iter")
@@ -308,6 +314,16 @@ class Settings:
         cv.check_type('relax_pres', relax_pres, Real)
         cv.check_greater_than('relax_pres', relax_pres, 0)
         self._relax_pres = relax_pres
+
+    @property
+    def relax_enth(self) -> float:
+        return self._relax_enth
+
+    @relax_enth.setter
+    def relax_enth(self, relax_enth: float):
+        cv.check_type('relax_enth', relax_enth, Real)
+        cv.check_greater_than('relax_enth', relax_enth, 0)
+        self._relax_enth = relax_enth
 
     @property
     def conv_crit_flow(self) -> float:

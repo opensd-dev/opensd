@@ -171,19 +171,6 @@ Circuit::Circuit(pugi::xml_node cir_node) : fltype(FluidType::UNSET)
     this->bcs.push_back(BC(bc));
   }
 
-  if (settings::run_mode == RunMode::TRANSIENT) {
-    for (const auto& bc : this->bcs) {
-      if (bc.trans_) continue;
-      for (auto& node : this->nodes) {
-        if (node->identifier == bc.node_) {
-          node->fixed_var.erase(bc.var_);
-          break;
-        }
-      }
-    }
-  }
-
-
   std::string pbound_ind_str = cir_node.attribute("Pbound_ind").value();
   if (!pbound_ind_str.empty()) {
     std::istringstream iss(pbound_ind_str);
@@ -232,7 +219,7 @@ void discretize_pipes() {
         auto node = std::make_shared<Node>();
         node->identifier = pipe->identifier + "_node" + std::to_string(i);
         node->tpres_old = pipe->unode->tpres_old+(pipe->dnode->tpres_old-pipe->unode->tpres_old)*(i+1)/pipe->ncell;
-        node->ttemp_old = pipe->unode->ttemp_old+(pipe->dnode->ttemp_old-pipe->unode->ttemp_old)*(i+1)/pipe->ncell;
+        node->ttemp_old = settings::T_ambient;
         node->tenth_old = std::max(pipe->unode->tenth_old,pipe->dnode->tenth_old);
         node->volume = delx*pipe->cfarea;
         node->msource = 0.;
@@ -295,9 +282,7 @@ for (auto& circuit : model::circuits) {
 
   }
 }
-
 }
-
 
 void Circuit::save_to_hdf5(hid_t group_id) const {
   write_string(group_id, "identifier", identifier);

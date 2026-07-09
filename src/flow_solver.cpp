@@ -72,6 +72,36 @@ double face_residual(double x, void* params) {
 
 // Solve nonlinear equation for one face using GSL
 double solve_face(FaceWrapper& fw, double x_guess) {
+  bool is_vspump = static_cast<bool>(std::dynamic_pointer_cast<VSPump>(fw.face));
+  if (!is_vspump) {
+    const gsl_multiroot_fsolver_type* T = gsl_multiroot_fsolver_hybrids;
+    gsl_multiroot_fsolver* s = gsl_multiroot_fsolver_alloc(T, 1);
+
+    gsl_multiroot_function F;
+    F.f = &face_residual_vec;
+    F.n = 1;
+    F.params = &fw;
+
+    gsl_vector* x = gsl_vector_alloc(1);
+    gsl_vector_set(x, 0, x_guess);
+    gsl_multiroot_fsolver_set(s, &F, x);
+
+    int status = GSL_CONTINUE;
+    int iter = 0;
+    int max_iter = 100;
+    do {
+      ++iter;
+      status = gsl_multiroot_fsolver_iterate(s);
+      if (status) break;
+      status = gsl_multiroot_test_residual(s->f, 1.0e-8);
+    } while (status == GSL_CONTINUE && iter < max_iter);
+
+    double root = gsl_vector_get(s->x, 0);
+    gsl_vector_free(x);
+    gsl_multiroot_fsolver_free(s);
+    return root;
+  }
+
   const gsl_root_fsolver_type* T;
   gsl_root_fsolver* s;
 
@@ -86,11 +116,8 @@ double solve_face(FaceWrapper& fw, double x_guess) {
   // Initial bracket: you must provide [x_lo, x_hi] that contains the root
   double x_lo = -1.E5;
   double x_hi = 1.E5;
-  bool is_vspump = static_cast<bool>(std::dynamic_pointer_cast<VSPump>(fw.face));
-  if (is_vspump) {
-    x_lo = -0.01;
-    x_hi = 0.01;
-  }
+  x_lo = -0.01;
+  x_hi = 0.01;
 
 
   // auto* pump = dynamic_cast<VSPump*>(fw.face.get());
@@ -149,6 +176,7 @@ void solve_energy_like_pinet(std::shared_ptr<Circuit> circuit, Mat A, Vec b, Vec
   std::vector<PetscScalar> rhs(n, 0.0);
   Eigen::MatrixXd dense = Eigen::MatrixXd::Zero(n, n);
   Eigen::VectorXd rhs_vec = Eigen::VectorXd::Zero(n);
+  std::vector<PetscInt> nocal_ind;
 
   for (auto& node : circuit->nodes) {
     PetscInt row = circuit->old2new[node->node_ind];
@@ -169,7 +197,51 @@ void solve_energy_like_pinet(std::shared_ptr<Circuit> circuit, Mat A, Vec b, Vec
     MatRestoreRow(A, i, &ncols, &cols, &vals);
   }
 
-  Eigen::JacobiSVD<Eigen::MatrixXd> svd(dense);
+  for (PetscInt col = 0; col < n; ++col) {
+    bool any = false;
+    for (PetscInt row = 0; row < n; ++row) {
+      if (dense(row, col) != 0.0) {
+        any = true;
+        break;
+      }
+    }
+    if (!any) {
+      nocal_ind.push_back(col);
+    }
+  }
+
+  std::sort(nocal_ind.begin(), nocal_ind.end());
+  nocal_ind.erase(std::unique(nocal_ind.begin(), nocal_ind.end()), nocal_ind.end());
+
+  std::vector<PetscInt> active;
+  active.reserve(n);
+  for (PetscInt i = 0; i < n; ++i) {
+    if (!std::binary_search(nocal_ind.begin(), nocal_ind.end(), i)) {
+      active.push_back(i);
+    }
+  }
+
+  const PetscInt nr = static_cast<PetscInt>(active.size());
+  Eigen::MatrixXd solve_mat = Eigen::MatrixXd::Zero(nr, nr);
+  Eigen::VectorXd solve_rhs = Eigen::VectorXd::Zero(nr);
+  std::vector<PetscScalar> solve_phi(nr, 0.0);
+
+  for (PetscInt i = 0; i < nr; ++i) {
+    solve_rhs(i) = rhs_vec(active[i]);
+    solve_phi[i] = phi[active[i]];
+    for (PetscInt j = 0; j < nr; ++j) {
+      solve_mat(i, j) = dense(active[i], active[j]);
+    }
+  }
+
+  if (nr == 0) {
+    VecZeroEntries(x);
+    VecAssemblyBegin(x);
+    VecAssemblyEnd(x);
+    return;
+  }
+
+  Eigen::JacobiSVD<Eigen::MatrixXd> svd(solve_mat);
   auto singular = svd.singularValues();
   double cond = std::numeric_limits<double>::infinity();
   if (singular.size() > 0 && singular(singular.size() - 1) > 0.0) {
@@ -177,31 +249,39 @@ void solve_energy_like_pinet(std::shared_ptr<Circuit> circuit, Mat A, Vec b, Vec
   }
 
   if (std::isfinite(cond) && cond < 1.0e8) {
-    Eigen::VectorXd sol = dense.partialPivLu().solve(rhs_vec);
-    for (PetscInt i = 0; i < n; ++i) {
-      phi[i] = sol(i);
+    Eigen::VectorXd sol = solve_mat.partialPivLu().solve(solve_rhs);
+    for (PetscInt i = 0; i < nr; ++i) {
+      phi[active[i]] = sol(i);
     }
   } else {
     for (int iter = 0; iter < max_iterations; ++iter) {
-      for (PetscInt i = 0; i < n; ++i) {
-        double diag = dense(i, i);
+      for (PetscInt i = 0; i < nr; ++i) {
+        double diag = solve_mat(i, i);
         double sigma = 0.0;
-        for (PetscInt j = 0; j < n; ++j) {
+        for (PetscInt j = 0; j < nr; ++j) {
           if (j != i) {
-            sigma += dense(i, j) * phi[j];
+            sigma += solve_mat(i, j) * solve_phi[j];
           }
         }
 
         if (diag != 0.0) {
-          phi[i] = (1.0 - omega) * phi[i] + (omega / diag) * (rhs[i] - sigma);
+          solve_phi[i] = (1.0 - omega) * solve_phi[i] + (omega / diag) * (solve_rhs(i) - sigma);
         }
       }
 
-      double residual = (dense * Eigen::Map<Eigen::VectorXd>(phi.data(), n) - rhs_vec).norm();
+      double residual = (solve_mat * Eigen::Map<Eigen::VectorXd>(solve_phi.data(), nr) - solve_rhs).norm();
       if (residual < tolerance) {
         break;
       }
     }
+    for (PetscInt i = 0; i < nr; ++i) {
+      phi[active[i]] = solve_phi[i];
+    }
+  }
+
+  for (auto i : nocal_ind) {
+    auto& node = circuit->nodes[i];
+    phi[i] = node->tenth_gues;
   }
 
   VecZeroEntries(x);
@@ -1116,15 +1196,11 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
       }
 	  else if (node->fixed_var.count("msource") || node->fixed_var.count("P")) {
 		if (node->msource > 0.0) {
-          // if (node->tenth_msrc.has_value()) {
-            // b(i) += node->tenth_msrc.value() * node->msource;
-          // } else {
-            // if (node->msource > 1.E-6) {
-              // std::cout << "warning: positive mass source condition assumed based on previous circuit condition "
-                        // << node->identifier << " tenth=" << node->tenth_gues << " " << node->msource << std::endl;
-            // }
-            // b(i) += node->tenth_old * node->msource;
-          // }
+          if (node->msource > 1.E-6) {
+            std::cout << "warning: positive mass source condition assumed based on previous circuit condition "
+                      << node->identifier << " tenth=" << node->tenth_gues << " " << node->msource << std::endl;
+          }
+          VecSetValue(bh, i, node->tenth_old * node->msource, ADD_VALUES);
         } else {
 	      PetscScalar Aii;
 		  PetscInt row = i, col = i;
@@ -1144,8 +1220,8 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
     MatAssemblyBegin(Ah, MAT_FINAL_ASSEMBLY);
     MatAssemblyEnd(Ah, MAT_FINAL_ASSEMBLY);
 
-    // VecAssemblyBegin(bh);
-    // VecAssemblyEnd(bh);
+    VecAssemblyBegin(bh);
+    VecAssemblyEnd(bh);
 
 
     
@@ -1221,28 +1297,7 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
     // PCSetType(pc, PCLU);  // direct LU
     // KSPSetFromOptions(ksp);
   
-    bool has_fixed_enthalpy = false;
-    for (auto& node : circuit->nodes) {
-      if (node->fixed_var.count("T") || node->fixed_var.count("H")) {
-        has_fixed_enthalpy = true;
-        break;
-      }
-    }
-
-    if (!trans_sim && !has_fixed_enthalpy) {
-      solve_energy_like_pinet(circuit, Ah, bh, enth);
-    } else {
-      // Refresh the KSP operator after rebuilding Ah. The energy matrix changes
-      // every nonlinear iteration; PINET solves this freshly assembled system.
-      KSPSetOperators(circuit->ksph, Ah, Ah);
-      PC pc;
-      KSPGetPC(circuit->ksph, &pc);
-      KSPSetType(circuit->ksph, KSPPREONLY);
-      PCSetType(pc, PCLU);
-      KSPSetInitialGuessNonzero(circuit->ksph, PETSC_FALSE);
-      KSPSetUp(circuit->ksph);
-      KSPSolve(circuit->ksph, bh, enth);
-    }
+    solve_energy_like_pinet(circuit, Ah, bh, enth);
   
   // } else {
     // (3) Else -> fallback to SOR iteration
@@ -1292,11 +1347,9 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
     // std::vector<PetscScalar> vals_owned(n_local);
     // VecGetValues(enth, n_local, circuit->indices_owned.data(), vals_owned.data());
 	
-    double relax = 1.;
-    if (!model::hslabs.empty()) {
-  	if (!trans_sim) {
-  	  relax = 0.25;
-  	}
+    double relax = settings::relax_enth;
+    if (!model::hslabs.empty() && !trans_sim) {
+      relax = std::min(relax, 0.25);
     }
 	PetscScalar enth_i;
     for (auto& node : circuit->nodes_owned) {

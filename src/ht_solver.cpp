@@ -190,13 +190,7 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
     if (A.cols() == 0 || A.rows() == 0) {
       solved = false;
     } else {
-      // Try LDLT (symmetric PD) first, fallback to full-pivot QR if it fails.
-      Eigen::LDLT<Eigen::MatrixXd> ldlt(A);
-      if (ldlt.info() == Eigen::Success) {
-        tempVec = ldlt.solve(b);
-      } else {
-        tempVec = A.colPivHouseholderQr().solve(b);
-      }
+      tempVec = A.partialPivLu().solve(b);
     }
     // std::cout<<A<<std::endl<<std::endl;
     // std::cout<<b<<std::endl<<std::endl;
