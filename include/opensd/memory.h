@@ -13,6 +13,7 @@
 
 namespace opensd {
 using std::make_unique;
+using std::shared_ptr;
 using std::unique_ptr;
 } // namespace opensd
 

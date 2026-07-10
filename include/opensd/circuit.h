@@ -79,6 +79,7 @@ public:
 
   void save_to_hdf5(hid_t group_id) const;
   void load_from_hdf5(hid_t group_id);
+  void apply_transient_bc_mask();
   //! Find a node by its identifier string
   Node* get_node_by_identifier(const std::string& id) const;
 

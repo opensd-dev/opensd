@@ -39,6 +39,7 @@ find_package(pybind11 REQUIRED)
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(OPENSD_COOLPROP_SOURCE_DIR "${CMAKE_SOURCE_DIR}/externals/CoolProp" CACHE PATH "CoolProp source tree to build with OpenSD")
 
 # Add bindings library
 add_library(bindings MODULE src/bindings.cpp)
@@ -48,7 +49,7 @@ target_include_directories(bindings
     PRIVATE
         include
         ${Python_INCLUDE_DIRS}        # <--- this is key for Python.h
-        ${CMAKE_SOURCE_DIR}/externals/CoolProp/include
+        ${OPENSD_COOLPROP_SOURCE_DIR}/include
         ${MPI_CXX_INCLUDE_DIRS}
 )
 
@@ -112,7 +113,7 @@ else()
 endif()
 
 
-add_subdirectory ("${CMAKE_SOURCE_DIR}/externals/CoolProp")
+add_subdirectory ("${OPENSD_COOLPROP_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/externals/CoolProp")
 include_directories(${HDF5_INCLUDE_DIRS})
 include_directories(include)
 
@@ -126,8 +127,8 @@ add_executable(${EXENAME} src/main.cpp)
 
 target_include_directories(${EXENAME} PUBLIC
   include
-  externals/CoolProp/externals/Eigen
-  externals/CoolProp/include
+  ${OPENSD_COOLPROP_SOURCE_DIR}/externals/Eigen
+  ${OPENSD_COOLPROP_SOURCE_DIR}/include
   external/fmtlib
   ${MPI_CXX_INCLUDE_DIRS}
   ${METIS_INCLUDE_DIRS}
@@ -136,8 +137,8 @@ target_include_directories(${EXENAME} PUBLIC
 
 target_include_directories(opensd_core PUBLIC
   include
-  externals/CoolProp/externals/Eigen
-  externals/CoolProp/include
+  ${OPENSD_COOLPROP_SOURCE_DIR}/externals/Eigen
+  ${OPENSD_COOLPROP_SOURCE_DIR}/include
   external/fmtlib
   ${MPI_CXX_INCLUDE_DIRS}
   ${METIS_INCLUDE_DIRS}

@@ -11,7 +11,6 @@
 #include "opensd/vector.h"
 // #include "CoolProp.h"
 #include "solidframe.h"
-#include "crossplatform_shared_ptr.h"
 // #include "hdf5_interface.h"
 // #include <petscksp.h>
 #include "opensd/memory.h"

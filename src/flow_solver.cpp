@@ -137,11 +137,7 @@ double solve_vspump_face_bracketed(FaceWrapper& fw, double x_guess) {
   int status = gsl_root_fsolver_set(solver, &F, x_lo_init, x_hi_init);
   if (status != GSL_SUCCESS) {
     gsl_root_fsolver_free(solver);
-    double f_lo = face_residual(x_lo_init, &fw);
-    double f_hi = face_residual(x_hi_init, &fw);
-    throw std::runtime_error(
-      "VSPump root solver could not bracket the root: f_lo=" +
-      std::to_string(f_lo) + " f_hi=" + std::to_string(f_hi));
+    return solve_face_unbracketed(fw, x_guess);
   }
 
   int iter = 0;

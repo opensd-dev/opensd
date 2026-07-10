@@ -182,7 +182,27 @@ Circuit::Circuit(pugi::xml_node cir_node) : fltype(FluidType::UNSET)
   }
 
   this->eps_m = this->mean_flow = this->eps_h = this->eps_p = 0;
+  apply_transient_bc_mask();
 
+}
+
+void Circuit::apply_transient_bc_mask() {
+  if (settings::run_mode != RunMode::TRANSIENT) return;
+
+  Pbound_ind.clear();
+  for (const auto& bc : bcs) {
+    Node* node = get_node_by_identifier(bc.node_);
+    if (!node) continue;
+
+    if (!bc.enabled_ || !bc.trans_) {
+      node->fixed_var.erase(bc.var_);
+      continue;
+    }
+
+    if (bc.var_ == "P") {
+      Pbound_ind.push_back(node->node_ind);
+    }
+  }
 }
 
 void read_circuits(pugi::xml_node node)
@@ -392,6 +412,8 @@ void Circuit::load_from_hdf5(hid_t group_id) {
     H5Gclose(bcgrp);
   }
   H5Gclose(bc_group);
+
+  apply_transient_bc_mask();
 
   // Load Faces
   hid_t face_group = H5Gopen(group_id, "faces", H5P_DEFAULT);

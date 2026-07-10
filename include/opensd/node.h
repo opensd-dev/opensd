@@ -3,6 +3,7 @@
 #ifndef OPENSD_NODE_H
 #define OPENSD_NODE_H
 
+#include <memory>
 #include <optional>
 #include "pugixml.hpp"
 
@@ -11,11 +12,11 @@
 #include "CoolProp.h"
 #include "fluidframe.h"
 #include "AbstractState.h"
-#include "crossplatform_shared_ptr.h"
 #include "hdf5_interface.h"
 #include <petscksp.h>
 
 namespace opensd {
+using std::shared_ptr;
 
 //==============================================================================
 // Global variables

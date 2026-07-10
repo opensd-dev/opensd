@@ -5,6 +5,8 @@
 #include "opensd/fluidframe.h"
 #include "CoolProp.h"
 #include "AbstractState.h"
+#include <algorithm>
+#include <cmath>
 #include <memory>
 #include <string>
 
@@ -32,6 +34,33 @@ public:
   }
 
   void update(int input_pair, double val1, double val2) override {
+    if (backend_ == "INCOMP" && input_pair == CoolProp::HmassP_INPUTS) {
+      const double pressure = val2;
+      const double tmin = std::isfinite(state_->Tmin()) ? state_->Tmin() : 400.0;
+      const double tmax = std::isfinite(state_->Tmax()) ? state_->Tmax() : 1100.0;
+
+      state_->update(CoolProp::PT_INPUTS, pressure, tmin);
+      const double hmin = state_->hmass();
+      state_->update(CoolProp::PT_INPUTS, pressure, tmax);
+      const double hmax = state_->hmass();
+
+      const double eps = std::max(1.0e-3, 1.0e-10 * std::abs(hmax - hmin));
+      const double hmass = std::clamp(val1, hmin + eps, hmax - eps);
+      double lo = tmin;
+      double hi = tmax;
+      for (int i = 0; i < 80; ++i) {
+        const double mid = 0.5 * (lo + hi);
+        state_->update(CoolProp::PT_INPUTS, pressure, mid);
+        if (state_->hmass() < hmass) {
+          lo = mid;
+        } else {
+          hi = mid;
+        }
+      }
+      state_->update(CoolProp::PT_INPUTS, pressure, 0.5 * (lo + hi));
+      return;
+    }
+
     state_->update(static_cast<CoolProp::input_pairs>(input_pair), val1, val2);
   }
 
