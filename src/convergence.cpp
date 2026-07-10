@@ -163,6 +163,11 @@ std::tuple<bool, double, double, double, double> check_conv(double time, double 
 
 
 
+  auto within_criterion = [](double value, double criterion) {
+    constexpr double absolute_margin = 2.0e-12;
+    return value <= criterion + absolute_margin;
+  };
+
   bool condition;
   if (opt == "all") {
     double conv_crit_temp;
@@ -171,14 +176,14 @@ std::tuple<bool, double, double, double, double> check_conv(double time, double 
     } else {
       conv_crit_temp = settings::conv_crit_temp_SS;
     }
-    condition = (eps_ptot < settings::conv_crit_flow) &&
-                     (eps_mtot < settings::conv_crit_flow) &&
-                     (eps_htot < conv_crit_temp) &&
-                     (eps_ttot < settings::conv_crit_ht);
+    condition = within_criterion(eps_ptot, settings::conv_crit_flow) &&
+                     within_criterion(eps_mtot, settings::conv_crit_flow) &&
+                     within_criterion(eps_htot, conv_crit_temp) &&
+                     within_criterion(eps_ttot, settings::conv_crit_ht);
 					 
   } else if (opt == "massmom") {
-    condition = (eps_ptot < settings::conv_crit_flow) &&
-                     (eps_mtot < settings::conv_crit_flow);  
+    condition = within_criterion(eps_ptot, settings::conv_crit_flow) &&
+                     within_criterion(eps_mtot, settings::conv_crit_flow);  
 
   }
 

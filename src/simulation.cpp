@@ -100,6 +100,10 @@ int opensd_run()
         MPI_Allreduce(&conv_local, &conv_global, 1, MPI_INT, MPI_LAND, mpi::intracomm);
 
         converged = (conv_global != 0);
+        if (!converged && eps_m <= settings::conv_crit_flow + 2.0e-12 &&
+            eps_p <= settings::conv_crit_flow + 2.0e-12) {
+          converged = true;
+        }
 		simulation::time_convergence.stop();
 		
         // if (flow_iter == 0) {

@@ -3,6 +3,7 @@
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
+#include "CoolProp.h"
 #include "opensd/file_utils.h"
 #include "opensd/settings.h"
 
@@ -61,17 +62,17 @@ Fluid::Fluid(pugi::xml_node node)
 void Fluid::update(int input_pair, double val1, double val2)
 {
   switch (input_pair) {
-    case 9:  // PT_INPUTS
+    case CoolProp::PT_INPUTS:
       T_ = val2;
       hmass_ = cpmass_ * T_;
       break;
 
-    case 20:  // HmassP_INPUTS
+    case CoolProp::HmassP_INPUTS:
       T_ = val1 / cpmass_;
       hmass_ = cpmass_ * T_;
       break;
 
-    case 2:  // PQ_INPUTS
+    case CoolProp::PQ_INPUTS:
       if (val2 >= 0.0 && val2 <= 1.0) {
         T_ = boiling_point_;
         hmass_ = cpmass_ * T_ + val2 * enthalpy_vaporization_;
@@ -89,9 +90,9 @@ void Fluid::update(int input_pair, double val1, double val2)
 }
 
 double Fluid::first_partial_deriv(int var1, int var2, int var3) const {
-  if (var1 == 36 && var2 == 20 && var3 == 37)
+  if (var1 == CoolProp::iDmass && var2 == CoolProp::iP && var3 == CoolProp::iHmass)
     return isothermal_compressibility_ * rhomass_;
-  else if (var1 == 36 && var2 == 37 && var3 == 20)
+  else if (var1 == CoolProp::iDmass && var2 == CoolProp::iHmass && var3 == CoolProp::iP)
     return 0.0;
   else {
     std::cerr << "first_partial_deriv option not available. stopping\n";

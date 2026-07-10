@@ -34,7 +34,15 @@ public:
   }
 
   void update(int input_pair, double val1, double val2) override {
-    if (backend_ == "INCOMP" && input_pair == CoolProp::HmassP_INPUTS) {
+    if (input_pair == CoolProp::HmassP_INPUTS && backend_ != "INCOMP") {
+      try {
+        state_->update(static_cast<CoolProp::input_pairs>(input_pair), val1, val2);
+        return;
+      } catch (const CoolProp::CoolPropBaseError&) {
+      }
+    }
+
+    if (input_pair == CoolProp::HmassP_INPUTS) {
       const double pressure = val2;
       const double tmin = std::isfinite(state_->Tmin()) ? state_->Tmin() : 400.0;
       const double tmax = std::isfinite(state_->Tmax()) ? state_->Tmax() : 1100.0;
