@@ -25,6 +25,7 @@ public:
   virtual double viscosity() const = 0;
   virtual double conductivity() const = 0;
   virtual double speed_sound() const = 0;
+  virtual double Qth() const = 0;
 
   // Phase and derivatives
   virtual int phase() const = 0;

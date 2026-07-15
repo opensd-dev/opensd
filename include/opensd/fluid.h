@@ -113,6 +113,7 @@ public:
   double conductivity() const override { return conductivity_; }
   double adiabatic_compressibility() const { return adiabatic_compressibility_; }
   double isothermal_compressibility() const { return isothermal_compressibility_; }
+  double Qth() const override { return 0.0; }
   double boiling_point() const { return boiling_point_; }
   double enthalpy_vaporization() const { return enthalpy_vaporization_; }
   double T() const { return T_; }

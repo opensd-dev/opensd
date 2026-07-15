@@ -17,10 +17,10 @@ namespace py = pybind11;
 
 std::ofstream f1;
 std::vector<std::unique_ptr<Calculate>> Calculate::registry;
-const std::vector<std::string> node_items = {"tpres_gues", "spres_gues", "ttemp_gues", "tenth_gues", "rhomass", "msource", "esource"};
+const std::vector<std::string> node_items = {"tpres_gues", "spres_gues", "ttemp_gues", "tenth_gues", "rhomass", "Qth", "msource", "esource"};
 const std::vector<std::string> pipe_node_items = {"tpres_gues", "spres_gues", "ttemp_gues", "tenth_gues", "rhomass"};
 const std::vector<std::string> pipe_items = {"vflow", "velocity", "mflow"};
-const std::vector<std::string> face_items = {"vflow", "velocity", "mflow"};
+const std::vector<std::string> face_items = {"tpres_gues", "spres_gues", "vflow", "velocity", "mflow"};
 bool output_has_header = false;
 
 // Map to access Node attributes by string
@@ -59,6 +59,8 @@ std::unordered_map<std::string, std::function<double(const Pipe&)>> pipeAttribut
 };
 
 std::unordered_map<std::string, std::function<double(const Face&)>> faceAttributeMap = {
+  {"tpres_gues", &Face::tpres_gues},
+  {"spres_gues", &Face::spres_gues},
   {"vflow", &Face::vflow_gues},
   {"velocity", &Face::velocity},
   {"mflow", &Face::mflow}
@@ -67,6 +69,7 @@ std::unordered_map<std::string, std::function<double(const Face&)>> faceAttribut
 double nodeAttributeValue(const Node& node, const std::string& item)
 {
   if (item == "rhomass") return node.ther_gues ? node.ther_gues->rhomass() : 0.0;
+  if (item == "Qth") return node.ther_gues ? node.ther_gues->Qth() : 0.0;
 
   auto it = nodeAttributeMap.find(item);
   return it != nodeAttributeMap.end() ? it->second(node) : 0.0;

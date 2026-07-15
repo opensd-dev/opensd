@@ -69,7 +69,16 @@ public:
       return;
     }
 
-    state_->update(static_cast<CoolProp::input_pairs>(input_pair), val1, val2);
+    try {
+      state_->update(static_cast<CoolProp::input_pairs>(input_pair), val1, val2);
+    } catch (const CoolProp::CoolPropBaseError&) {
+      if (backend_ == "INCOMP" || backend_ == "HEOS") {
+        throw;
+      }
+      backend_ = "HEOS";
+      state_.reset(CoolProp::AbstractState::factory(backend_, fluid_name_));
+      state_->update(static_cast<CoolProp::input_pairs>(input_pair), val1, val2);
+    }
   }
 
   double hmass() const override { return state_->hmass(); }
@@ -80,6 +89,13 @@ public:
   double viscosity() const override { return state_->viscosity(); }
   double conductivity() const override { return state_->conductivity(); }
   double speed_sound() const override { return state_->speed_sound(); }
+  double Qth() const override {
+    try {
+      return state_->Q();
+    } catch (const CoolProp::CoolPropBaseError&) {
+      return -1000.0;
+    }
+  }
 
   int phase() const override { return state_->phase(); }
 

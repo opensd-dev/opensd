@@ -308,8 +308,8 @@ void Node::update_staticpres() {
 
 void Node::assign_prop() {
 	if (circuit->fltype != FluidType::INCOMPRESSIBLE) {
-  ther_gues = std::make_shared<opensd::CoolPropAdapter>("BICUBIC&HEOS", circuit->flname);
-  ther_old  = std::make_shared<opensd::CoolPropAdapter>("BICUBIC&HEOS", circuit->flname);
+  ther_gues = std::make_shared<opensd::CoolPropAdapter>("HEOS", circuit->flname);
+  ther_old  = std::make_shared<opensd::CoolPropAdapter>("HEOS", circuit->flname);
 	}
 	else {
       if (circuit->fllib=="CoolProp") {

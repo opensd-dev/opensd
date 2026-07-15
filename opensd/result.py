@@ -9,7 +9,13 @@ class Result:
         from matplotlib import pyplot
         import pandas as pd
         
-        df = pd.read_csv(self.resfile,header=0,delimiter=' ',skipinitialspace = True)
+        df = pd.read_csv(
+            self.resfile,
+            header=0,
+            sep=r"\s*,\s*|\s+",
+            engine="python",
+            skipinitialspace=True,
+        )
         
         df.plot(x="time(s)",y=parameter)
         

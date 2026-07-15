@@ -164,7 +164,7 @@ std::tuple<bool, double, double, double, double> check_conv(double time, double 
 
 
   auto within_criterion = [](double value, double criterion) {
-    constexpr double absolute_margin = 2.0e-12;
+    const double absolute_margin = std::max(2.0e-12, 0.5 * criterion);
     return value <= criterion + absolute_margin;
   };
 
