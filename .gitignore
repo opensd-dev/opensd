@@ -279,3 +279,7 @@ tutorials/**/glass.py
 !tutorials/**/*.png
 !tutorials/**/*.csv
 !tutorials/**/geometry.layout.json
+
+# Local per-commit solver build cache
+.opensd-binary-cache/
+.opensd-build-worktrees/

@@ -1,0 +1,67 @@
+name: Build OpenSD solver
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  linux-solver:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            gfortran \
+            libfmt-dev \
+            libgsl-dev \
+            libhdf5-dev \
+            libmetis-dev \
+            libopenmpi-dev \
+            libpetsc-real-dev \
+            openmpi-bin \
+            pkg-config \
+            pybind11-dev \
+            python3-dev
+
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DOPENSD_USE_MPI=ON
+
+      - name: Build solver
+        run: cmake --build build --target opensd --parallel 2
+
+      - name: Package solver
+        run: |
+          mkdir -p artifact
+          cp build/opensd artifact/opensd
+          cp build/libopensd_core.so artifact/libopensd_core.so
+          cat > artifact/opensd-run <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+          export LD_LIBRARY_PATH="$here${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          exec "$here/opensd" "$@"
+          EOF
+          chmod +x artifact/opensd-run
+          printf '%s\n' "${GITHUB_SHA}" > artifact/commit.txt
+
+      - name: Upload solver artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: opensd-solver-${{ github.sha }}
+          path: artifact/
+          retention-days: 30
