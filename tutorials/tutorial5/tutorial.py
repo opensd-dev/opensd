@@ -23,20 +23,6 @@ bc3 = circuit1.add_BC("bc3","node2",'P',650000.)
 geometry = opensd.Geometry([circuit1])
 geometry.export_to_xml()
 
-# def fun1(t,dt):
-#     # y = 700.*1000.
-#     import math
-#     y = (650. + 50.*math.exp(-0.004*t))*1000.
-#     # print t
-#     return y
-# action_setup.Action("bc1","bval",fun1)
-
-# val1 = post.Monitor("node1","msource")
-
-# from PINET import scheduler
-# scheduler.etime = 1800.
-# scheduler.delt = 10.
-
 settings = opensd.Settings()
 settings.verbosity = 3
 settings.temp_solve = False
@@ -45,3 +31,17 @@ settings.export_to_xml()
 
 opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/c/codes/opensd/build/opensd')
 
+a1 = opensd.Action("ramp_bc1", "bc1", "bval", "fun1")
+
+actions = opensd.Actions([a1])
+actions.export_to_xml()
+
+# settings.no_main_iter = 500
+settings.verbosity = 1
+settings.temp_solve = False
+settings.run_mode = "transient"
+settings.tim_slot = [[10.0, 1800.]]
+settings.flag_write = True
+settings.export_to_xml()
+
+opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/c/codes/opensd/build/opensd')

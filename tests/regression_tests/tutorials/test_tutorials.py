@@ -257,7 +257,64 @@ PINET_VALUE_REFERENCES = {
                     0.0327680798, 0.0379800499, 0.0311221945, 0.0242643392, 0.0206982544, 0.0124688279,
                     0.00314214464,
                 ],
-                "atol": 0.03,
+                "atol": 0.025,
+            }
+        ],
+    },
+    "tutorial5": {
+        "time_checks": [
+            {
+                "column": "msource:node1",
+                "time_shift": 10.0,
+                "times": [
+                    0.0,
+                    27.2020725388601,
+                    43.0699481865285,
+                    81.6062176165803,
+                    142.810880829016,
+                    197.215025906736,
+                    242.551813471503,
+                    301.489637305699,
+                    343.426165803109,
+                    444.300518134715,
+                    544.041450777202,
+                    644.915803108808,
+                    743.523316062176,
+                    845.531088082902,
+                    944.138601036269,
+                    1144.75388601036,
+                    1244.49481865285,
+                    1344.23575129534,
+                    1445.11010362694,
+                    1545.98445595855,
+                    1643.4585492228,
+                    1749.99999999999,
+                ],
+                "expected": [
+                    1.76167076167076,
+                    1.66584766584766,
+                    1.61425061425061,
+                    1.5036855036855,
+                    1.32678132678133,
+                    1.19410319410319,
+                    1.09090909090909,
+                    0.972972972972973,
+                    0.894348894348894,
+                    0.732186732186732,
+                    0.5995085995086,
+                    0.491400491400492,
+                    0.400491400491401,
+                    0.329238329238329,
+                    0.27027027027027,
+                    0.181818181818182,
+                    0.147420147420148,
+                    0.120393120393121,
+                    0.0982800982800987,
+                    0.0786240786240787,
+                    0.0638820638820644,
+                    0.051597051597052,
+                ],
+                "atol": 0.01,
             }
         ],
     },
@@ -739,7 +796,8 @@ def _compare_pinet_values(actual, tutorial_name):
         required = ["time(s)", check["column"]]
         missing = [column for column in required if column not in results]
         assert not missing, f"Missing result columns: {', '.join(missing)}"
-        actual_values = np.interp(check["times"], results["time(s)"], results[check["column"]])
+        sample_times = np.asarray(check["times"]) + check.get("time_shift", 0.0)
+        actual_values = np.interp(sample_times, results["time(s)"], results[check["column"]])
         actual_values = actual_values * check.get("scale", 1.0) + check.get("offset", 0.0)
         expected_values = np.asarray(check["expected"])
         if "rtol" in check or "atol" in check:
