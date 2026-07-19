@@ -31,26 +31,32 @@ circuit1.add_BC("bc5","node4",'msource', -11.61)
 geometry = opensd.Geometry([circuit1])
 geometry.export_to_xml()
 
-# def fun1(time,delt):
-    # if time > 0.:
-        # y = 0.
-    # else:
-        # y = -12.37
-    # return y
-# action_setup.Action("bc4","bval",fun1)
-# def fun2(time,delt):
-    # if time > 0.:
-        # y = 0.
-    # else:
-        # y = -11.61
-    # return y
-# action_setup.Action("bc5","bval",fun2)
-
-
 settings = opensd.Settings()
 settings.verbosity = 3
 settings.temp_solve = False
 settings.run_mode = "steady"
+settings.export_to_xml()
+
+opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/c/codes/opensd/build/opensd')
+
+times  = [0.0, 1.E-8, 50.0]
+values = [-12.37, 0.0, 0.0]
+tdist = opensd.Tabular(times, values)
+values2 = [-11.61, 0.0, 0.0]
+tdist2 = opensd.Tabular(times, values)
+
+a1 = opensd.Action("ramp_bc4", "bc4", "bval", tdist)
+a2 = opensd.Action("ramp_bc5", "bc5", "bval", tdist2)
+
+actions = opensd.Actions([a1,a2])
+actions.export_to_xml()
+
+# settings.no_main_iter = 500
+settings.verbosity = 1
+settings.temp_solve = False
+settings.run_mode = "transient"
+settings.tim_slot = [[0.0009, 0.7]]
+settings.flag_write = True
 settings.export_to_xml()
 
 opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/c/codes/opensd/build/opensd')
