@@ -1,0 +1,67 @@
+# OpenSD tutorial regression benchmark data.
+# This file is test data, not executable code. Keep metadata with values so the source, units, and tolerance are reviewable.
+# For time_checks, either use parallel times/expected arrays or [[time_checks.points]] rows.
+# Point rows may include enabled = false and reason = "..." to preserve values that are intentionally excluded.
+format_version = 1
+
+[benchmark]
+id = "tutorial5"
+source = "C:/codes/PINET/validation/Greyvenstein (2002)/Figure 10.xlsx, sheet Literature-data, columns A:B."
+independent_variable = "time"
+independent_units = "s"
+
+[[time_checks]]
+quantity = "mass source"
+native_units = "kg/s"
+column = "msource:node1"
+time_shift = 10.0
+times = [
+    0.0,
+    27.2020725388601,
+    43.0699481865285,
+    81.6062176165803,
+    142.810880829016,
+    197.215025906736,
+    242.551813471503,
+    301.489637305699,
+    343.426165803109,
+    444.300518134715,
+    544.041450777202,
+    644.915803108808,
+    743.523316062176,
+    845.531088082902,
+    944.138601036269,
+    1144.75388601036,
+    1244.49481865285,
+    1344.23575129534,
+    1445.11010362694,
+    1545.98445595855,
+    1643.4585492228,
+    1749.99999999999,
+]
+expected = [
+    1.76167076167076,
+    1.66584766584766,
+    1.61425061425061,
+    1.5036855036855,
+    1.32678132678133,
+    1.19410319410319,
+    1.09090909090909,
+    0.972972972972973,
+    0.894348894348894,
+    0.732186732186732,
+    0.5995085995086,
+    0.491400491400492,
+    0.400491400491401,
+    0.329238329238329,
+    0.27027027027027,
+    0.181818181818182,
+    0.147420147420148,
+    0.120393120393121,
+    0.0982800982800987,
+    0.0786240786240787,
+    0.0638820638820644,
+    0.051597051597052,
+]
+atol = 0.01
+comparison_units = "kg/s"

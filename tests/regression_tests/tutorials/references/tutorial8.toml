@@ -1,0 +1,71 @@
+# OpenSD tutorial regression benchmark data.
+# This file is test data, not executable code. Keep metadata with values so the source, units, and tolerance are reviewable.
+# For time_checks, either use parallel times/expected arrays or [[time_checks.points]] rows.
+# Point rows may include enabled = false and reason = "..." to preserve values that are intentionally excluded.
+format_version = 1
+
+[benchmark]
+id = "tutorial8"
+source = "PINET-tests reference values migrated from the previous pytest constants."
+independent_variable = "time"
+independent_units = "s"
+
+[[checks]]
+quantity = "pressure"
+native_units = "Pa"
+comparison_note = "actual values are transformed as actual * scale + offset before comparison"
+columns = ["spres_gues:pipe1_face0", "spres_gues:pipe1_face1", "spres_gues:pipe1_face2", "spres_gues:pipe1_face3", "spres_gues:pipe1_face4", "spres_gues:pipe1_face5", "spres_gues:pipe1_face6", "spres_gues:pipe1_face7", "spres_gues:pipe1_face8", "spres_gues:pipe1_face9", "spres_gues:pipe1_face10", "spres_gues:pipe1_face11", "spres_gues:pipe1_face12", "spres_gues:pipe1_face13", "spres_gues:pipe1_face14", "spres_gues:pipe1_face15", "spres_gues:pipe1_face16", "spres_gues:pipe1_face17", "spres_gues:pipe1_face18", "spres_gues:pipe1_face19"]
+scale = 0.001
+expected = [
+    6888.016504,
+    6886.136167,
+    6884.268556,
+    6882.421156,
+    6880.594158,
+    6878.787761,
+    6877.002146,
+    6875.201083,
+    6873.135554,
+    6870.609996,
+    6867.839134,
+    6865.020446,
+    6862.133006,
+    6859.145805,
+    6856.043237,
+    6852.816902,
+    6849.462167,
+    6845.976515,
+    6842.358969,
+    6838.968367,
+]
+decimal = 0
+comparison_units = "Pa"
+
+[[checks]]
+quantity = "volumetric flow rate"
+native_units = "m3/s"
+columns = ["vflow:pipe1_face0", "vflow:pipe1_face1", "vflow:pipe1_face2", "vflow:pipe1_face3", "vflow:pipe1_face4", "vflow:pipe1_face5", "vflow:pipe1_face6", "vflow:pipe1_face7", "vflow:pipe1_face8", "vflow:pipe1_face9", "vflow:pipe1_face10", "vflow:pipe1_face11", "vflow:pipe1_face12", "vflow:pipe1_face13", "vflow:pipe1_face14", "vflow:pipe1_face15", "vflow:pipe1_face16", "vflow:pipe1_face17", "vflow:pipe1_face18", "vflow:pipe1_face19"]
+expected = [
+    0.000125915,
+    0.000127811,
+    0.000129842,
+    0.000132023,
+    0.000134371,
+    0.000136906,
+    0.000139655,
+    0.000142649,
+    0.000154655,
+    0.000234802,
+    0.00032516,
+    0.000414691,
+    0.000503866,
+    0.000592881,
+    0.000681835,
+    0.000770785,
+    0.000859763,
+    0.000948795,
+    0.001037897,
+    0.001127013,
+]
+decimal = 5
+comparison_units = "m3/s"

@@ -1,0 +1,23 @@
+# OpenSD tutorial regression benchmark data.
+# This file is test data, not executable code. Keep metadata with values so the source, units, and tolerance are reviewable.
+# For time_checks, either use parallel times/expected arrays or [[time_checks.points]] rows.
+# Point rows may include enabled = false and reason = "..." to preserve values that are intentionally excluded.
+format_version = 1
+
+[benchmark]
+id = "tutorial9"
+source = "PINET-tests reference values migrated from the previous pytest constants."
+independent_variable = "time"
+independent_units = "s"
+
+[[checks]]
+quantity = "temperature"
+native_units = "K"
+comparison_note = "actual values are transformed as actual * scale + offset before comparison"
+columns = ["ttemp_gues:node4"]
+offset = -273.15
+expected = [
+    514.43,
+]
+decimal = 1
+comparison_units = "degC"

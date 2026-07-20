@@ -1,0 +1,64 @@
+# OpenSD tutorial regression benchmark data.
+# This file is test data, not executable code. Keep metadata with values so the source, units, and tolerance are reviewable.
+# For time_checks, either use parallel times/expected arrays or [[time_checks.points]] rows.
+# Point rows may include enabled = false and reason = "..." to preserve values that are intentionally excluded.
+format_version = 1
+
+[benchmark]
+id = "tutorial7"
+source = "PINET-tests reference values migrated from the previous pytest constants."
+independent_variable = "time"
+independent_units = "s"
+
+[[time_checks]]
+quantity = "volumetric flow rate"
+native_units = "m3/s"
+column = "vflow:pipe1"
+times = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+]
+expected = [
+    0.0018603,
+    0.0017773,
+    0.0016833,
+    0.0015824,
+    0.001473,
+    0.0013531,
+    0.0013426,
+    0.0013426,
+    0.0013426,
+    0.0013426,
+    0.0013426,
+    0.0013426,
+    0.0013426,
+    0.0013426,
+    0.0013426,
+    0.0013426,
+    0.0013426,
+    0.0013426,
+    0.0013426,
+    0.0013426,
+    0.0013426,
+]
+decimal = 5
+comparison_units = "m3/s"

@@ -1,0 +1,80 @@
+# OpenSD tutorial regression benchmark data.
+# This file is test data, not executable code. Keep metadata with values so the source, units, and tolerance are reviewable.
+# For time_checks, either use parallel times/expected arrays or [[time_checks.points]] rows.
+# Point rows may include enabled = false and reason = "..." to preserve values that are intentionally excluded.
+format_version = 1
+
+[benchmark]
+id = "tutorial20"
+source = "PINET-tests reference values migrated from the previous pytest constants."
+independent_variable = "time"
+independent_units = "s"
+
+[[time_checks]]
+quantity = "pressure"
+native_units = "Pa"
+comparison_note = "actual values are transformed as actual * scale + offset before comparison"
+column = "tank_pressure"
+scale = 1e-05
+times = [
+    0.0,
+    0.01,
+    0.02,
+    0.03,
+    0.04,
+    0.05,
+    0.1,
+    0.5,
+    1.0,
+    1.5,
+    2.0,
+    2.1,
+    2.2,
+    2.3,
+    2.4,
+    2.5,
+    2.6,
+    2.7,
+    2.8,
+    2.9,
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0,
+    9.98,
+]
+expected = [
+    123,
+    84.37104134,
+    60.91706122,
+    48.15655766,
+    46.61774324,
+    46.61125364,
+    46.57877175,
+    46.31684825,
+    45.98409963,
+    45.64510976,
+    45.29954167,
+    45.22958318,
+    45.15937604,
+    45.08888449,
+    44.94650433,
+    44.15543954,
+    43.38333019,
+    42.62964342,
+    41.8938622,
+    41.17548486,
+    40.47402479,
+    34.29273306,
+    29.36422288,
+    25.39060768,
+    22.15209814,
+    19.48579418,
+    17.26936544,
+    15.42675776,
+]
+rtol = 0.03
+comparison_units = "bar"

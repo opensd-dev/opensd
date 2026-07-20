@@ -1,0 +1,34 @@
+# OpenSD tutorial regression benchmark data.
+# This file is test data, not executable code. Keep metadata with values so the source, units, and tolerance are reviewable.
+# For time_checks, either use parallel times/expected arrays or [[time_checks.points]] rows.
+# Point rows may include enabled = false and reason = "..." to preserve values that are intentionally excluded.
+format_version = 1
+
+[benchmark]
+id = "tutorial10"
+source = "PINET-tests reference values migrated from the previous pytest constants."
+independent_variable = "time"
+independent_units = "s"
+
+[[checks]]
+quantity = "mass flow rate"
+native_units = "kg/s"
+columns = ["mflow:pipe1", "mflow:pipe2", "mflow:pipe3"]
+expected = [
+    0.8834,
+    0.8834,
+    0.8834,
+]
+decimal = 4
+comparison_units = "kg/s"
+
+[[checks]]
+quantity = "temperature"
+native_units = "K"
+columns = ["ttemp_gues:node1", "ttemp_gues:node4"]
+transform = "absolute_difference"
+expected = [
+    5.409,
+]
+decimal = 3
+comparison_units = "K"

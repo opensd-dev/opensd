@@ -1,0 +1,73 @@
+# OpenSD tutorial regression benchmark data.
+# This file is test data, not executable code. Keep metadata with values so the source, units, and tolerance are reviewable.
+# For time_checks, either use parallel times/expected arrays or [[time_checks.points]] rows.
+# Point rows may include enabled = false and reason = "..." to preserve values that are intentionally excluded.
+format_version = 1
+
+[benchmark]
+id = "tutorial18"
+source = "PINET-tests reference values migrated from the previous pytest constants."
+independent_variable = "time"
+independent_units = "s"
+
+[[time_checks]]
+quantity = "pressure"
+native_units = "Pa"
+comparison_note = "actual values are transformed as actual * scale + offset before comparison"
+column = "tank_pressure"
+scale = 1e-05
+times = [
+    0.0,
+    300.0,
+    400.0,
+    500.0,
+    600.0,
+    700.0,
+    800.0,
+    900.0,
+    1000.0,
+]
+expected = [
+    1.520482,
+    1.522878949,
+    1.77061509,
+    2.03328268,
+    2.30931901,
+    2.59667375,
+    2.893964496,
+    3.199335589,
+    3.511451651,
+]
+decimal = 2
+comparison_units = "bar"
+
+[[time_checks]]
+quantity = "specific enthalpy"
+native_units = "J/kg"
+comparison_note = "actual values are transformed as actual * scale + offset before comparison"
+column = "tank_enthalpy"
+scale = 0.001
+times = [
+    0.0,
+    300.0,
+    400.0,
+    500.0,
+    600.0,
+    700.0,
+    800.0,
+    900.0,
+    1000.0,
+]
+expected = [
+    484.058,
+    484.2800002,
+    505.9528118,
+    526.6135666,
+    546.318825,
+    565.1195728,
+    583.0623281,
+    600.1986703,
+    616.5662238,
+]
+decimal = 0
+comparison_units = "kJ/kg"

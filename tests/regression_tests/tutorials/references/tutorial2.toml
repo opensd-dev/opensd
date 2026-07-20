@@ -1,0 +1,51 @@
+# OpenSD tutorial regression benchmark data.
+# This file is test data, not executable code. Keep metadata with values so the source, units, and tolerance are reviewable.
+# For time_checks, either use parallel times/expected arrays or [[time_checks.points]] rows.
+# Point rows may include enabled = false and reason = "..." to preserve values that are intentionally excluded.
+format_version = 1
+
+[benchmark]
+id = "tutorial2"
+source = "PINET-tests reference values migrated from the previous pytest constants."
+independent_variable = "time"
+independent_units = "s"
+
+[[checks]]
+quantity = "pressure"
+native_units = "Pa"
+comparison_note = "actual values are transformed as actual * scale + offset before comparison"
+columns = ["tpres_gues:node1", "tpres_gues:node2", "tpres_gues:node3", "tpres_gues:node4", "tpres_gues:node5", "tpres_gues:node6", "tpres_gues:node7", "tpres_gues:node8", "tpres_gues:node9", "tpres_gues:node10", "tpres_gues:node11", "tpres_gues:node12", "tpres_gues:node13", "tpres_gues:node14", "tpres_gues:node15", "tpres_gues:node16", "tpres_gues:node17", "tpres_gues:node18", "tpres_gues:node19", "tpres_gues:node20", "tpres_gues:node21", "tpres_gues:node22", "tpres_gues:node23", "tpres_gues:node24", "tpres_gues:node25", "tpres_gues:node26", "tpres_gues:node27", "tpres_gues:node28", "tpres_gues:node29"]
+scale = 1e-05
+expected = [
+    6,
+    5.2151,
+    4.1131,
+    3,
+    3.8546,
+    3.2057,
+    3,
+    3.0423,
+    3,
+    3,
+    4.1131,
+    3,
+    5.2151,
+    6,
+    3.9848,
+    3,
+    3.5975,
+    3.1286,
+    3,
+    3,
+    3.5478,
+    3,
+    3.5975,
+    3.1286,
+    3,
+    3.9848,
+    3,
+    3,
+    3,
+]
+decimal = 3
+comparison_units = "bar"

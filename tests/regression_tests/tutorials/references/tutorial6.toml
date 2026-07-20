@@ -1,0 +1,83 @@
+# OpenSD tutorial regression benchmark data.
+# This file is test data, not executable code. Keep metadata with values so the source, units, and tolerance are reviewable.
+# For time_checks, either use parallel times/expected arrays or [[time_checks.points]] rows.
+# Point rows may include enabled = false and reason = "..." to preserve values that are intentionally excluded.
+format_version = 1
+
+[benchmark]
+id = "tutorial6"
+source = "C:/codes/opensd/tutorials/tutorial6/output.res selected ttemp_gues:node2 values."
+independent_variable = "time"
+independent_units = "s"
+
+[[time_checks]]
+quantity = "temperature"
+native_units = "K"
+comparison_note = "actual values are transformed as actual * scale + offset before comparison"
+column = "ttemp_gues:node2"
+offset = -273.15
+decimal = 0
+comparison_units = "degC"
+
+# Individual points can be retained but excluded by setting enabled = false and adding a reason.
+[[time_checks.points]]
+time = 0
+expected = 393.3472
+enabled = true
+
+[[time_checks.points]]
+time = 5
+expected = 393.3383
+enabled = true
+
+[[time_checks.points]]
+time = 10
+expected = 392.9872
+enabled = true
+
+[[time_checks.points]]
+time = 15
+expected = 391.5439
+enabled = true
+
+[[time_checks.points]]
+time = 20
+expected = 389.3058
+enabled = true
+
+[[time_checks.points]]
+time = 25
+expected = 387.3356
+enabled = true
+
+[[time_checks.points]]
+time = 30
+expected = 385.9367
+enabled = true
+
+[[time_checks.points]]
+time = 35
+expected = 384.9961
+enabled = true
+
+[[time_checks.points]]
+time = 40
+expected = 384.3729
+enabled = true
+
+[[time_checks.points]]
+time = 45
+expected = 383.9614
+enabled = true
+
+[[time_checks.points]]
+time = 50
+expected = 383.6887
+enabled = true
+
+# Example for preserving a point without using it in the assertion:
+# [[time_checks.points]]
+# time = 55.0
+# expected = 383.5
+# enabled = false
+# reason = "retained for traceability; outside accepted comparison window"

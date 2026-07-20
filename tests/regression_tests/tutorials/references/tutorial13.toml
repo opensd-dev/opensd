@@ -1,0 +1,59 @@
+# OpenSD tutorial regression benchmark data.
+# This file is test data, not executable code. Keep metadata with values so the source, units, and tolerance are reviewable.
+# For time_checks, either use parallel times/expected arrays or [[time_checks.points]] rows.
+# Point rows may include enabled = false and reason = "..." to preserve values that are intentionally excluded.
+format_version = 1
+
+[benchmark]
+id = "tutorial13"
+source = "PINET-tests reference values migrated from the previous pytest constants."
+independent_variable = "time"
+independent_units = "s"
+
+[[profile_checks]]
+quantity = "temperature"
+native_units = "K"
+comparison_note = "actual values are transformed as actual * scale + offset before comparison"
+columns = ["ttemp_gues:node1", "ttemp_gues:pipe1_node0", "ttemp_gues:pipe1_node1", "ttemp_gues:pipe1_node2", "ttemp_gues:pipe1_node3", "ttemp_gues:pipe1_node4", "ttemp_gues:pipe1_node5", "ttemp_gues:pipe1_node6", "ttemp_gues:pipe1_node7", "ttemp_gues:pipe1_node8", "ttemp_gues:node2"]
+positions = [
+    0.0,
+    0.09144,
+    0.18288,
+    0.27432,
+    0.36576,
+    0.4572,
+    0.54864,
+    0.64008,
+    0.73152,
+    0.8229599999999999,
+    0.9144,
+]
+sample_positions = [
+    0.079332229,
+    0.160098077,
+    0.244005707,
+    0.319292655,
+    0.389878412,
+    0.462033562,
+    0.531049926,
+    0.5984949,
+    0.681620828,
+    0.763170374,
+    0.838439352,
+]
+offset = -273.15
+expected = [
+    331.9095582,
+    339.9206318,
+    349.1795528,
+    358.4400111,
+    367.8796519,
+    377.6757007,
+    386.7589334,
+    395.1290706,
+    404.7448189,
+    412.7557527,
+    418.8060232,
+]
+decimal = 0
+comparison_units = "degC"
