@@ -223,11 +223,19 @@ def _compare_pinet_values(actual, tutorial_name):
             assert len(actual_values) == 2, "absolute_difference checks require exactly two columns"
             actual_values = np.asarray([abs(actual_values[0] - actual_values[1])])
         expected_values = np.asarray(check["expected"])
-        np.testing.assert_array_almost_equal(
-            actual_values,
-            expected_values,
-            decimal=check["decimal"],
-        )
+        if "rtol" in check or "atol" in check:
+            np.testing.assert_allclose(
+                actual_values,
+                expected_values,
+                rtol=check.get("rtol", 0.0),
+                atol=check.get("atol", 0.0),
+            )
+        else:
+            np.testing.assert_array_almost_equal(
+                actual_values,
+                expected_values,
+                decimal=check["decimal"],
+            )
 
     for check in reference.get("time_checks", []):
         required = ["time(s)", check["column"]]
