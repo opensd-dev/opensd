@@ -288,6 +288,7 @@ def test_tutorial_results_agree_with_reference(monkeypatch, tmp_path, entrypoint
     monkeypatch.setenv("MPLBACKEND", "Agg")
     monkeypatch.chdir(work_dir)
     monkeypatch.syspath_prepend(str(ROOT))
+    monkeypatch.syspath_prepend(str(ROOT / "opensd"))
     monkeypatch.syspath_prepend(str(work_dir))
     _reset_opensd_registries()
     sys.modules.pop("scripts", None)
