@@ -230,6 +230,7 @@ pyrightconfig.json
 
 # Local Codex scratch space
 .codex_tmp/
+.tmp/
 
 # Local scratch scripts
 tmp_*

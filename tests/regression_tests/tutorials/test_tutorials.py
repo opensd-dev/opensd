@@ -54,6 +54,21 @@ def _load_pinet_value_references():
 PINET_VALUE_REFERENCES = _load_pinet_value_references()
 
 
+def _tutorial_plot_dir(tutorial_name):
+    configured = os.environ.get("OPENSD_TUTORIAL_PLOTS")
+    if not configured:
+        return None
+
+    if configured.lower() in {"1", "true", "yes", "on"}:
+        root = ROOT / ".tmp" / "tutorial-plots"
+    else:
+        root = Path(configured)
+
+    plot_dir = root / tutorial_name
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    return plot_dir
+
+
 def _tutorial_entrypoints():
     entrypoints = []
     for tutorial_dir in sorted(TUTORIALS_ROOT.glob("tutorial*")):
@@ -211,11 +226,57 @@ def _last_values(results, columns):
     return np.asarray([results[column][-1] for column in columns])
 
 
+def _check_tolerance(check, expected_values):
+    if "atol" not in check and "rtol" not in check:
+        return None
+    atol = check.get("atol", 0.0)
+    rtol = check.get("rtol", 0.0)
+    return atol + rtol * np.abs(expected_values)
+
+
+def _plot_reference_check(plot_dir, check, x_values, actual_values, expected_values, suffix):
+    if plot_dir is None:
+        return
+
+    matplotlib = pytest.importorskip("matplotlib")
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    quantity = check.get("quantity", "value")
+    units = check.get("comparison_units", check.get("native_units", ""))
+    ylabel = f"{quantity} ({units})" if units else quantity
+    safe_quantity = "".join(char if char.isalnum() else "_" for char in quantity.lower()).strip("_")
+    output = plot_dir / f"{safe_quantity}_{suffix}.png"
+    tolerance = _check_tolerance(check, expected_values)
+    residual = actual_values - expected_values
+
+    fig, axes = plt.subplots(2, 1, sharex=True, figsize=(8, 6), constrained_layout=True)
+    axes[0].plot(x_values, expected_values, "o-", label="reference")
+    axes[0].plot(x_values, actual_values, "s--", label="OpenSD")
+    axes[0].set_ylabel(ylabel)
+    axes[0].grid(True, alpha=0.3)
+    axes[0].legend()
+
+    axes[1].axhline(0.0, color="black", linewidth=0.8)
+    axes[1].plot(x_values, residual, "o-", label="OpenSD - reference")
+    if tolerance is not None:
+        axes[1].fill_between(x_values, -tolerance, tolerance, color="tab:green", alpha=0.18, label="tolerance")
+    axes[1].set_xlabel(check.get("independent_variable", "sample"))
+    axes[1].set_ylabel(f"deviation ({units})" if units else "deviation")
+    axes[1].grid(True, alpha=0.3)
+    axes[1].legend()
+
+    fig.suptitle(quantity)
+    fig.savefig(output, dpi=160)
+    plt.close(fig)
+
+
 def _compare_pinet_values(actual, tutorial_name):
     reference = PINET_VALUE_REFERENCES.get(tutorial_name)
     assert reference is not None, f"{tutorial_name} is missing results_true.res and PINET value reference"
 
     results = _read_results(actual)
+    plot_dir = _tutorial_plot_dir(tutorial_name)
     for check in reference.get("checks", []):
         actual_values = _last_values(results, check["columns"])
         actual_values = actual_values * check.get("scale", 1.0) + check.get("offset", 0.0)
@@ -223,6 +284,8 @@ def _compare_pinet_values(actual, tutorial_name):
             assert len(actual_values) == 2, "absolute_difference checks require exactly two columns"
             actual_values = np.asarray([abs(actual_values[0] - actual_values[1])])
         expected_values = np.asarray(check["expected"])
+        x_values = np.asarray(check.get("positions", range(len(expected_values))))
+        _plot_reference_check(plot_dir, check, x_values, actual_values, expected_values, "final")
         if "rtol" in check or "atol" in check:
             np.testing.assert_allclose(
                 actual_values,
@@ -245,6 +308,9 @@ def _compare_pinet_values(actual, tutorial_name):
         actual_values = np.interp(sample_times, results["time(s)"], results[check["column"]])
         actual_values = actual_values * check.get("scale", 1.0) + check.get("offset", 0.0)
         expected_values = np.asarray(check["expected"])
+        plot_check = dict(check)
+        plot_check["independent_variable"] = "time (s)"
+        _plot_reference_check(plot_dir, plot_check, sample_times, actual_values, expected_values, "time")
         if "rtol" in check or "atol" in check:
             np.testing.assert_allclose(
                 actual_values,
@@ -264,11 +330,29 @@ def _compare_pinet_values(actual, tutorial_name):
         profile = profile * check.get("scale", 1.0) + check.get("offset", 0.0)
         actual_values = np.interp(check["sample_positions"], check["positions"], profile)
         expected_values = np.asarray(check["expected"])
-        np.testing.assert_array_almost_equal(
+        plot_check = dict(check)
+        plot_check["independent_variable"] = "position"
+        _plot_reference_check(
+            plot_dir,
+            plot_check,
+            np.asarray(check["sample_positions"]),
             actual_values,
             expected_values,
-            decimal=check["decimal"],
+            "profile",
         )
+        if "rtol" in check or "atol" in check:
+            np.testing.assert_allclose(
+                actual_values,
+                expected_values,
+                rtol=check.get("rtol", 0.0),
+                atol=check.get("atol", 0.0),
+            )
+        else:
+            np.testing.assert_array_almost_equal(
+                actual_values,
+                expected_values,
+                decimal=check["decimal"],
+            )
 
 
 @pytest.mark.parametrize(("entrypoint", "expected"), _tutorial_entrypoints())

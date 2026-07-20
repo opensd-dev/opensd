@@ -14,6 +14,29 @@ independent_units = "m"
 quantity = "pressure"
 native_units = "Pa"
 comparison_note = "actual values are transformed as actual * scale + offset before comparison"
+independent_variable = "pipe face axial location (m)"
+positions = [
+    0.0915,
+    0.2745,
+    0.4575,
+    0.6405,
+    0.8235,
+    1.0065,
+    1.1895,
+    1.3725,
+    1.5555,
+    1.7385,
+    1.9215,
+    2.1045,
+    2.2875,
+    2.4705,
+    2.6535,
+    2.8365,
+    3.0195,
+    3.2025,
+    3.3855,
+    3.5685,
+]
 columns = ["spres_gues:pipe1_face0", "spres_gues:pipe1_face1", "spres_gues:pipe1_face2", "spres_gues:pipe1_face3", "spres_gues:pipe1_face4", "spres_gues:pipe1_face5", "spres_gues:pipe1_face6", "spres_gues:pipe1_face7", "spres_gues:pipe1_face8", "spres_gues:pipe1_face9", "spres_gues:pipe1_face10", "spres_gues:pipe1_face11", "spres_gues:pipe1_face12", "spres_gues:pipe1_face13", "spres_gues:pipe1_face14", "spres_gues:pipe1_face15", "spres_gues:pipe1_face16", "spres_gues:pipe1_face17", "spres_gues:pipe1_face18", "spres_gues:pipe1_face19"]
 scale = 0.001
 expected = [
@@ -46,6 +69,29 @@ uncertainty_note = "OpenSD agrees with the PINET pressure profile trend; largest
 [[checks]]
 quantity = "volumetric flow rate"
 native_units = "m3/s"
+independent_variable = "pipe face axial location (m)"
+positions = [
+    0.0915,
+    0.2745,
+    0.4575,
+    0.6405,
+    0.8235,
+    1.0065,
+    1.1895,
+    1.3725,
+    1.5555,
+    1.7385,
+    1.9215,
+    2.1045,
+    2.2875,
+    2.4705,
+    2.6535,
+    2.8365,
+    3.0195,
+    3.2025,
+    3.3855,
+    3.5685,
+]
 columns = ["vflow:pipe1_face0", "vflow:pipe1_face1", "vflow:pipe1_face2", "vflow:pipe1_face3", "vflow:pipe1_face4", "vflow:pipe1_face5", "vflow:pipe1_face6", "vflow:pipe1_face7", "vflow:pipe1_face8", "vflow:pipe1_face9", "vflow:pipe1_face10", "vflow:pipe1_face11", "vflow:pipe1_face12", "vflow:pipe1_face13", "vflow:pipe1_face14", "vflow:pipe1_face15", "vflow:pipe1_face16", "vflow:pipe1_face17", "vflow:pipe1_face18", "vflow:pipe1_face19"]
 expected = [
     0.000125915,
