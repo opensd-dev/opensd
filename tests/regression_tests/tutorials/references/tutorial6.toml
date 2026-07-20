@@ -6,78 +6,95 @@ format_version = 1
 
 [benchmark]
 id = "tutorial6"
-source = "C:/codes/opensd/tutorials/tutorial6/output.res selected ttemp_gues:node2 values."
+source = "PINET-tests test_ht.py::test_case6 steady IHX reference value."
 independent_variable = "time"
 independent_units = "s"
 
 [[time_checks]]
-quantity = "temperature"
+quantity = "node2 outlet static temperature"
 native_units = "K"
-comparison_note = "actual values are transformed as actual * scale + offset before comparison"
+comparison_note = "PINET unittest compares circuits[0].nodes[1].stemp_gues - 273.0 against 396.13 degC. OpenSD output.res records ttemp_gues; the kinetic correction is negligible for this case."
 column = "ttemp_gues:node2"
-offset = -273.15
-decimal = 0
+offset = -273.0
+decimal = 2
 comparison_units = "degC"
 
-# Individual points can be retained but excluded by setting enabled = false and adding a reason.
 [[time_checks.points]]
 time = 0
-expected = 393.3472
+expected = 396.13
 enabled = true
+
+[[time_checks]]
+quantity = "node2 outlet temperature transient"
+native_units = "K"
+comparison_note = "PINET tutorial6 transient run sampled from ttemp_gues:node2 with the same -273.0 degC convention used by PINET-tests."
+column = "ttemp_gues:node2"
+offset = -273.0
+decimal = 2
+comparison_units = "degC"
 
 [[time_checks.points]]
 time = 5
-expected = 393.3383
+expected = 396.122004
 enabled = true
 
 [[time_checks.points]]
 time = 10
-expected = 392.9872
+expected = 395.694871
 enabled = true
 
 [[time_checks.points]]
 time = 15
-expected = 391.5439
+expected = 393.972572
 enabled = true
 
 [[time_checks.points]]
 time = 20
-expected = 389.3058
+expected = 391.402414
 enabled = true
 
 [[time_checks.points]]
 time = 25
-expected = 387.3356
+expected = 389.260939
 enabled = true
 
 [[time_checks.points]]
 time = 30
-expected = 385.9367
+expected = 387.815508
 enabled = true
 
 [[time_checks.points]]
 time = 35
-expected = 384.9961
+expected = 386.883700
 enabled = true
 
 [[time_checks.points]]
 time = 40
-expected = 384.3729
+expected = 386.289294
 enabled = true
 
 [[time_checks.points]]
 time = 45
-expected = 383.9614
+expected = 385.911064
 enabled = true
 
 [[time_checks.points]]
 time = 50
-expected = 383.6887
+expected = 385.670534
 enabled = true
 
-# Example for preserving a point without using it in the assertion:
-# [[time_checks.points]]
-# time = 55.0
-# expected = 383.5
-# enabled = false
-# reason = "retained for traceability; outside accepted comparison window"
+# Previous OpenSD transient reference values, retained for traceability.
+# They came from C:/codes/opensd/tutorials/tutorial6/output.res for ttemp_gues:node2
+# with offset = -273.15 and decimal = 0:
+# time(s), expected(degC)
+# 0, 393.3472
+# 5, 393.3383
+# 10, 392.9872
+# 15, 391.5439
+# 20, 389.3058
+# 25, 387.3356
+# 30, 385.9367
+# 35, 384.9961
+# 40, 384.3729
+# 45, 383.9614
+# 50, 383.6887

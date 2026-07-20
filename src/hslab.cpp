@@ -213,7 +213,10 @@ void discretize_layers() {
 	  double thk_elem = layer->thk_elem;
 	  double thk_cros = layer->thk_cros;
 	  
-      if (hslab->nlayers == 1 || layer->layerno == 0) { //first layer
+      if (hslab->nlayers == 1) {
+        layer->delx = thk_elem/(nnodes-1);
+	  }
+	  else if (layer->layerno == 0) { //first layer
         layer->delx = thk_elem/(nnodes-1+0.5);
 	  }
 	  else if (layer->layerno < hslab->nlayers-1) {
@@ -238,7 +241,10 @@ void discretize_layers() {
         for (int j = 0; j < ninc; ++j) {
       
           double Ai;
-          if (hslab->nlayers == 1 || layer->layerno == 0) {
+          if (hslab->nlayers == 1) {
+            Ai = (uarea - i * (uarea - darea) / (nnodes - 1)) / ninc;
+          }
+          else if (layer->layerno == 0) {
             Ai = (uarea - i * (uarea - darea) / (nnodes - 1 + 0.5)) / ninc;
           }
           else if (layer->layerno < hslab->nlayers - 1) {
@@ -259,7 +265,15 @@ void discretize_layers() {
           // ---- Heat fraction and volume corrections ----
           double heat_frac = 0.0;
       
-          if (hslab->nlayers == 1 || layer->layerno == 0) {
+          if (hslab->nlayers == 1) {
+            if (i == 0 || i == nnodes - 1) {
+              vol *= 0.5;
+              heat_frac = 0.5 * AFF[j] / (nnodes - 1);
+            } else {
+              heat_frac = AFF[j] / (nnodes - 1);
+            }
+          }
+          else if (layer->layerno == 0) {
             if (i == 0) {
               vol *= 0.5;
               heat_frac = 0.5 * AFF[j] / (nnodes - 1 + 0.5);
@@ -319,7 +333,10 @@ void discretize_layers() {
 
           double area;
 
-          if (hslab->nlayers == 1 || layer->layerno == 0) {
+          if (hslab->nlayers == 1) {
+            area = (uarea - (i + 0.5)*(uarea - darea)/(nnodes - 1)) / ninc;
+          }
+          else if (layer->layerno == 0) {
             area = (uarea - (i + 0.5)*(uarea - darea)/(nnodes - 1 + 0.5)) / ninc;
           }
           else if (layer->layerno < hslab->nlayers - 1) {
