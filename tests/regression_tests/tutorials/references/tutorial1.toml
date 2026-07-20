@@ -6,7 +6,7 @@ format_version = 1
 
 [benchmark]
 id = "tutorial1"
-source = "PINET-tests reference values migrated from the previous pytest constants."
+source = "PINET docs/tutorials/tutorial1.py and PINET-tests pressure table using user-defined water1 properties."
 independent_variable = "time"
 independent_units = "s"
 
@@ -16,6 +16,29 @@ native_units = "Pa"
 comparison_note = "actual values are transformed as actual * scale + offset before comparison"
 columns = ["tpres_gues:node1", "tpres_gues:node2", "tpres_gues:node3", "tpres_gues:node4", "tpres_gues:node5", "tpres_gues:node6", "tpres_gues:node7", "tpres_gues:node8", "tpres_gues:node9", "tpres_gues:node10", "tpres_gues:node11", "tpres_gues:node12"]
 scale = 1e-05
+expected = [
+    1.4386,
+    1.3323,
+    1.0463,
+    0.9773,
+    1.0183,
+    0.9711,
+    1.0043,
+    1.0415,
+    1.0780,
+    1.0909,
+    1.0000,
+    1.0036,
+]
+decimal = 4
+comparison_units = "bar"
+
+# Previous OpenSD values generated with CoolProp compressible water are retained for traceability.
+# They should remain disabled because the benchmark is PINET's user-defined water1 case.
+[[checks.alternates]]
+source = "OpenSD tutorial1 before aligning fluid definition; circuit1.assign_fluid(\"water\") exported CoolProp compressible water."
+enabled = false
+reason = "Different fluid definition from PINET tutorial1 water1."
 expected = [
     1.439937,
     1.333257,
@@ -30,5 +53,3 @@ expected = [
     1.0,
     1.003655,
 ]
-decimal = 4
-comparison_units = "bar"
