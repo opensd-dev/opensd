@@ -386,6 +386,7 @@ class HSlab:
         element.set("dtype",  str(self.dtype))
         element.set("uarea", str(self.uarea))
         element.set("ninc", str(self.ninc))
+        element.set("nlayers", str(self.nlayers))
         if self.config is not None:
             element.set("config", str(self.config))
 

@@ -45,14 +45,18 @@ HSlab::HSlab(pugi::xml_node hslab_node)
   ninc = stod(get_node_value(hslab_node, "ninc"));
   uarea = stod(get_node_value(hslab_node, "uarea"));
 
-  // Read the solid layers
-  nlayers = 0;
+  // Read the solid layers. The Python input uses nlayers as a discretization
+  // mode flag: nlayers=1 is distinct from the default one-layer slab.
+  int layer_count = 0;
   for (pugi::xml_node layer_node : hslab_node.children("layer")) {
     this->layers.push_back(std::make_shared<Layer>(layer_node));
  // this->layers.back()->layer_ind = this->layers.size() - 1;
     this->layers.back()->hslab = this;
-    nlayers++;
+    layer_count++;
   }
+  nlayers = hslab_node.attribute("nlayers")
+              ? hslab_node.attribute("nlayers").as_int()
+              : layer_count;
   uvar = get_node_value(hslab_node, "uvar");
   dvar = get_node_value(hslab_node, "dvar");
   ucompid = get_node_value(hslab_node, "ucomp");

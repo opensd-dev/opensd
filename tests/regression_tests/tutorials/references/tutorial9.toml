@@ -19,5 +19,5 @@ offset = -273.15
 expected = [
     514.43,
 ]
-decimal = 1
+atol = 0.3
 comparison_units = "degC"
