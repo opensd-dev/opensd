@@ -189,18 +189,27 @@ Circuit::Circuit(pugi::xml_node cir_node) : fltype(FluidType::UNSET)
 void Circuit::apply_transient_bc_mask() {
   if (settings::run_mode != RunMode::TRANSIENT) return;
 
+  bool has_transient_pressure_bc = false;
+  for (const auto& bc : bcs) {
+    if (bc.enabled_ && bc.trans_ && bc.var_ == "P") {
+      has_transient_pressure_bc = true;
+      break;
+    }
+  }
+
   Pbound_ind.clear();
   for (const auto& bc : bcs) {
     Node* node = get_node_by_identifier(bc.node_);
     if (!node) continue;
 
-    if (!bc.enabled_ || !bc.trans_) {
-      node->fixed_var.erase(bc.var_);
+    if (bc.enabled_ && bc.var_ == "P" && (bc.trans_ || !has_transient_pressure_bc)) {
+      Pbound_ind.push_back(node->node_ind);
       continue;
     }
 
-    if (bc.var_ == "P") {
-      Pbound_ind.push_back(node->node_ind);
+    if (!bc.enabled_ || !bc.trans_) {
+      node->fixed_var.erase(bc.var_);
+      continue;
     }
   }
 }

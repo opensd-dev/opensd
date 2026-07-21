@@ -198,11 +198,6 @@ class Circuit:
         else:
             pmax = max(plist)
             pref = pmax #pmean = sum(plist)/len(plist) didn't converge for validation case 6
-        for node in self.nodes:
-            if hasattr(node, 'ttemp_old') and node.ttemp_old > 0.0 and 'T' not in node.fixed_var:
-                tlist.append(node.ttemp_old)
-            if hasattr(node, 'tenth_old') and node.tenth_old > 0.0 and 'H' not in node.fixed_var:
-                hlist.append(node.tenth_old)
         if len(tlist) == 0 and len(hlist) == 0:
             print ("warning: ambient temperature assumed in the circuit")
             tmean = Settings.T_ambient

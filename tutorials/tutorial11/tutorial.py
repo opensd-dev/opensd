@@ -68,9 +68,9 @@ settings.export_to_xml()
 opensd.run(mpi_args=['mpiexec', '-n', '1'], opensd_exec='/mnt/c/codes/opensd/build/opensd')
 
 settings.run_mode = "transient"
-settings.tim_slot = [[4.0, 10000.0]]
+settings.tim_slot = [[4.0, 300.0]]
 
-heat_input = opensd.Tabular([0.0, 4.0, 10000.0], [1000.0, 0.0, 0.0])
+heat_input = opensd.Tabular([0.0, 4.0, 300.0], [1000.0, 0.0, 0.0])
 actions = opensd.Actions([
     opensd.Action("pipe4_heat_input", "pipe4", "heat_input", heat_input),
 ])
