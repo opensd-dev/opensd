@@ -226,6 +226,19 @@ def _last_values(results, columns):
     return np.asarray([results[column][-1] for column in columns])
 
 
+def _check_values(results, check):
+    missing = [column for column in check["columns"] if column not in results]
+    assert not missing, f"Missing result columns: {', '.join(missing)}"
+    row = check.get("row", "last")
+    if row == "first":
+        index = 0
+    elif row == "last":
+        index = -1
+    else:
+        raise AssertionError(f"Unsupported row selector: {row}")
+    return np.asarray([results[column][index] for column in check["columns"]])
+
+
 def _check_tolerance(check, expected_values):
     if "atol" not in check and "rtol" not in check:
         return None
@@ -278,7 +291,7 @@ def _compare_pinet_values(actual, tutorial_name):
     results = _read_results(actual)
     plot_dir = _tutorial_plot_dir(tutorial_name)
     for check in reference.get("checks", []):
-        actual_values = _last_values(results, check["columns"])
+        actual_values = _check_values(results, check)
         actual_values = actual_values * check.get("scale", 1.0) + check.get("offset", 0.0)
         if check.get("transform") == "absolute_difference":
             assert len(actual_values) == 2, "absolute_difference checks require exactly two columns"

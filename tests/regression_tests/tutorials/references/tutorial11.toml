@@ -1,0 +1,39 @@
+# OpenSD tutorial regression benchmark data.
+# This file is test data, not executable code. Keep metadata with values so the source, units, and tolerance are reviewable.
+# For time_checks, either use parallel times/expected arrays or [[time_checks.points]] rows.
+# Point rows may include enabled = false and reason = "..." to preserve values that are intentionally excluded.
+format_version = 1
+
+[benchmark]
+id = "tutorial11"
+source = "PINET-tests test_nc.py::test_case11 steady-state reference values."
+independent_variable = "time"
+independent_units = "s"
+
+[[checks]]
+quantity = "primary loop mass flow rate"
+native_units = "kg/s"
+row = "first"
+row_note = "PINET test_case11 checks the steady-state result before transient execution; in OpenSD output.res this is the first row."
+columns = ["mflow:pipe1", "mflow:pipe2", "mflow:pipe3", "mflow:pipe4"]
+expected = [
+    0.04389,
+    0.04389,
+    0.04389,
+    0.04389,
+]
+decimal = 5
+comparison_units = "kg/s"
+
+[[checks]]
+quantity = "node1-node4 temperature difference"
+native_units = "K"
+row = "first"
+row_note = "PINET test_case11 checks abs(circuits[0].nodes[0].ttemp_gues - circuits[0].nodes[3].ttemp_gues) after the steady-state solve."
+columns = ["ttemp_gues:node1", "ttemp_gues:node4"]
+transform = "absolute_difference"
+expected = [
+    5.4729,
+]
+decimal = 4
+comparison_units = "K"
