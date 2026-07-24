@@ -1,3 +1,4 @@
+import json
 import os
 import runpy
 import shlex
@@ -45,7 +46,7 @@ def _load_pinet_value_references():
         tutorial_name = data.get("benchmark", {}).get("id", path.stem)
         references[tutorial_name] = {
             key: [_load_reference_check(check) for check in data.get(key, [])]
-            for key in ("checks", "time_checks", "profile_checks")
+            for key in ("checks", "time_checks", "profile_checks", "design_checks")
             if data.get(key)
         }
     return references
@@ -226,17 +227,20 @@ def _last_values(results, columns):
     return np.asarray([results[column][-1] for column in columns])
 
 
-def _check_values(results, check):
-    missing = [column for column in check["columns"] if column not in results]
+def _row_values(results, columns, row="last"):
+    missing = [column for column in columns if column not in results]
     assert not missing, f"Missing result columns: {', '.join(missing)}"
-    row = check.get("row", "last")
     if row == "first":
         index = 0
     elif row == "last":
         index = -1
     else:
         raise AssertionError(f"Unsupported row selector: {row}")
-    return np.asarray([results[column][index] for column in check["columns"]])
+    return np.asarray([results[column][index] for column in columns])
+
+
+def _check_values(results, check):
+    return _row_values(results, check["columns"], check.get("row", "last"))
 
 
 def _check_tolerance(check, expected_values):
@@ -288,7 +292,7 @@ def _compare_pinet_values(actual, tutorial_name):
     reference = PINET_VALUE_REFERENCES.get(tutorial_name)
     assert reference is not None, f"{tutorial_name} is missing results_true.res and PINET value reference"
 
-    results = _read_results(actual)
+    results = _read_results(actual) if actual.exists() else {}
     plot_dir = _tutorial_plot_dir(tutorial_name)
     for check in reference.get("checks", []):
         actual_values = _check_values(results, check)
@@ -339,7 +343,7 @@ def _compare_pinet_values(actual, tutorial_name):
             )
 
     for check in reference.get("profile_checks", []):
-        profile = _last_values(results, check["columns"])
+        profile = _row_values(results, check["columns"], check.get("row", "last"))
         profile = profile * check.get("scale", 1.0) + check.get("offset", 0.0)
         actual_values = np.interp(check["sample_positions"], check["positions"], profile)
         expected_values = np.asarray(check["expected"])
@@ -353,6 +357,29 @@ def _compare_pinet_values(actual, tutorial_name):
             expected_values,
             "profile",
         )
+        if "rtol" in check or "atol" in check:
+            np.testing.assert_allclose(
+                actual_values,
+                expected_values,
+                rtol=check.get("rtol", 0.0),
+                atol=check.get("atol", 0.0),
+            )
+        else:
+            np.testing.assert_array_almost_equal(
+                actual_values,
+                expected_values,
+                decimal=check["decimal"],
+            )
+
+    for check in reference.get("design_checks", []):
+        result_path = actual.parent / check.get("file", "design_result.json")
+        assert result_path.exists(), f"{tutorial_name} did not write {result_path.name}"
+        data = json.loads(result_path.read_text(encoding="utf-8"))
+        value = data
+        for part in check["path"].split("."):
+            value = value[part]
+        actual_values = np.asarray(value if isinstance(value, list) else [value])
+        expected_values = np.asarray(check["expected"])
         if "rtol" in check or "atol" in check:
             np.testing.assert_allclose(
                 actual_values,

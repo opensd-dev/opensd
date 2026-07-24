@@ -7,7 +7,7 @@ Na13 = opensd.Fluid(name="Na13")
 Na13.rhomass = 860.0
 Na13.molarmass = 23E-3
 Na13.viscosity = 3.75E-4
-Na13.cpmass = 1267.0
+Na13.cpmass = 1282.0
 Na13.cvmass = 1266.9
 Na13.conductivity = 70.0
 Na13.adiabatic_compressibility = 1.86E-10
@@ -64,7 +64,7 @@ solids.export_to_xml()
 
 snode1 = opensd.SNode("snode1")
 
-hslab1 = opensd.HSlab("hslab1",ucomp="pipe1",uvar="pipe",uval="script1",dcomp="snode1",dvar="conv",dval=0.0,uarea=3.642,nlayers=3,ninc=10)
+hslab1 = opensd.HSlab("hslab1",ucomp="pipe1",uvar="pipe",uval="script1",dcomp="snode1",dvar="hflux",dval=0.0,uarea=3.642,nlayers=3,ninc=10)
 hslab1.add_layer(thk_elem=3.81E-4,thk_cros=0.9144,nnodes=2,darea=3.167,solname='SS13',sollib="User")
 hslab1.add_layer(thk_elem=7.5E-5,thk_cros=0.9144,nnodes=2,darea=3.079,solname='gap13',sollib="User",heat_input=0.)
 hslab1.add_layer(thk_elem=0.00247,thk_cros=0.9144,nnodes=2,darea=3.079,solname='MOX13',sollib="User",heat_input=3174806.,AFF=[0.0740, 0.0937, 0.1107, 0.1222, 0.1271, 0.1248,0.1156, 0.0999, 0.0786, 0.0534])
@@ -82,12 +82,36 @@ conditions.export_to_xml('conditions.xml')
 initial_guess = opensd.InitialGuess(geometry,conditions)
 initial_guess.export_to_xml('initial_guess.xml')
 
+outlet_temperature = opensd.Post([
+    opensd.Calculate(
+        "node2_sodium_outlet_temperature",
+        "node2",
+        identifier="node2_sodium_outlet_temperature",
+    ),
+])
+outlet_temperature.export_to_xml()
+
 settings = opensd.Settings()
 settings.verbosity = 6
 settings.temp_solve = True
 settings.run_mode = "steady"
 settings.no_main_iter = 200
+settings.tim_slot = [[0.0, 0.0]]
 settings.export_to_xml()
 
 opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/c/codes/opensd/build/opensd',threads=1)
 
+msource_ramp = opensd.Tabular(
+    [0.0, 100.0, 200.0],
+    [-25.3928, -15.3928, -15.3928],
+)
+actions = opensd.Actions([
+    opensd.Action("bc3_msource_ramp", "bc3", "bval", msource_ramp),
+])
+actions.export_to_xml()
+
+settings.run_mode = "transient"
+settings.tim_slot = [[1.0, 200.0]]
+settings.export_to_xml()
+
+opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/c/codes/opensd/build/opensd',threads=1)

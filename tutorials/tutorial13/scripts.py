@@ -3,3 +3,7 @@ def script1(flow_elem,WallTemp):
     Nu = 5.0 + 0.025*Pe**0.8
     h = Nu * flow_elem.ther_gues.conductivity() / flow_elem.diameter
     return h
+
+
+def node2_sodium_outlet_temperature(node2):
+    return node2.stemp_gues

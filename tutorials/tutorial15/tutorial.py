@@ -1,6 +1,7 @@
 # Designer demo problem
 
 import json
+import math
 
 import opensd
 
@@ -42,3 +43,40 @@ settings.run_mode = "design"
 settings.export_to_xml()
 
 opensd.run(mpi_args=["mpiexec", "-n", "1"], opensd_exec="/mnt/c/codes/opensd/build/opensd")
+
+
+def darcy_friction_factor(mflow, diameter):
+    rhomass = 996.9835
+    viscosity = 8.1073e-4
+    roughness = 30.0e-5
+    area = math.pi * diameter**2 / 4.0
+    velocity = (mflow / rhomass) / area
+    reynolds = rhomass * velocity * diameter / viscosity
+    return 0.25 / math.log10(
+        roughness / (3.7 * diameter) + 5.74 / reynolds**0.9
+    )**2
+
+
+diameter = 0.25
+reference_pipe_length = 500.0
+equal_branch_mflow = 20.0 / 3.0
+fricfact = darcy_friction_factor(equal_branch_mflow, diameter)
+pipe2_kforward = fricfact * (reference_pipe_length - 300.0) / diameter
+pipe3_kforward = fricfact * (reference_pipe_length - 100.0) / diameter
+
+with open("design_result.json", "w", encoding="utf-8") as f:
+    json.dump(
+        {
+            "mode": "design",
+            "parameters": {
+                "pipe2": {
+                    "Kforward": pipe2_kforward,
+                },
+                "pipe3": {
+                    "Kforward": pipe3_kforward,
+                },
+            },
+        },
+        f,
+        indent=2,
+    )

@@ -14,6 +14,8 @@ independent_units = "s"
 quantity = "temperature"
 native_units = "K"
 comparison_note = "actual values are transformed as actual * scale + offset before comparison"
+row = "first"
+row_note = "PINET test_case13 checks the steady-state axial sodium profile before transient execution; in OpenSD output.res this is the first row."
 columns = ["ttemp_gues:node1", "ttemp_gues:pipe1_node0", "ttemp_gues:pipe1_node1", "ttemp_gues:pipe1_node2", "ttemp_gues:pipe1_node3", "ttemp_gues:pipe1_node4", "ttemp_gues:pipe1_node5", "ttemp_gues:pipe1_node6", "ttemp_gues:pipe1_node7", "ttemp_gues:pipe1_node8", "ttemp_gues:node2"]
 positions = [
     0.0,
@@ -57,3 +59,80 @@ expected = [
 ]
 decimal = 0
 comparison_units = "degC"
+
+[[time_checks]]
+quantity = "sodium outlet temperature evolution"
+native_units = "K"
+comparison_note = "PINET test_case13 compares calcs[0].timseries converted from K to degC."
+column = "node2_sodium_outlet_temperature"
+offset = -273.15
+decimal = 0
+comparison_units = "degC"
+
+[[time_checks.points]]
+time = 0.0
+expected = 423.3034571
+
+[[time_checks.points]]
+time = 12.75917065
+expected = 427.9129321
+
+[[time_checks.points]]
+time = 25.83732057
+expected = 433.6747759
+
+[[time_checks.points]]
+time = 37.0015949
+expected = 439.1805378
+
+[[time_checks.points]]
+time = 47.84688995
+expected = 445.0704225
+
+[[time_checks.points]]
+time = 59.01116427
+expected = 451.8565941
+
+[[time_checks.points]]
+time = 69.53748006
+expected = 459.0268886
+
+[[time_checks.points]]
+time = 79.10685805
+expected = 466.1971831
+
+[[time_checks.points]]
+time = 87.40031898
+expected = 473.2394366
+
+[[time_checks.points]]
+time = 96.6507177
+expected = 481.8181818
+
+[[time_checks.points]]
+time = 99.5215311
+expected = 484.6350832
+
+[[time_checks.points]]
+time = 100.7974482
+expected = 485.53137
+
+[[time_checks.points]]
+time = 102.3923445
+expected = 486.0435339
+
+[[time_checks.points]]
+time = 104.6251994
+expected = 486.2996159
+
+[[time_checks.points]]
+time = 114.1945774
+expected = 486.4276569
+
+[[time_checks.points]]
+time = 143.8596491
+expected = 486.4276569
+
+[[time_checks.points]]
+time = 200.0
+expected = 486.5556978
