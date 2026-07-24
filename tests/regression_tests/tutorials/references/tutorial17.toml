@@ -1,0 +1,62 @@
+# OpenSD tutorial regression benchmark data.
+# This file is test data, not executable code. Keep metadata with values so the source, units, and tolerance are reviewable.
+# For time_checks, either use parallel times/expected arrays or [[time_checks.points]] rows.
+# Point rows may include enabled = false and reason = "..." to preserve values that are intentionally excluded.
+format_version = 1
+
+[benchmark]
+id = "tutorial17"
+source = "PINET-tests test_tp.py::test_case17 tank level transient reference values."
+independent_variable = "time"
+independent_units = "s"
+
+[[time_checks]]
+quantity = "tank level"
+native_units = "m"
+column = "tank_level"
+decimal = 3
+comparison_units = "m"
+
+[[time_checks.points]]
+time = 0.0
+expected = 5.74978952
+
+[[time_checks.points]]
+time = 10.0
+expected = 5.754993479
+
+[[time_checks.points]]
+time = 20.0
+expected = 5.760199166
+
+[[time_checks.points]]
+time = 30.0
+expected = 5.765406637
+
+[[time_checks.points]]
+time = 40.0
+expected = 5.770615909
+
+[[time_checks.points]]
+time = 50.0
+expected = 5.775826997
+
+[[time_checks.points]]
+time = 60.0
+expected = 5.781037955
+
+[[time_checks.points]]
+time = 70.0
+expected = 5.786246672
+
+[[time_checks.points]]
+time = 80.0
+expected = 5.791453186
+
+[[time_checks.points]]
+time = 90.0
+expected = 5.796657534
+
+[[time_checks.points]]
+time = 100.0
+expected = 5.801859755

@@ -262,8 +262,8 @@ void discretize_pipes() {
         pipe->nodes.push_back(node);
       }
 
-      double ufrac;
-      double dfrac;
+      double ufrac = pipe->ufrac;
+      double dfrac = pipe->dfrac;
       // double delz = 0.;
       double fricopt = pipe->fricopt;
 

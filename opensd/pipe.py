@@ -86,6 +86,8 @@ class Pipe(object):
         subelement.set("cfarea",     str(self.cfarea))
         subelement.set("heat_input", str(self.heat_input))
         subelement.set("Kforward",   str(self.Kforward))
+        subelement.set("ufrac",      "-1" if self.ufrac is None else str(self.ufrac))
+        subelement.set("dfrac",      "-1" if self.dfrac is None else str(self.dfrac))
 
 class Wall(object):
     def __init__(self,thk,solname,sollib,restraint):

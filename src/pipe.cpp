@@ -54,10 +54,10 @@ Pipe::Pipe(pugi::xml_node pipe_node)
   this->heat_input= stod(get_node_value(pipe_node, "heat_input"));
   this->Kforward  = pipe_node.attribute("Kforward").as_double(0.0);
   this->Kforward_old = this->Kforward;
+  this->ufrac = pipe_node.attribute("ufrac").as_double(-1.0);
+  this->dfrac = pipe_node.attribute("dfrac").as_double(-1.0);
   this->unode = nullptr;
   this->dnode = nullptr;
-  double ufrac;
-  double dfrac;
   double delx;
   double delz;
   this->roughness = stod(get_node_value(pipe_node, "roughness"));

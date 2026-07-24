@@ -1,0 +1,22 @@
+# OpenSD tutorial regression benchmark data.
+# This file is test data, not executable code. Keep metadata with values so the source, units, and tolerance are reviewable.
+# For time_checks, either use parallel times/expected arrays or [[time_checks.points]] rows.
+# Point rows may include enabled = false and reason = "..." to preserve values that are intentionally excluded.
+format_version = 1
+
+[benchmark]
+id = "tutorial14"
+source = "PINET-tests test_des.py::test_case14 optimizer reference value."
+independent_variable = "optimizer parameter"
+independent_units = "m"
+
+[[design_checks]]
+quantity = "optimized pipe1 diameter"
+native_units = "m"
+file = "design_result.json"
+path = "parameters.pipe1.diameter"
+expected = [
+    0.26647775,
+]
+decimal = 4
+comparison_units = "m"
