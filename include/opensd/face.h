@@ -108,6 +108,11 @@ public:
   double fricfact_old;
   double fricfact_gues;
   double opening;
+  double cr_ttemp = 0.0;
+  double cr_hmass = 0.0;
+  double cr_cpmass = 0.0;
+  double cr_viscosity = 0.0;
+  double cr_conductivity = 0.0;
   std::shared_ptr<Circuit> circuit;
   std::shared_ptr<Wall> wall;
   
@@ -124,6 +129,7 @@ public:
   void update_old() override;
   void update_gues() override;
   void update_velocity() override;
+  void update_Gcr() override;
   void update_Re();
 
   void update_fricfact() override;

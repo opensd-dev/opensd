@@ -1,7 +1,7 @@
 //! \file ht_solver.cpp
 #include "opensd/ht_solver.h"
 
-// #include <algorithm>
+#include <algorithm>
 // #include <cmath>         // For std::isinf and other math functions
 // #include <iostream>
 // #include <iomanip>
@@ -294,18 +294,17 @@ exec_bc(const std::string& bvar,
 
   }
   else if (bvar == "node") {
+    auto hslab = wall_node->layer->hslab;
+    auto flow_node = std::find(hslab->uwnodes.begin(), hslab->uwnodes.end(), wall_node) != hslab->uwnodes.end()
+                       ? hslab->unode
+                       : hslab->dnode;
+    double h = eval(bval);
 
-    // auto* flow_node = bval[1];
-    // double h = calc_value(bval[0], flow_node, wall_node);
+    wall_node->htc = h;
 
-    // double relax = 1.0;
-    // wall_node->htc = relax * h + (1.0 - relax) * wall_node->htc;
-
-    // double Tf = flow_node->stemp_gues;
-    // double hA = wall_node->htc * A;
-
-    // binc = hA * Tf;
-    // Ainc = hA;
+    double hA = wall_node->htc * A;
+    binc = hA * flow_node->stemp_gues;
+    Ainc = hA;
 
   }
   else if (bvar == "pipe" || bvar == "pipenl") {
@@ -391,14 +390,15 @@ double exec_ht(const std::string& bvar,
         heat_transfer = -eval(bval) * A * wall_node->AFF;
 
     } else if (bvar == "node") {
-    //     SNode* flow_node = std::any_cast<SNode*>(bval[1]);
-    //     double h = wall_node->htc;
-    //     double hA = h * A;
-    //     double Tw = wall_node->temp_gues;
-    //     double Tf = flow_node->stemp_gues;
-    //     heat_transfer = relax * (Tw - Tf) * hA + (1.0 - relax) * wall_node->heat_transfer;
-    //     flow_node->heat_hslab.push_back(heat_transfer);
-    //
+        auto hslab = wall_node->layer->hslab;
+        auto flow_node = std::find(hslab->uwnodes.begin(), hslab->uwnodes.end(), wall_node) != hslab->uwnodes.end()
+                           ? hslab->unode
+                           : hslab->dnode;
+        double h = wall_node->htc;
+        double hA = h * A;
+        heat_transfer = relax * (wall_node->temp_gues - flow_node->stemp_gues) * hA
+                      + (1.0 - relax) * wall_node->heat_transfer;
+        flow_node->heat_hslab.push_back(heat_transfer);
     } else {
         std::cerr << "unknown option in heat transfer. stopping" << std::endl;
         std::exit(EXIT_FAILURE);

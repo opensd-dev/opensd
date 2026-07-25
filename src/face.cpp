@@ -5,13 +5,65 @@
 #include <iomanip>
 #include <cmath>
 #include <cstdlib>
+#include <memory>
 
+#include "AbstractState.h"
+#include "CoolProp.h"
 #include "opensd/circuit.h"
 #include "opensd/constants.h"
 #include "opensd/hdf5_interface.h"
 #include "opensd/node.h"
 
 namespace opensd {
+
+namespace {
+
+struct CriticalState {
+  double Gcr = 0.0;
+  double pcr = 0.0;
+  double rhocr = 0.0;
+  double T = 0.0;
+  double h = 0.0;
+  double cp = 0.0;
+  double mu = 0.0;
+  double k = 0.0;
+};
+
+CriticalState GcrHEM(CoolProp::AbstractState& flstate)
+{
+  const double h0 = flstate.hmass();
+  const double p0 = flstate.p();
+  const double s0 = flstate.smass();
+  const double pmin = std::max(0.001 * p0, 1000.0);
+  const double pmax = std::min(0.999 * p0, 220.0E5);
+
+  CriticalState cr;
+  cr.pcr = pmin;
+  cr.rhocr = flstate.rhomass();
+
+  for (int i = 0; i < 50; ++i) {
+    const double p = pmin + (pmax - pmin) * static_cast<double>(i) / 49.0;
+    flstate.update(CoolProp::PSmass_INPUTS, p, s0);
+    const double h = flstate.hmass();
+    const double rho = flstate.rhomass();
+    const double G = h > h0 ? 0.0 : rho * std::sqrt(2.0 * (h0 - h));
+    if (G > cr.Gcr) {
+      cr.Gcr = G;
+      cr.pcr = p;
+      cr.rhocr = rho;
+    }
+  }
+
+  flstate.update(CoolProp::PSmass_INPUTS, cr.pcr, s0);
+  cr.T = flstate.T();
+  cr.h = flstate.hmass();
+  cr.cp = flstate.cpmass();
+  cr.mu = flstate.viscosity();
+  cr.k = flstate.conductivity();
+  return cr;
+}
+
+} // namespace
 
 //==============================================================================
 // Global variables
@@ -160,6 +212,10 @@ PFace::PFace(int faceno, std::shared_ptr<Pipe> pipe, std::shared_ptr<Node> unode
 }
 
 double PFace::eqn_mom(double x, double time, double delt, bool trans_sim, double alpha_mom) {
+  if (choked) {
+    return x - vflow_gues;
+  }
+
   double delp_fr = fricfact_gues * delx * ther_gues->rhomass() * x * std::abs(x) / (2. * diameter * cfarea * cfarea);
   if (faceno == 0) {
     delp_fr += pipe->Kforward * ther_gues->rhomass() * x * std::abs(x) / (2. * cfarea * cfarea);
@@ -261,16 +317,19 @@ void PFace::update_abcoef(double time, double delt, double trans_sim, double alp
       // std::exit(EXIT_FAILURE);
     // }
   } else {
-/*     double delta = 0.1;
-    double y1 = Gcr / rhocr;
-    auto& flstate = circuit.flstate;
-    flstate.update(1, 1, 1 + delta); // replace HmassP_INPUTS, upstream.tenth_gues, upstream.tpres_gues with appropriate values
-    double Gcr2, pcr2, rhocr2;
-    std::tie(Gcr2, pcr2, rhocr2) = GcrHEM(flstate); // replace with appropriate function call
-    double y2 = Gcr2 / rhocr2;
-    aminus = (y2 - y1) / delta * 0.1;
-    bminus = (rhocr2 - rhocr) / delta * 0.1;
- */  }
+    aplus = bplus = 0.0;
+    const double delta = 0.1;
+    try {
+      auto flstate = std::unique_ptr<CoolProp::AbstractState>(
+        CoolProp::AbstractState::factory("BICUBIC&HEOS", circuit->flname));
+      flstate->update(CoolProp::HmassP_INPUTS, upstream->tenth_gues, upstream->tpres_gues + delta);
+      const auto cr2 = GcrHEM(*flstate);
+      aminus = ((cr2.Gcr / cr2.rhocr) - (Gcr / rhocr)) / delta * 0.1;
+      bminus = (cr2.rhocr - rhocr) / delta * 0.1;
+    } catch (const CoolProp::CoolPropBaseError&) {
+      aminus = bminus = 0.0;
+    }
+  }
 }
 
 void PFace::update_old() {
@@ -286,6 +345,31 @@ void PFace::update_gues() {
 
 void PFace::update_velocity() {
   velocity = vflow_gues / cfarea;
+}
+
+void PFace::update_Gcr() {
+  upstream->update_gues();
+
+  try {
+    auto flstate = std::unique_ptr<CoolProp::AbstractState>(
+      CoolProp::AbstractState::factory("BICUBIC&HEOS", circuit->flname));
+    flstate->update(CoolProp::HmassP_INPUTS, upstream->tenth_gues, upstream->tpres_gues);
+    const auto cr = GcrHEM(*flstate);
+    Gcr = cr.Gcr;
+    pcr = cr.pcr;
+    rhocr = cr.rhocr;
+    cr_ttemp = cr.T;
+    cr_hmass = cr.h;
+    cr_cpmass = cr.cp;
+    cr_viscosity = cr.mu;
+    cr_conductivity = cr.k;
+  } catch (const CoolProp::CoolPropBaseError&) {
+    if (Gcr <= 0.0) {
+      Gcr = 1.0E8;
+      pcr = 0.0;
+      rhocr = ther_gues->rhomass();
+    }
+  }
 }
 
 void PFace::update_Re() {

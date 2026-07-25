@@ -186,6 +186,9 @@ void discretize_layers() {
   hslab->uval1.assign(hslab->upipe->faces.begin(),
              hslab->upipe->faces.begin() + hslab->upipe->ncell);
   }
+  else if (hslab->uvar == "node") {
+    hslab->unode = find_node(hslab->ucompid);
+  }
 
   if (hslab->dvar == "pipe"){
   hslab->dpipe = get_comp<Pipe>(hslab->dcompid);
@@ -203,6 +206,9 @@ void discretize_layers() {
     hslab->dval1.assign(hslab->dpipe->faces.begin(),
                  hslab->dpipe->faces.begin() + hslab->dpipe->ncell);
   }
+  }
+  else if (hslab->dvar == "node") {
+    hslab->dnode = find_node(hslab->dcompid);
   }
 
 
@@ -634,6 +640,18 @@ std::shared_ptr<T> get_comp(const std::string& obj)
   }
 
   std::cerr << "Object not found in project. Stopping: " << obj << std::endl;
+  std::exit(EXIT_FAILURE);
+}
+
+std::shared_ptr<Node> find_node(const std::string& obj)
+{
+  for (const auto& circuit : model::circuits) {
+    if (auto item = find_in_vector(circuit->nodes, obj)) {
+      return item;
+    }
+  }
+
+  std::cerr << "Node not found in project. Stopping: " << obj << std::endl;
   std::exit(EXIT_FAILURE);
 }
 

@@ -8,7 +8,6 @@
 #include <iomanip>
 #include <Eigen/Dense>   // For matrix manipulations
 #include <Eigen/SVD>
-#include <cstdlib>
 #include <limits>
 #include <numeric>
 #include <utility>
@@ -27,6 +26,7 @@
 // #include <petscksp.h>
 // #include <petscsnes.h>
 #include <fstream>
+#include <cstdlib>
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_roots.h>
 #include <gsl/gsl_multiroots.h>
@@ -50,6 +50,22 @@ void apply_choked_orifice_state(const std::shared_ptr<Orifice>& orifice)
                       + 0.5 * orifice->velocity * orifice->velocity / orifice->cr_cpmass;
   orifice->G = sign * orifice->Gcr;
   orifice->vflow_gues = orifice->G * orifice->cfarea * orifice->opening / orifice->rhocr;
+}
+
+void apply_choked_pipe_state(const std::shared_ptr<PFace>& face)
+{
+  const double sign = face->vflow_gues < 0.0 ? -1.0 : 1.0;
+  face->spres_gues = face->pcr;
+  face->stemp_gues = face->cr_ttemp;
+  face->ther_gues->set_state(face->rhocr, face->cr_cpmass,
+                             face->cr_viscosity, face->cr_conductivity,
+                             face->cr_hmass, 0.0);
+  face->velocity = face->Gcr / face->ther_gues->rhomass();
+  face->tpres_gues = face->spres_gues
+                   + 0.5 * face->ther_gues->rhomass() * face->velocity * face->velocity;
+  face->ttemp_gues = face->stemp_gues
+                   + 0.5 * face->velocity * face->velocity / face->ther_gues->cpmass();
+  face->vflow_gues = sign * face->Gcr * face->cfarea / face->ther_gues->rhomass();
 }
 
 } // namespace
@@ -375,6 +391,19 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
   #pragma omp parallel for
   for (PetscInt i = 0; i < n_faces_owned; ++i) {
     FaceWrapper fw {circuit->faces_owned[i], time, delt, trans_sim, alpha_mom,main_iter};
+
+    if (auto pface = std::dynamic_pointer_cast<PFace>(circuit->faces_owned[i])) {
+      pface->choked = false;
+      if (circuit->fllib == "CoolProp" && circuit->flname != "Air" && circuit->flname != "Nitrogen") {
+        pface->update_Gcr();
+        if (pface->dnode->spres_gues < pface->pcr) {
+          pface->choked = true;
+          apply_choked_pipe_state(pface);
+          pface->update_abcoef(time, delt, trans_sim, alpha_mom);
+          continue;
+        }
+      }
+    }
 
     double guess = circuit->faces_owned[i]->vflow_gues;
     double root;

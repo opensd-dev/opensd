@@ -156,7 +156,21 @@ class Settings:
 
     def _create_tim_slot_subelement(self, root):
         elem = ET.SubElement(root, "tim_slot")
-        flat_list = [str(val) for pair in self._tim_slot for val in pair]
+        times = []
+        current = 0.0
+        for dt, t_end in self._tim_slot:
+            if dt == 0:
+                times.append(t_end)
+                current = t_end
+                continue
+
+            next_time = current + dt
+            while next_time <= t_end + 1.0e-12:
+                times.append(next_time)
+                current = next_time
+                next_time = current + dt
+
+        flat_list = [str(val) for val in times]
         elem.text = ' '.join(flat_list)
 
     def _create_verbosity_subelement(self, root):

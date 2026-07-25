@@ -98,11 +98,13 @@ double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_he
             + heat_transfer_old * (1.0 - alpha_heat); //hslab->dval1
             // + this->heat_transfer_old * (1.0 - alpha_heat);
     }
-  //   else if (dvar == "node") {
-  //     // dval[1] is a node-like object with stemp_gues
-  //     y = y + hslab->dval[0] * (this->temp_gues - hslab->dval[1].stemp_gues) * this->Ai * alpha_heat
-  //           + this->heat_transfer_old * (1.0 - alpha_heat);
-  //   }
+    else if (dvar == "node") {
+      auto flow_node = hslab->dnode;
+      double h = eval(hslab->dval);
+      double hA = h * Ai;
+      y = y + alpha_heat * (temp_gues - flow_node->stemp_gues) * hA
+            + heat_transfer_old * (1.0 - alpha_heat);
+    }
     else if (dvar == "hflux") {
       y = y - eval(hslab->dval) * Ai * alpha_heat * AFF
             + heat_transfer_old * (1.0 - alpha_heat);
@@ -154,14 +156,13 @@ double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_he
             + (1.0 - alpha_heat) * heat_transfer_old; //hslab->uval1
             // + (1.0 - alpha_heat) * this->heat_transfer_old;
     }
-  //   else if (uvar == "node") {
-  //     auto& flow_node = hslab->uval[1];
-  //     double Tf = flow_node.stemp_gues;
-  //     double Tw = this->temp_gues;
-  //     double h = calc_value(hslab->uval[0], &flow_node, this); // adapt if signature different
-  //     double hA = h * this->Ai;
-  //     y = y + alpha_heat * (Tw - Tf) * hA + (1.0 - alpha_heat) * this->heat_transfer_old;
-  //   }
+    else if (uvar == "node") {
+      auto flow_node = hslab->unode;
+      double h = eval(hslab->uval);
+      double hA = h * Ai;
+      y = y + alpha_heat * (temp_gues - flow_node->stemp_gues) * hA
+            + (1.0 - alpha_heat) * heat_transfer_old;
+    }
     else if (uvar == "hflux") {
       y = y - alpha_heat * eval(hslab->uval) * Ai * AFF
             + heat_transfer_old * (1.0 - alpha_heat);

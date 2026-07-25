@@ -405,6 +405,13 @@ class HSlab:
 
     @staticmethod
     def _xml_scalar_or_text(value):
+        if isinstance(value, (list, tuple, np.ndarray)):
+            numeric_values = [
+                item for item in value
+                if isinstance(item, (int, float, np.integer, np.floating))
+            ]
+            if len(numeric_values) == 1:
+                return str(numeric_values[0])
         if isinstance(value, (list, tuple, np.ndarray)) and len(value) == 1:
             return str(value[0])
         return str(value)

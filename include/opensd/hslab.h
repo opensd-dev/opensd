@@ -51,6 +51,8 @@ public:
   Input uval;
   vector<std::shared_ptr<Face>> uval1;
   vector<std::shared_ptr<Face>> dval1;
+  std::shared_ptr<Node> unode;
+  std::shared_ptr<Node> dnode;
   std::shared_ptr<Pipe> upipe;
   std::shared_ptr<Pipe> dpipe;
   Input dval;
@@ -122,6 +124,8 @@ std::shared_ptr<T> find_in_vector(
 
 template<typename T>
 std::shared_ptr<T> get_comp(const std::string& obj);
+
+std::shared_ptr<Node> find_node(const std::string& obj);
 
 
 
