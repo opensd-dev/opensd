@@ -53,7 +53,8 @@ PYBIND11_MODULE(bindings, m) {
         .def_readwrite("tpres_gues", &opensd::Node::tpres_gues)
         .def_readwrite("spres_gues", &opensd::Node::spres_gues)
         .def_readwrite("tenth_gues", &opensd::Node::tenth_gues)
-        .def_readwrite("senth_gues", &opensd::Node::senth_gues);
+        .def_readwrite("senth_gues", &opensd::Node::senth_gues)
+        .def_readwrite("level", &opensd::Node::level);
 
     // ---------------------------
     // SNode binding

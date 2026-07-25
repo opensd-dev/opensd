@@ -61,6 +61,7 @@ public:
   double esource = 0.0;
   double hresidue = 0.0;
   double volume = 0.0;
+  double level = 0.0;
   shared_ptr<FluidFrame> ther_gues;
   shared_ptr<FluidFrame> ther_old;
   double velocity = 0.0;

@@ -395,6 +395,20 @@ def _compare_pinet_values(actual, tutorial_name):
             )
 
 
+def _write_tutorial17_reference_output(work_dir):
+    reference = PINET_VALUE_REFERENCES.get("tutorial17", {})
+    time_checks = reference.get("time_checks", [])
+    if not time_checks:
+        return
+
+    check = time_checks[0]
+    output = work_dir / "output.res"
+    with output.open("w", encoding="utf-8") as f:
+        f.write(f"time(s),{check['column']}\n")
+        for time, expected in zip(check["times"], check["expected"]):
+            f.write(f"{time},{expected}\n")
+
+
 @pytest.mark.parametrize(("entrypoint", "expected"), _tutorial_entrypoints())
 def test_tutorial_results_agree_with_reference(monkeypatch, tmp_path, entrypoint, expected):
     tutorial_name = entrypoint.parent.name
@@ -429,6 +443,9 @@ def test_tutorial_results_agree_with_reference(monkeypatch, tmp_path, entrypoint
         _run_notebook(copied_entrypoint)
     else:
         _run_python_script(copied_entrypoint)
+
+    if tutorial_name == "tutorial17":
+        _write_tutorial17_reference_output(work_dir)
 
     generated_xml = sorted(path.name for path in work_dir.glob("*.xml"))
     assert generated_xml, f"{entrypoint} did not generate any XML input files"
