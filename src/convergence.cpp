@@ -91,10 +91,17 @@ std::tuple<bool, double, double, double, double> check_conv(double time, double 
 
 	if (opt == "all") {
 	  circuit->eps_h = 0.;
+      bool has_msource_boundary = false;
+      for (const auto& node : circuit->nodes_owned) {
+        if (node->fixed_var.count("msource")) {
+          has_msource_boundary = true;
+          break;
+        }
+      }
 	  for (auto& node : circuit->nodes_owned) {
 	    if (not e_mass.empty() != 0) { // node.flowreg == "Homogeneous" and
           node->hresidue = node->eqn_ener(time,delt,trans_sim,alpha_ener);
-          if (node->is_reservoir || node->fixed_var.count("P")) {
+          if (node->fixed_var.count("P") || (node->is_reservoir && !has_msource_boundary)) {
             continue;
           }
           // std::cout << "flag1 " << node->identifier << " " << abs(node->hresidue)/(node->tenth_gues*circuit->mean_flow) <<std::endl;

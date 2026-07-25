@@ -439,22 +439,6 @@ void Circuit::load_from_hdf5(hid_t group_id) {
   }
   H5Gclose(pipe_group);
 
-  // Load BCs
-  if (bcs.size() > 0)
-    std::cerr << "Warning: Overwriting existing BC values\n";
-  hid_t bc_group = H5Gopen(group_id, "bcs", H5P_DEFAULT);
-  for (size_t i = 0; i < bcs.size(); ++i) {
-    std::string name = "bc_" + std::to_string(i);
-    if (H5Lexists(bc_group, name.c_str(), H5P_DEFAULT) <= 0) {
-      std::cerr << "Warning: bc group '" << name << "' missing in HDF5\n";
-      continue;
-    }
-    hid_t bcgrp = H5Gopen(bc_group, name.c_str(), H5P_DEFAULT);
-    bcs[i].load_from_hdf5(bcgrp);
-    H5Gclose(bcgrp);
-  }
-  H5Gclose(bc_group);
-
   apply_transient_bc_mask();
 
   // Load Faces

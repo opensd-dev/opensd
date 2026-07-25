@@ -65,15 +65,6 @@ geometry.export_to_xml()
 conditions = opensd.Conditions([bc1, bc2, bc3, bc4, bc5])
 conditions.export_to_xml()
 
-heat_profile = opensd.Tabular(
-    [0., 300., 1000.],
-    [-39776208.0996519, -39776208.0996519, -39776208.0996519*0.8],
-)
-actions = opensd.Actions([
-    opensd.Action("LPH3shell_heat_input", tank, "heat_input", heat_profile),
-])
-actions.export_to_xml()
-
 post = opensd.Post([
     opensd.Calculate("tank_pressure", "LPH3shell", identifier="tank_pressure"),
     opensd.Calculate("tank_enthalpy", "LPH3shell", identifier="tank_enthalpy"),
@@ -83,9 +74,30 @@ post.export_to_xml()
 settings = opensd.Settings()
 settings.verbosity = 3
 settings.temp_solve = True
+settings.run_mode = "steady"
+settings.tim_slot = [[0., 0.]]
+settings.conv_crit_temp_SS = 1.E-7
+settings.conv_crit_temp_trans = 1.E-7
+settings.export_to_xml()
+
+opensd.run(mpi_args=["mpiexec", "-n", "1"], opensd_exec="/mnt/c/codes/opensd/build/opensd")
+
+bc3.enabled = False
+bc4.enabled = False
+for fixed_var in ("P", "H"):
+    if fixed_var in tank.fixed_var:
+        tank.fixed_var.remove(fixed_var)
+geometry.export_to_xml()
+conditions.export_to_xml()
+
+actions = opensd.Actions([
+    opensd.Action("LPH3shell_heat_input", tank, "heat_input", "lph3_heat_input"),
+])
+actions.export_to_xml()
+
 settings.run_mode = "transient"
 settings.tim_slot = [[1., 1000.]]
-settings.conv_crit_temp_trans = 1.E-7
+settings.conv_crit_temp_trans = 1.E-5
 settings.export_to_xml()
 
 opensd.run(mpi_args=["mpiexec", "-n", "1"], opensd_exec="/mnt/c/codes/opensd/build/opensd")

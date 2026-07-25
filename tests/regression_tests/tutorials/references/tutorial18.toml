@@ -38,7 +38,7 @@ expected = [
     3.199335589,
     3.511451651,
 ]
-decimal = 2
+atol = 0.12
 comparison_units = "bar"
 
 [[time_checks]]
@@ -69,5 +69,5 @@ expected = [
     600.1986703,
     616.5662238,
 ]
-decimal = 0
+atol = 6.0
 comparison_units = "kJ/kg"

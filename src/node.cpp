@@ -518,7 +518,8 @@ void Node::update_level() {
 void Node::save_to_hdf5(hid_t group_id) const {
   H5LTset_attribute_string(group_id, ".", "identifier", identifier.c_str());
 
-  H5LTset_attribute_double(group_id, ".", "volume", &volume, 1);
+  const double stored_volume = is_tptank ? tpvolume : volume;
+  H5LTset_attribute_double(group_id, ".", "volume", &stored_volume, 1);
   H5LTset_attribute_double(group_id, ".", "heat_input", &heat_input, 1);
   H5LTset_attribute_double(group_id, ".", "elevation", &elevation, 1);
   H5LTset_attribute_double(group_id, ".", "tpres_gues", &tpres_gues, 1);
@@ -534,6 +535,9 @@ void Node::save_to_hdf5(hid_t group_id) const {
 void Node::load_from_hdf5(hid_t group_id) {
   identifier = opensd::read_string_attribute(group_id, "identifier");
   volume = opensd::read_double_attribute(group_id, "volume");
+  if (is_tptank) {
+    volume = tpvolume;
+  }
   heat_input = opensd::read_double_attribute(group_id, "heat_input");
   elevation = opensd::read_double_attribute(group_id, "elevation");
   tpres_old = opensd::read_double_attribute(group_id, "tpres_gues");
