@@ -45,6 +45,7 @@ public:
   double presidue;
   double Gcr;
   double pcr;
+  double rhocr;
   double tpres_old;
   double spres_old;
   double ttemp_old;
@@ -77,6 +78,7 @@ public:
   virtual void update_old();
 
   virtual void update_velocity() {}
+  virtual void update_Gcr() {}
   virtual void update_fricfact() {}
   virtual void update_heat_input() {}
 

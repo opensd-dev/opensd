@@ -134,13 +134,19 @@ void read_settings_xml(pugi::xml_node root)
 
   bool trans_sim = settings::run_mode == RunMode::TRANSIENT;
   if (trans_sim) {
-    double start = tim_slot[0];
-    double end = tim_slot[1];
-    double step = tim_slot[0];
+    vector<double> tim_slot_input = tim_slot;
     tim_slot.clear();
-  
-    for (double t = start; t <= end + 1e-9; t += step) {
-      tim_slot.push_back(t);
+
+    double previous_time = 0.0;
+    for (size_t i = 0; i + 1 < tim_slot_input.size(); i += 2) {
+      double step = tim_slot_input[i];
+      double end = tim_slot_input[i + 1];
+      double start = tim_slot.empty() ? step : previous_time + step;
+
+      for (double t = start; t <= end + 1e-9; t += step) {
+        tim_slot.push_back(t);
+      }
+      previous_time = end;
     }
   } else {
     tim_slot = {0.0};

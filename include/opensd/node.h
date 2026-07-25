@@ -39,6 +39,8 @@ public:
   double mflow_out = 0.0;
   Circuit* circuit = nullptr;
   int node_ind = -1;
+  bool is_reservoir = false;
+  bool is_tptank = false;
   
   double tpres_old = 0.0;
   double ttemp_old = 0.0;
@@ -62,6 +64,23 @@ public:
   double hresidue = 0.0;
   double volume = 0.0;
   double level = 0.0;
+  double level_old = 0.0;
+  double height = 0.0;
+  double cross_area = 0.0;
+  double tpvolume = 0.0;
+  double volfracliq = 0.0;
+  double watermass = 0.0;
+  double Tsat = 0.0;
+  double hf = 0.0;
+  double hg = 0.0;
+  double rhof = 0.0;
+  double rhog = 0.0;
+  double muf = 0.0;
+  double mug = 0.0;
+  double cpf = 0.0;
+  double cpg = 0.0;
+  double kf = 0.0;
+  double kg = 0.0;
   shared_ptr<FluidFrame> ther_gues;
   shared_ptr<FluidFrame> ther_old;
   double velocity = 0.0;
@@ -98,6 +117,8 @@ public:
   void update_staticpres();
   void update_totaltemp(); 
   void update_staticenth();
+  void update_sat(double pressure = -1.0);
+  void update_level();
 
   void save_to_hdf5(hid_t group_id) const;
   void load_from_hdf5(hid_t group_id);

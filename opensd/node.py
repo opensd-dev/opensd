@@ -73,10 +73,45 @@ class Reservoir(Node):
         self.level = self.level_old = 0.
         self.geom = geom
 
+    def to_xml_element(self, element):
+        subelement = ET.SubElement(element, "node")
+        subelement.set("identifier", self.identifier)
+        subelement.set("type", "reservoir")
+        subelement.set("elevation", str(self.elevation))
+        subelement.set("tpres_old", str(self.tpres_old))
+        subelement.set("ttemp_old", str(self.ttemp_old))
+        subelement.set("tenth_old", str(self.tenth_old))
+        subelement.set("msource", str(self.msource))
+        subelement.set("volume", str(self.volume))
+        subelement.set("heat_input", str(self.heat_input))
+        subelement.set("fixed_var", ','.join(self.fixed_var))
+        subelement.set("height", str(self.height))
+        if self.geom[0] == "vertcyl":
+            subelement.set("cross_area", str(math.pi*self.geom[1]**2/4.))
+        subelement.set("level", str(self.level))
+
 class TPTank(Reservoir):
     def __init__(self,identifier,circuit,volume,heat_input,elevation,tpres_old,ttemp_old,tenth_old,geom):
         super().__init__(identifier,circuit,volume,heat_input,elevation,tpres_old,ttemp_old,tenth_old,geom)
         if geom[0] == "vertcyl" or geom[0] == "horicyl":
             self.tpvolume = math.pi*geom[1]**2/4.*geom[2]
             self.volume = self.tpvolume
+
+    def to_xml_element(self, element):
+        subelement = ET.SubElement(element, "node")
+        subelement.set("identifier", self.identifier)
+        subelement.set("type", "tptank")
+        subelement.set("elevation", str(self.elevation))
+        subelement.set("tpres_old", str(self.tpres_old))
+        subelement.set("ttemp_old", str(self.ttemp_old))
+        subelement.set("tenth_old", str(self.tenth_old))
+        subelement.set("msource", str(self.msource))
+        subelement.set("volume", str(self.volume))
+        subelement.set("heat_input", str(self.heat_input))
+        subelement.set("fixed_var", ','.join(self.fixed_var))
+        subelement.set("height", str(self.height))
+        if self.geom[0] == "vertcyl":
+            subelement.set("cross_area", str(math.pi*self.geom[1]**2/4.))
+        subelement.set("tpvolume", str(self.tpvolume))
+        subelement.set("level", str(self.level))
 

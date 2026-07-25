@@ -13,6 +13,7 @@
 #include <numeric>
 #include <utility>
 #include "opensd/hslab.h"
+#include "opensd/orifice.h"
 #include "opensd/pump.h"
 #include "opensd/vector.h"
 #include "opensd/message_passing.h"
@@ -31,6 +32,27 @@
 #include <gsl/gsl_multiroots.h>
 
 namespace opensd {
+
+namespace {
+
+void apply_choked_orifice_state(const std::shared_ptr<Orifice>& orifice)
+{
+  const double sign = orifice->vflow_gues < 0.0 ? -1.0 : 1.0;
+  orifice->spres_gues = orifice->pcr;
+  orifice->stemp_gues = orifice->cr_ttemp;
+  orifice->ther_gues->set_state(orifice->rhocr, orifice->cr_cpmass,
+                                orifice->cr_viscosity, orifice->cr_conductivity,
+                                orifice->cr_hmass, 0.0);
+  orifice->velocity = orifice->Gcr / orifice->rhocr;
+  orifice->tpres_gues = orifice->spres_gues
+                      + 0.5 * orifice->rhocr * orifice->velocity * orifice->velocity;
+  orifice->ttemp_gues = orifice->stemp_gues
+                      + 0.5 * orifice->velocity * orifice->velocity / orifice->cr_cpmass;
+  orifice->G = sign * orifice->Gcr;
+  orifice->vflow_gues = orifice->G * orifice->cfarea * orifice->opening / orifice->rhocr;
+}
+
+} // namespace
 
 //==============================================================================
 // Global variables
@@ -304,6 +326,19 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
   std::ofstream fout;
   if (settings::verbosity >= 6)
     std::ofstream fout("vflow_rank" + std::to_string(mpi::rank) + ".txt");
+  for (auto& face : circuit->faces_owned) {
+    auto orifice = std::dynamic_pointer_cast<Orifice>(face);
+    if (!orifice) continue;
+
+    orifice->choked = false;
+    if (circuit->fllib == "CoolProp" && circuit->flname != "Air" && circuit->flname != "Nitrogen") {
+      orifice->update_Gcr();
+      if (orifice->dnode->spres_gues < orifice->pcr) {
+        orifice->choked = true;
+        apply_choked_orifice_state(orifice);
+      }
+    }
+  }
   // for (auto& branch : circuit->branches) { // Guess flow rate calculation
   // for (auto& face : circuit->faces_owned) {
     // branch.choked = false;
@@ -589,7 +624,15 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
       // if (node.fixed_var.count("P") && !dynamic_cast<cont.Reservoir*>(node)) {
       if (node->fixed_var.count("P")) {
-        node->msource = -b_local;
+        double isum_gues = 0.0;
+        double osum_gues = 0.0;
+        for (auto& iface : node->ifaces) {
+          isum_gues += iface->ther_gues->rhomass() * iface->vflow_gues;
+        }
+        for (auto& oface : node->ofaces) {
+          osum_gues += oface->ther_gues->rhomass() * oface->vflow_gues;
+        }
+        node->msource = osum_gues - isum_gues;
         A_local_node = 1.0;
 		b_local = 0.0;
         
@@ -936,21 +979,23 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
       b_local = b_local - node->tenth_old * node->msource * trans_sim;
 
       for (auto& iface : node->ifaces) {
-        // if (dynamic_cast<cont::Reservoir*>(iface.dnode) && iface.dfrac != nullptr 
-            // && iface.dnode->ther_gues.phase() == 6) {
-          // b(i) -= alpha_ener * iface.downstream->tenth_gues * std::max(-iface.ther_gues.rhomass() * iface.vflow_gues, 0.0);
-        // } else {
+        if (iface->dnode->is_reservoir && iface->dfrac >= 0.0
+            && iface->dnode->ther_gues->phase() == 6) {
+          b_local -= alpha_ener * iface->downstream->tenth_gues
+                   * std::max(-iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
+        } else {
           A_local_node = A_local_node + alpha_ener * std::max(-iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
-        // }
+        }
 
-        // if (dynamic_cast<cont::Reservoir*>(iface.unode) && iface.ufrac != nullptr 
-            // && iface.unode->ther_gues.phase() == 6) {
-          // b(i) += alpha_ener * iface.upstream->tenth_gues * std::max(iface.ther_gues.rhomass() * iface.vflow_gues, 0.0);
-        // } else {
+        if (iface->unode->is_reservoir && iface->ufrac >= 0.0
+            && iface->unode->ther_gues->phase() == 6) {
+          b_local += alpha_ener * iface->upstream->tenth_gues
+                   * std::max(iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
+        } else {
           A_local_iface = -alpha_ener * std::max(iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
 		  int j = circuit->old2new[iface->unode->node_ind];
 		  MatSetValue(Ah, i, j, A_local_iface, INSERT_VALUES);
-        // }
+        }
 		
         b_local = (b_local 
                   - iface->downstream->tenth_old * (1.0 - alpha_ener) 
@@ -973,22 +1018,24 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
       }
 
       for (auto& oface : node->ofaces) {
-        // if (dynamic_cast<cont::Reservoir*>(oface.unode) && oface.ufrac != nullptr 
-            // && oface.unode->ther_gues.phase() == 6) {
-          // b(i) -= alpha_ener * oface.upstream->tenth_gues * std::max(oface.ther_gues.rhomass() * oface.vflow_gues, 0.0);
-        // } else {
+        if (oface->unode->is_reservoir && oface->ufrac >= 0.0
+            && oface->unode->ther_gues->phase() == 6) {
+          b_local -= alpha_ener * oface->upstream->tenth_gues
+                   * std::max(oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
+        } else {
           A_local_node = A_local_node + alpha_ener * std::max(oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
-        // }
+        }
 
-        // if (dynamic_cast<cont::Reservoir*>(oface.dnode) && oface.dfrac != nullptr 
-            // && oface.dnode->ther_gues.phase() == 6) {
-          // b(i) += alpha_ener * oface.downstream->tenth_gues * std::max(-oface.ther_gues.rhomass() * oface.vflow_gues, 0.0);
-        // } else {
+        if (oface->dnode->is_reservoir && oface->dfrac >= 0.0
+            && oface->dnode->ther_gues->phase() == 6) {
+          b_local += alpha_ener * oface->downstream->tenth_gues
+                   * std::max(-oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
+        } else {
           A_local_oface = -alpha_ener * std::max(-oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
 		  int j = circuit->old2new[oface->dnode->node_ind];
 		  MatSetValue(Ah, i, j, A_local_oface, INSERT_VALUES);
 
-        // }
+        }
 
         
         b_local = (b_local 
@@ -1387,20 +1434,22 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
         node->update_staticpres();
       }
 
-      // if (!trans_sim && dynamic_cast<Reservoir*>(node.get())) {
-      //     node->update_level();
-      // }
+      if (!trans_sim && node->is_reservoir) {
+        node->update_level();
+      }
     }
 
 
     for (auto& face : circuit->faces_owned) {
-      // if (!face->choked) {
+      if (!face->choked) {
         face->update_staticpres();
-      // } else {
-      //   face->update_Gcr();
-      //   face->G = std::copysign(face->Gcr, face->vflow_gues);
-      //   face->vflow_gues = face->G * face->cfarea / face->ther_gues.rhomass();
-      // }
+      } else {
+        auto orifice = std::dynamic_pointer_cast<Orifice>(face);
+        if (orifice && orifice->choked) {
+          orifice->update_Gcr();
+          apply_choked_orifice_state(orifice);
+        }
+      }
       // std::cout << "face " << face->faceno << " " << std::setprecision(8) << std::fixed << face->stemp_gues << "\n";
     }
 

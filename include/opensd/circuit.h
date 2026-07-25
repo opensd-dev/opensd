@@ -10,6 +10,7 @@
 #include "opensd/bc.h"
 #include "opensd/face.h"
 #include "opensd/ger.h"
+#include "opensd/orifice.h"
 #include "opensd/vector.h"
 #include "hdf5_interface.h"
 #include <petscksp.h>
@@ -58,6 +59,7 @@ public:
   vector<PetscInt> face_old2new;
   vector<std::shared_ptr<Pipe>> pipes;
   vector<std::shared_ptr<GER>> gers;
+  vector<std::shared_ptr<Orifice>> orifices;
   vector<BC> bcs;
   vector<std::shared_ptr<Face>> faces;
   vector<std::shared_ptr<Face>> faces_owned;

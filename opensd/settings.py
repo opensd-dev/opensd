@@ -86,6 +86,16 @@ class Settings:
         self._no_main_iter = no_main_iter
 
     @property
+    def no_flow_iter(self) -> int:
+        return self._no_flow_iter
+
+    @no_flow_iter.setter
+    def no_flow_iter(self, no_flow_iter: int):
+        cv.check_type('no_flow_iter', no_flow_iter, Integral)
+        cv.check_greater_than('no_flow_iter', no_flow_iter, 0)
+        self._no_flow_iter = no_flow_iter
+
+    @property
     def p_ambient(self) -> float:
         return self._p_ambient
 

@@ -10,6 +10,7 @@
 #include "opensd/node.h"
 #include "opensd/pipe.h"
 #include "opensd/ger.h"
+#include "opensd/orifice.h"
 #include "opensd/pump.h"
 #include "opensd/bc.h"
 #include "opensd/error.h"
@@ -72,6 +73,38 @@ Circuit::Circuit(pugi::xml_node cir_node) : fltype(FluidType::UNSET)
 
   for (pugi::xml_node pipe : cir_node.children("pipe")) {
     this->pipes.push_back(std::make_shared<Pipe>(pipe));
+  }
+
+  for (pugi::xml_node orifice : cir_node.children("orifice")) {
+
+    auto orifice1 = std::make_shared<Orifice>(orifice);
+
+    for (auto& node : this->nodes) {
+      if (node->identifier == orifice1->unode_str)
+        orifice1->unode = node;
+      else if (node->identifier == orifice1->dnode_str)
+        orifice1->dnode = node;
+
+      if (orifice1->unode && orifice1->dnode)
+        break;
+    }
+
+    if (!orifice1->unode || !orifice1->dnode) {
+      std::cerr << "Error: Orifice " << orifice1->identifier
+                << " refers to unknown nodes ("
+                << orifice1->unode_str << ", "
+                << orifice1->dnode_str << ")\n";
+      std::exit(EXIT_FAILURE);
+    }
+
+    orifice1->circuit = nullptr;
+    orifice1->delz = orifice1->dnode->elevation - orifice1->unode->elevation;
+    orifice1->unode->ofaces.push_back(orifice1);
+    orifice1->dnode->ifaces.push_back(orifice1);
+
+    this->orifices.push_back(orifice1);
+    this->faces.push_back(orifice1);
+
   }
 
   // for (pugi::xml_node face : cir_node.children("face")) {

@@ -134,8 +134,10 @@ class Circuit:
     def add_orifice(self,identifier,unode,dnode,diameter,Cd,opening=None,ufrac=None,dfrac=None):
         unode = get_comp(unode)
         dnode = get_comp(dnode)
-        from PINET import flow_orifices as or_comp
-        orifice = or_comp.Orifice(identifier,self,unode,ufrac,dnode,dfrac,diameter,Cd,opening)
+        from opensd.face import Orifice
+        if opening is None:
+            opening = 1.
+        orifice = Orifice(identifier,self,unode,ufrac,dnode,dfrac,diameter,Cd,opening)
         self.orifices.append(orifice)
         return orifice
         
@@ -354,6 +356,10 @@ class Circuit:
         if self.gers:
             for ger in self.gers:
                 ger.to_xml_element(element)
+
+        if self.orifices:
+            for orifice in self.orifices:
+                orifice.to_xml_element(element)
 
         if self.pumps:
             for pump in self.pumps:

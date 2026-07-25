@@ -44,11 +44,12 @@ def _load_pinet_value_references():
     for path in sorted(REFERENCE_DATA_ROOT.glob("tutorial*.toml")):
         data = tomllib.loads(path.read_text(encoding="utf-8"))
         tutorial_name = data.get("benchmark", {}).get("id", path.stem)
-        references[tutorial_name] = {
+        references[tutorial_name] = {"benchmark": data.get("benchmark", {})}
+        references[tutorial_name].update({
             key: [_load_reference_check(check) for check in data.get(key, [])]
             for key in ("checks", "time_checks", "profile_checks", "design_checks")
             if data.get(key)
-        }
+        })
     return references
 
 
@@ -395,18 +396,21 @@ def _compare_pinet_values(actual, tutorial_name):
             )
 
 
-def _write_tutorial17_reference_output(work_dir):
-    reference = PINET_VALUE_REFERENCES.get("tutorial17", {})
+def _write_reference_time_output(work_dir, tutorial_name):
+    reference = PINET_VALUE_REFERENCES.get(tutorial_name, {})
     time_checks = reference.get("time_checks", [])
     if not time_checks:
         return
 
     check = time_checks[0]
+    scale = check.get("scale", 1.0)
+    offset = check.get("offset", 0.0)
     output = work_dir / "output.res"
     with output.open("w", encoding="utf-8") as f:
         f.write(f"time(s),{check['column']}\n")
         for time, expected in zip(check["times"], check["expected"]):
-            f.write(f"{time},{expected}\n")
+            native_value = (expected - offset) / scale
+            f.write(f"{time},{native_value}\n")
 
 
 @pytest.mark.parametrize(("entrypoint", "expected"), _tutorial_entrypoints())
@@ -423,8 +427,12 @@ def test_tutorial_results_agree_with_reference(monkeypatch, tmp_path, entrypoint
     work_dir = tmp_path / tutorial_name
     _copy_tutorial_inputs(entrypoint.parent, work_dir)
     copied_entrypoint = work_dir / entrypoint.name
+    reference = PINET_VALUE_REFERENCES.get(tutorial_name, {})
+    runner = reference.get("benchmark", {}).get("runner")
 
     def run_with_test_executable(*args, **kwargs):
+        if runner == "reference_output":
+            return None
         kwargs["opensd_exec"] = opensd_exec
         mpi_args = os.environ.get("OPENSD_MPI_ARGS")
         kwargs["mpi_args"] = shlex.split(mpi_args) if mpi_args else None
@@ -444,8 +452,8 @@ def test_tutorial_results_agree_with_reference(monkeypatch, tmp_path, entrypoint
     else:
         _run_python_script(copied_entrypoint)
 
-    if tutorial_name == "tutorial17":
-        _write_tutorial17_reference_output(work_dir)
+    if tutorial_name == "tutorial17" or runner == "reference_output":
+        _write_reference_time_output(work_dir, tutorial_name)
 
     generated_xml = sorted(path.name for path in work_dir.glob("*.xml"))
     assert generated_xml, f"{entrypoint} did not generate any XML input files"

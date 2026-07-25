@@ -3,6 +3,8 @@
 
 #include <iostream>
 #include <cstdlib>
+#include <cmath>
+#include <memory>
 
 #include "opensd/error.h"
 #include "opensd/xml_interface.h"
@@ -32,6 +34,17 @@ Node::Node(pugi::xml_node flnode_node)
     elevation  = stod(get_node_value(flnode_node, "elevation"));
     msource    = stod(get_node_value(flnode_node, "msource"));
     heat_input = stod(get_node_value(flnode_node, "heat_input"));
+    std::string node_type = flnode_node.attribute("type").as_string("");
+    is_reservoir = (node_type == "reservoir" || node_type == "tptank");
+    is_tptank = (node_type == "tptank");
+    height = flnode_node.attribute("height").as_double(0.0);
+    cross_area = flnode_node.attribute("cross_area").as_double(0.0);
+    tpvolume = flnode_node.attribute("tpvolume").as_double(volume);
+    level = flnode_node.attribute("level").as_double(0.0);
+    level_old = level;
+    if (is_reservoir && tpvolume == 0.0) {
+      tpvolume = volume;
+    }
 
     pugi::xml_attribute fixed_var_attr = flnode_node.attribute("fixed_var");
     if (fixed_var_attr) {
@@ -135,12 +148,12 @@ double Node::eqn_ener(double time, double delt, bool trans_sim, double alpha_ene
   double isum_old2  = 0.0;
   for (const auto& iface : ifaces) {
 
-    double up_contrib_gues = iface->unode->tenth_gues * std::max(iface->ther_gues->rhomass() * iface->vflow_gues, 0.0); //iface->upstream->tenth_gues
-    double down_contrib_gues = iface->dnode->tenth_gues * std::max(-iface->ther_gues->rhomass() * iface->vflow_gues, 0.0); //iface->downstream->tenth_gues
+    double up_contrib_gues = iface->upstream->tenth_gues * std::max(iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
+    double down_contrib_gues = iface->downstream->tenth_gues * std::max(-iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
     isum_gues += (up_contrib_gues - down_contrib_gues);
 
-    double up_contrib_old = iface->unode->tenth_old * std::max(iface->ther_old->rhomass() * iface->vflow_old, 0.0); //iface->upstream->tenth_old
-    double down_contrib_old = iface->dnode->tenth_old * std::max(-iface->ther_old->rhomass() * iface->vflow_old, 0.0); //iface->downstream->tenth_old
+    double up_contrib_old = iface->upstream->tenth_old * std::max(iface->ther_old->rhomass() * iface->vflow_old, 0.0);
+    double down_contrib_old = iface->downstream->tenth_old * std::max(-iface->ther_old->rhomass() * iface->vflow_old, 0.0);
     isum_old += (up_contrib_old - down_contrib_old);
 
     isum_gues2 += iface->ther_gues->rhomass() * iface->vflow_gues;
@@ -155,12 +168,12 @@ double Node::eqn_ener(double time, double delt, bool trans_sim, double alpha_ene
   double osum_old2  = 0.0;
 
   for (const auto& oface : ofaces) {
-    double up_contrib_gues = oface->unode->tenth_gues * std::max(oface->ther_gues->rhomass() * oface->vflow_gues, 0.0); //oface->upstream->tenth_gues
-    double down_contrib_gues = oface->dnode->tenth_gues * std::max(-oface->ther_gues->rhomass() * oface->vflow_gues, 0.0); //oface->downstream->tenth_gues
+    double up_contrib_gues = oface->upstream->tenth_gues * std::max(oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
+    double down_contrib_gues = oface->downstream->tenth_gues * std::max(-oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
     osum_gues += (up_contrib_gues - down_contrib_gues);
 
-    double up_contrib_old = oface->unode->tenth_old * std::max(oface->ther_old->rhomass() * oface->vflow_old, 0.0); //oface->upstream->tenth_old
-    double down_contrib_old = oface->dnode->tenth_old * std::max(-oface->ther_old->rhomass() * oface->vflow_old, 0.0); //oface->downstream->tenth_old
+    double up_contrib_old = oface->upstream->tenth_old * std::max(oface->ther_old->rhomass() * oface->vflow_old, 0.0);
+    double down_contrib_old = oface->downstream->tenth_old * std::max(-oface->ther_old->rhomass() * oface->vflow_old, 0.0);
     osum_old += (up_contrib_old - down_contrib_old);
 
     osum_gues2 += oface->ther_gues->rhomass() * oface->vflow_gues;
@@ -247,6 +260,9 @@ void Node::update_gues() {
   tenth_gues = tenth_old;
   senth_gues = senth_old;
   ther_gues->update(CoolProp::HmassP_INPUTS,senth_gues,spres_gues);
+  if (is_tptank) {
+    update_sat(spres_gues);
+  }
 
   double c1 = 5./4. - 0.26; //self.mech_gues.poissons_ratio()
   double youngs_modulus = 1.E11; 
@@ -335,6 +351,26 @@ void Node::assign_prop() {
 
     }
   ther_old->update(CoolProp::HmassP_INPUTS,senth_old,spres_old);
+  if (is_tptank) {
+    update_sat(spres_old);
+    const int ph = ther_old->phase();
+    if (ph == 0) {
+      volfracliq = 1.0;
+      level = height;
+      watermass = ther_old->rhomass() * tpvolume;
+    } else if (ph == 5) {
+      volfracliq = 0.0;
+      level = 0.0;
+      watermass = 0.0;
+    } else if (ph == 6) {
+      volfracliq = 1.0 - ther_old->Qth() * ther_old->rhomass() / rhog;
+      if (cross_area > 0.0) {
+        level = volfracliq * tpvolume / cross_area;
+      }
+      watermass = ther_old->rhomass() * tpvolume;
+    }
+    level_old = level;
+  }
 }
 
 void Node::update_staticvar(std::optional<double> velocity_in) {
@@ -345,6 +381,8 @@ void Node::update_staticvar(std::optional<double> velocity_in) {
   if (velocity_in.has_value()) {
     // directly use provided velocity
     velocity = velocity_in.value();
+  } else if (is_reservoir) {
+    velocity = 0.0;
   } else {
   if (std::find(fixed_var.begin(), fixed_var.end(), "P") != fixed_var.end()) {
     velocity = 0.0;
@@ -378,9 +416,17 @@ void Node::update_staticvar(std::optional<double> velocity_in) {
     stemp_gues = ttemp_gues;
     senth_gues = tenth_gues;
   }
+  if (is_tptank) {
+    update_sat(spres_gues);
+  }
 }
 
 void Node::update_old() {
+  if (is_tptank) {
+    update_sat(spres_gues);
+    update_level();
+  }
+
   tpres_old = tpres_gues;
   ttemp_old = ttemp_gues;
   spres_old = spres_gues;
@@ -389,11 +435,83 @@ void Node::update_old() {
   senth_old = senth_gues;
 
   ther_old->update(CoolProp::HmassP_INPUTS,senth_old,spres_old);
+  if (is_tptank) {
+    level_old = level;
+  }
 
   // if (circuit->flag_tp || dynamic_cast<TPTank*>(this)) {
   //   ther_old.update_sat();
   // }
 
+}
+
+void Node::update_sat(double pressure) {
+  if (!is_tptank || circuit == nullptr || circuit->fltype == FluidType::INCOMPRESSIBLE) {
+    return;
+  }
+  if (pressure < 0.0) {
+    pressure = spres_gues;
+  }
+
+  try {
+    auto flstate = std::unique_ptr<CoolProp::AbstractState>(
+      CoolProp::AbstractState::factory("BICUBIC&HEOS", circuit->flname));
+    flstate->update(CoolProp::PQ_INPUTS, pressure, 0.0);
+    Tsat = flstate->T();
+    hf = flstate->hmass();
+    rhof = flstate->rhomass();
+    muf = flstate->viscosity();
+    cpf = flstate->cpmass();
+    kf = flstate->conductivity();
+    flstate->update(CoolProp::PQ_INPUTS, pressure, 1.0);
+    hg = flstate->hmass();
+    rhog = flstate->rhomass();
+    mug = flstate->viscosity();
+    cpg = flstate->cpmass();
+    kg = flstate->conductivity();
+  } catch (const CoolProp::CoolPropBaseError&) {
+    auto flstate = std::unique_ptr<CoolProp::AbstractState>(
+      CoolProp::AbstractState::factory("HEOS", circuit->flname));
+    flstate->update(CoolProp::PQ_INPUTS, pressure, 0.0);
+    Tsat = flstate->T();
+    hf = flstate->hmass();
+    rhof = flstate->rhomass();
+    muf = flstate->viscosity();
+    cpf = flstate->cpmass();
+    kf = flstate->conductivity();
+    flstate->update(CoolProp::PQ_INPUTS, pressure, 1.0);
+    hg = flstate->hmass();
+    rhog = flstate->rhomass();
+    mug = flstate->viscosity();
+    cpg = flstate->cpmass();
+    kg = flstate->conductivity();
+  }
+}
+
+void Node::update_level() {
+  if (!is_tptank) {
+    return;
+  }
+
+  const int ph = ther_gues->phase();
+  if (ph == 0) {
+    volfracliq = 1.0;
+    level = height;
+    watermass = ther_gues->rhomass() * tpvolume;
+  } else if (ph == 5) {
+    volfracliq = 0.0;
+    level = 0.0;
+    watermass = 0.0;
+  } else if (ph == 6) {
+    if (rhog <= 0.0) {
+      update_sat(spres_gues);
+    }
+    volfracliq = 1.0 - ther_gues->Qth() * ther_gues->rhomass() / rhog;
+    if (cross_area > 0.0) {
+      level = volfracliq * tpvolume / cross_area;
+    }
+    watermass = ther_gues->rhomass() * tpvolume;
+  }
 }
 
 

@@ -25,8 +25,13 @@ std::tuple<bool, double, double, double, double> check_conv(double time, double 
     for (size_t n = 0; n < circuit->nodes_owned.size(); ++n) {
       auto& node = circuit->nodes_owned[n];
       node->mresidue = node->eqn_cont(time,delt,trans_sim,alpha_mom);
+      if (node->fixed_var.count("P") && !node->is_reservoir) {
+        node->mresidue = 0.0;
+      }
+      if (node->is_reservoir) {
+        node->mresidue = 0.0;
+      }
       // std::cout << "rank " << mpi::rank << " " << node->identifier << " " << node->mresidue << std::endl;
-      // if (dynamic_cast<comp::Reservoir*>(&node)) node.mresidue = 0;
     }
     for (size_t n = 0; n < circuit->nodes_owned.size(); ++n) {
       auto& node = circuit->nodes_owned[n];
@@ -89,6 +94,9 @@ std::tuple<bool, double, double, double, double> check_conv(double time, double 
 	  for (auto& node : circuit->nodes_owned) {
 	    if (not e_mass.empty() != 0) { // node.flowreg == "Homogeneous" and
           node->hresidue = node->eqn_ener(time,delt,trans_sim,alpha_ener);
+          if (node->is_reservoir || node->fixed_var.count("P")) {
+            continue;
+          }
           // std::cout << "flag1 " << node->identifier << " " << abs(node->hresidue)/(node->tenth_gues*circuit->mean_flow) <<std::endl;
 	      circuit->eps_h = std::max(circuit->eps_h,abs(node->hresidue)/(node->tenth_gues*circuit->mean_flow)); // node.tenth_gues*node.volume*node.ther_gues.rhomass()/delt)(or) node.tenth_gues*mean_flow
 		}

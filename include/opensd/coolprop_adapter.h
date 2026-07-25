@@ -82,6 +82,7 @@ public:
   }
 
   double hmass() const override { return state_->hmass(); }
+  double smass() const override { return state_->smass(); }
   double T() const override { return state_->T(); }
   double rhomass() const override { return state_->rhomass(); }
   double cpmass() const override { return state_->cpmass(); }

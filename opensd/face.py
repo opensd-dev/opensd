@@ -1,5 +1,6 @@
 import numpy as np
 import lxml.etree as ET
+from opensd.node import Reservoir
 
 class Face(object): #partial class
     def __init__(self,faceno,unode,ufrac,dnode,dfrac):
@@ -131,3 +132,30 @@ class GER(Face): #General Empirical Relationship
         subelement.set("n", str(self.n))
         subelement.set("unode",      str(self.unode.identifier))
         subelement.set("dnode",      str(self.dnode.identifier))
+
+
+class Orifice(Face):
+    def __init__(self, identifier, circuit, unode, ufrac, dnode, dfrac, diameter, Cd, opening=1.):
+        super().__init__(identifier, unode, ufrac, dnode, dfrac)
+        self.identifier = identifier
+        self.circuit = circuit
+        self.opening = opening
+        self.Cd = Cd
+        self.diameter = diameter
+        self.cfarea = np.pi * diameter**2 / 4.
+        self.delz = dnode.elevation - unode.elevation
+        self.G = 0.
+        unode.ofaces.append(self)
+        dnode.ifaces.append(self)
+        self.circuit.faces.append(self)
+
+    def to_xml_element(self, element):
+        subelement = ET.SubElement(element, "orifice")
+        subelement.set("identifier", str(self.identifier))
+        subelement.set("diameter", str(self.diameter))
+        subelement.set("Cd", str(self.Cd))
+        subelement.set("opening", str(self.opening))
+        subelement.set("unode", str(self.unode.identifier))
+        subelement.set("dnode", str(self.dnode.identifier))
+        subelement.set("ufrac", "-1" if self.ufrac is None else str(self.ufrac))
+        subelement.set("dfrac", "-1" if self.dfrac is None else str(self.dfrac))

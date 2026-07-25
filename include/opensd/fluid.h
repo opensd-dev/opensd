@@ -118,6 +118,7 @@ public:
   double enthalpy_vaporization() const { return enthalpy_vaporization_; }
   double T() const { return T_; }
   double hmass() const { return hmass_; }
+  double smass() const override { return 0.0; }
   double speed_sound() const { return speed_sound_; }
   double first_partial_deriv(int var1, int var2, int var3) const override;
   double first_two_phase_deriv(int var1, int var2, int var3) const override;

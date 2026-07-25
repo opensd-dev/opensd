@@ -24,7 +24,7 @@ namespace opensd {
 Face::Face(int faceno, std::shared_ptr<Node> unode, double ufrac, std::shared_ptr<Node> dnode, double dfrac, double delz)
     : faceno(faceno), unode(unode), ufrac(ufrac), dnode(dnode), dfrac(dfrac), delz(delz),
       vflow_old{1.0E-8}, vflow_gues{1.0E-8}, mflow(0.0), velocity(0.0), choked(false), 
-	  presidue(0.0), Gcr(1.0E8), pcr(0.0),heat_input_old(0.0), heat_input(0.0),
+	  presidue(0.0), Gcr(1.0E8), pcr(0.0), rhocr(0.0), heat_input_old(0.0), heat_input(0.0),
 	  heat_hslab_old{}, owner(0) {
   // if (ufrac != nullptr && typeid(*unode) == typeid(Reservoir)) {
     // uheight = ufrac * unode->height;
@@ -91,14 +91,16 @@ void Face::assign_prop() {
   // if (dynamic_cast<Reservoir*>(unode) && ufrac != nullptr) {
     // upstream = new Connection(unode, ufrac, uheight);
   // } else {
-    upstream = new Connection(unode, ufrac, 0);
+    uheight = (unode->is_reservoir && ufrac >= 0.0) ? ufrac * unode->height : 0.0;
+    upstream = new Connection(unode, ufrac, uheight);
   // }
   upstream->update_old();
 
   // if (dynamic_cast<Reservoir*>(dnode) && dfrac != nullptr) {
     // downstream = new Connection(dnode, dfrac, dheight);
   // } else {
-    downstream = new Connection(dnode, dfrac, 0);
+    dheight = (dnode->is_reservoir && dfrac >= 0.0) ? dfrac * dnode->height : 0.0;
+    downstream = new Connection(dnode, dfrac, dheight);
   // }
   downstream->update_old();
   aplus = aminus = bplus = bminus = 0.;

@@ -18,6 +18,7 @@ public:
 
   // Common accessors used by solvers
   virtual double hmass() const = 0;
+  virtual double smass() const = 0;
   virtual double T() const = 0;
   virtual double rhomass() const = 0;
   virtual double cpmass() const = 0;

@@ -43,6 +43,16 @@ FaceTher::FaceTher(Face* face) :
     // _drho_dp_consth = 0.; //pending temp
   // }
 }
+
+void FaceTher::set_state(double rhomass, double cpmass, double viscosity,
+                         double conductivity, double hmass, double drho_dp_consth) {
+  _rhomass = rhomass;
+  _cpmass = cpmass;
+  _viscosity = viscosity;
+  _conductivity = conductivity;
+  _hmass = hmass;
+  _drho_dp_consth = drho_dp_consth;
+}
 /*
 void FaceTher::update_sat(double p) {
   if (p == nullptr) p = face.spres_gues;
