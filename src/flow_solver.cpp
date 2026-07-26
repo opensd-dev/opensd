@@ -352,6 +352,16 @@ void solve_energy_like_pinet(std::shared_ptr<Circuit> circuit, Mat A, Vec b, Vec
   VecAssemblyEnd(x);
 }
 
+bool solve_energy_with_petsc(std::shared_ptr<Circuit> circuit, Mat A, Vec b, Vec x)
+{
+  KSPSetOperators(circuit->ksph, A, A);
+  KSPSolve(circuit->ksph, b, x);
+
+  KSPConvergedReason reason;
+  KSPGetConvergedReason(circuit->ksph, &reason);
+  return reason >= 0;
+}
+
 void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int main_iter, std::shared_ptr<Circuit> circuit) {
   std::ofstream fout;
   if (settings::verbosity >= 6)
@@ -1235,13 +1245,11 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
           }
           VecSetValue(bh, i, node->tenth_old * node->msource, ADD_VALUES);
         } else {
-	      PetscScalar Aii;
-		  PetscInt row = i, col = i;
+          PetscScalar Aii;
+          PetscInt row = i, col = i;
           MatGetValues(Ah, 1, &row, 1, &col, &Aii);
           Aii = Aii - node->msource;
-		  MatSetValue(Ah, row, col, Aii, INSERT_VALUES);
-          MatAssemblyBegin(Ah, MAT_FINAL_ASSEMBLY);
-          MatAssemblyEnd(Ah, MAT_FINAL_ASSEMBLY);
+          MatSetValue(Ah, row, col, Aii, INSERT_VALUES);
           if (Aii < 0.0) {
             std::cerr << "negative coef. in energy solver. stopping" << std::endl;
             exit(EXIT_FAILURE);
@@ -1330,7 +1338,9 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
     // PCSetType(pc, PCLU);  // direct LU
     // KSPSetFromOptions(ksp);
   
-    solve_energy_like_pinet(circuit, Ah, bh, enth);
+    if (!solve_energy_with_petsc(circuit, Ah, bh, enth)) {
+      solve_energy_like_pinet(circuit, Ah, bh, enth);
+    }
   
   // } else {
     // (3) Else -> fallback to SOR iteration
@@ -1362,10 +1372,12 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
   // }
   
 
-    PetscViewer viewer;
-    PetscViewerASCIIOpen(PETSC_COMM_WORLD, "enth_output.txt", &viewer);
-    VecView(enth, viewer);
-    PetscViewerDestroy(&viewer);
+    if (settings::verbosity >= 6) {
+      PetscViewer viewer;
+      PetscViewerASCIIOpen(PETSC_COMM_WORLD, "enth_output.txt", &viewer);
+      VecView(enth, viewer);
+      PetscViewerDestroy(&viewer);
+    }
 	
 
 

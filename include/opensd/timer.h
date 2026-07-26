@@ -33,6 +33,13 @@ extern Timer time_pc_update_g;
 extern Timer time_pc_update_h;
 extern Timer time_fluid_energy;
 extern Timer time_solid_energy;
+extern Timer time_actions;
+extern Timer time_post_calcs;
+extern Timer time_output_write;
+extern Timer time_hdf5_save;
+extern long long n_time_steps;
+extern long long n_main_iterations;
+extern long long n_flow_iterations;
 } // namespace simulation
 
 //==============================================================================
@@ -41,7 +48,7 @@ extern Timer time_solid_energy;
 
 class Timer {
 public:
-  using clock = std::chrono::high_resolution_clock;
+  using clock = std::chrono::steady_clock;
 
   Timer() {};
 

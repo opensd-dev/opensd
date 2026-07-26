@@ -206,6 +206,18 @@ void show_rate(const char* label, double particles_per_sec)
   fmt::print(" {:<33} = {:.6} particles/second\n", label, particles_per_sec);
 }
 
+void show_count(const char* label, long long count)
+{
+  fmt::print(" {:<33} = {}\n", label, count);
+}
+
+void show_avg_time(const char* label, double secs, long long count)
+{
+  if (count > 0) {
+    show_time(label, secs / static_cast<double>(count));
+  }
+}
+
 void print_runtime()
 {
   using namespace simulation;
@@ -221,6 +233,13 @@ void print_runtime()
   // show_time("Time writing statepoints", time_statepoint.elapsed(), 1);
   show_time("Total time for finalization", time_finalize.elapsed());
   show_time("Total time elapsed", time_total.elapsed());
+  show_count("Number of time steps", n_time_steps);
+  show_count("Number of main iterations", n_main_iterations);
+  show_count("Number of flow iterations", n_flow_iterations);
+  show_avg_time("Average time per step", time_total.elapsed(), n_time_steps);
+  show_avg_time("Average time per main iter", time_total.elapsed(), n_main_iterations);
+  show_avg_time("Average time per flow iter", time_massmom.elapsed(), n_flow_iterations);
+  show_time("Total time for actions", time_actions.elapsed());
   show_time("Total time for mass momentum", time_massmom.elapsed());
   show_time("Total time for pressure correction", time_pressure_correction.elapsed());
   show_time("Total time for pc assembly", time_pc_assembly.elapsed());
@@ -236,7 +255,12 @@ void print_runtime()
   show_time("Total time for convergence", time_convergence.elapsed());
   show_time("Total time for convergence mass", time_conv_mass.elapsed());
   show_time("Total time for convergence momentum", time_conv_mom.elapsed());
+  show_time("Total time for solid energy", time_solid_energy.elapsed());
+  show_time("Total time for fluid energy", time_fluid_energy.elapsed());
   show_time("Total time for update old", time_update_old.elapsed());
+  show_time("Total time for post calcs", time_post_calcs.elapsed());
+  show_time("Total time for output writing", time_output_write.elapsed());
+  show_time("Total time for HDF5 save", time_hdf5_save.elapsed());
 
 }
 

@@ -49,6 +49,7 @@ int opensd_run()
 
   // Loop through time slots
   for (int i = 0; i < settings::tim_slot.size(); ++i) {
+    ++simulation::n_time_steps;
     simulation::current_time = settings::tim_slot[i];
     
     bool trans_sim = settings::run_mode == RunMode::TRANSIENT;
@@ -63,15 +64,19 @@ int opensd_run()
     if (mpi::rank == 0) {
     if (settings::verbosity >= 1) std::cout << "time=" << std::setprecision(5) << simulation::current_time << " ";
     }
+    simulation::time_actions.start();
     for (auto& action : opensd::model::actions) {
       action->update(simulation::current_time, simulation::delt);
     }
+    simulation::time_actions.stop();
 
     bool converged;
     double eps_m, eps_p, eps_h, eps_t;
     for (int main_iter = 0; main_iter < settings::no_main_iter; ++main_iter) {
+      ++simulation::n_main_iterations;
       
       for (int flow_iter = 0; flow_iter < settings::no_flow_iter; ++flow_iter) {
+        ++simulation::n_flow_iterations;
         exec_massmom(simulation::current_time, simulation::delt, trans_sim, alpha_mom, main_iter, flow_iter);
 		simulation::time_convergence.start();
         // if (mpi::rank == 0) {
@@ -168,7 +173,9 @@ int opensd_run()
     update_old();
     simulation::time_update_old.stop();
 
+    simulation::time_post_calcs.start();
     updateCalcs(simulation::current_time, simulation::delt);
+    simulation::time_post_calcs.stop();
 
     // for (auto& lmass : HTcomp.LumpedMass::_registry) {
       // lmass.update(time, delt);
@@ -176,7 +183,9 @@ int opensd_run()
 
     if (settings::flag_write) {
 	if (mpi::rank == 0) {
+      simulation::time_output_write.start();
       writeOutput(simulation::current_time, simulation::delt);
+      simulation::time_output_write.stop();
 	}
     }
   }
@@ -185,6 +194,7 @@ int opensd_run()
   }
 
   try {
+    simulation::time_hdf5_save.start();
     std::string fname = "circuits.h5";
     hid_t file_id = opensd::create_or_open_file(fname.c_str());
   
@@ -222,9 +232,11 @@ int opensd_run()
     }
    
     opensd::close_file(file_id);
+    simulation::time_hdf5_save.stop();
     std::cout << "Circuits and HSlabs saved to HDF5 successfully.\n";
   
   } catch (const std::exception& e) {
+    simulation::time_hdf5_save.stop();
     std::cerr << "HDF5 error during save: " << e.what() << std::endl;
   }
 

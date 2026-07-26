@@ -28,6 +28,13 @@ Timer time_pc_update_g;
 Timer time_pc_update_h;
 Timer time_fluid_energy;
 Timer time_solid_energy;
+Timer time_actions;
+Timer time_post_calcs;
+Timer time_output_write;
+Timer time_hdf5_save;
+long long n_time_steps = 0;
+long long n_main_iterations = 0;
+long long n_flow_iterations = 0;
 } // namespace simulation
 
 //==============================================================================
@@ -88,6 +95,13 @@ void reset_timers()
   simulation::time_pc_update_h.reset();
   simulation::time_fluid_energy.reset();
   simulation::time_solid_energy.reset();
+  simulation::time_actions.reset();
+  simulation::time_post_calcs.reset();
+  simulation::time_output_write.reset();
+  simulation::time_hdf5_save.reset();
+  simulation::n_time_steps = 0;
+  simulation::n_main_iterations = 0;
+  simulation::n_flow_iterations = 0;
 }
 
 } // namespace opensd
