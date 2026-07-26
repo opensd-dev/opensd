@@ -9,11 +9,30 @@
 
 #include "opensd/initialize.h"
 #include "opensd/message_passing.h"
+#include "opensd/orifice.h"
 #include "opensd/settings.h"
 #include "opensd/simulation.h"
 #include "opensd/timer.h"
 
 namespace opensd {
+
+namespace {
+
+double face_mass_flow_gues(const std::shared_ptr<Face>& face)
+{
+  if (face->choked) {
+    if (auto orifice = std::dynamic_pointer_cast<Orifice>(face)) {
+      return orifice->G * orifice->cfarea * orifice->opening;
+    }
+    if (auto pface = std::dynamic_pointer_cast<PFace>(face)) {
+      const double sign = pface->vflow_gues < 0.0 ? -1.0 : 1.0;
+      return sign * pface->Gcr * pface->cfarea;
+    }
+  }
+  return face->vflow_gues * face->ther_gues->rhomass();
+}
+
+} // namespace
     
 std::tuple<bool, double, double, double, double> check_conv(double time, double delt, bool trans_sim, double alpha_mom, double alpha_ener, std::string opt, double alpha_heat) {
   double eps_mtot = 0.0, eps_ptot = 0.0, eps_htot = 0.0, eps_ttot = 0.0;
@@ -25,10 +44,7 @@ std::tuple<bool, double, double, double, double> check_conv(double time, double 
     for (size_t n = 0; n < circuit->nodes_owned.size(); ++n) {
       auto& node = circuit->nodes_owned[n];
       node->mresidue = node->eqn_cont(time,delt,trans_sim,alpha_mom);
-      if (node->fixed_var.count("P") && !node->is_reservoir) {
-        node->mresidue = 0.0;
-      }
-      if (node->is_reservoir) {
+      if (node->is_reservoir && !node->is_tptank) {
         node->mresidue = 0.0;
       }
       // std::cout << "rank " << mpi::rank << " " << node->identifier << " " << node->mresidue << std::endl;
@@ -51,7 +67,7 @@ std::tuple<bool, double, double, double, double> check_conv(double time, double 
       face->presidue = face->eqn_mom(face->vflow_gues, time, delt, trans_sim, alpha_mom);
       // std::cout << "rank " << mpi::rank << " " << std::setprecision(12) << std::fixed << " face " << face->faceno << " " << face->presidue << std::endl;
       eps_p_sum += std::abs(face->presidue) / face->tpres_gues;
-      face->mflow = face->vflow_gues * face->ther_gues->rhomass();
+      face->mflow = face_mass_flow_gues(face);
     }
     circuit->eps_p = eps_p_sum;
 
@@ -101,7 +117,7 @@ std::tuple<bool, double, double, double, double> check_conv(double time, double 
 	  for (auto& node : circuit->nodes_owned) {
 	    if (not e_mass.empty() != 0) { // node.flowreg == "Homogeneous" and
           node->hresidue = node->eqn_ener(time,delt,trans_sim,alpha_ener);
-          if (node->fixed_var.count("P") || (node->is_reservoir && !has_msource_boundary)) {
+          if (node->fixed_var.count("P")) {
             continue;
           }
           // std::cout << "flag1 " << node->identifier << " " << abs(node->hresidue)/(node->tenth_gues*circuit->mean_flow) <<std::endl;

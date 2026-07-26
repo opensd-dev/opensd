@@ -68,6 +68,20 @@ void apply_choked_pipe_state(const std::shared_ptr<PFace>& face)
   face->vflow_gues = sign * face->Gcr * face->cfarea / face->ther_gues->rhomass();
 }
 
+double face_mass_flow_gues(const std::shared_ptr<Face>& face)
+{
+  if (face->choked) {
+    if (auto orifice = std::dynamic_pointer_cast<Orifice>(face)) {
+      return orifice->G * orifice->cfarea * orifice->opening;
+    }
+    if (auto pface = std::dynamic_pointer_cast<PFace>(face)) {
+      const double sign = pface->vflow_gues < 0.0 ? -1.0 : 1.0;
+      return sign * pface->Gcr * pface->cfarea;
+    }
+  }
+  return face->ther_gues->rhomass() * face->vflow_gues;
+}
+
 } // namespace
 
 //==============================================================================
@@ -391,6 +405,11 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
   #pragma omp parallel for
   for (PetscInt i = 0; i < n_faces_owned; ++i) {
     FaceWrapper fw {circuit->faces_owned[i], time, delt, trans_sim, alpha_mom,main_iter};
+    if (std::dynamic_pointer_cast<Orifice>(circuit->faces_owned[i])
+        && circuit->faces_owned[i]->choked) {
+      circuit->faces_owned[i]->update_abcoef(time, delt, trans_sim, alpha_mom);
+      continue;
+    }
 
     if (auto pface = std::dynamic_pointer_cast<PFace>(circuit->faces_owned[i])) {
       pface->choked = false;
@@ -653,15 +672,9 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
       // if (node.fixed_var.count("P") && !dynamic_cast<cont.Reservoir*>(node)) {
       if (node->fixed_var.count("P")) {
-        double isum_gues = 0.0;
-        double osum_gues = 0.0;
-        for (auto& iface : node->ifaces) {
-          isum_gues += iface->ther_gues->rhomass() * iface->vflow_gues;
+        if (!node->is_reservoir || !trans_sim) {
+          node->msource = -b_local;
         }
-        for (auto& oface : node->ofaces) {
-          osum_gues += oface->ther_gues->rhomass() * oface->vflow_gues;
-        }
-        node->msource = osum_gues - isum_gues;
         A_local_node = 1.0;
 		b_local = 0.0;
         
@@ -675,10 +688,8 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
         b_local += node->msource;
       }
 
-      if (A_local_node < -1.E-6) { // Pending check if 0
-        // if ((show_warn && trans_sim) || !trans_sim) {
+      if (A_local_node < -1.E-6 && settings::verbosity >= 3) { // Pending check if 0
           std::cout << "Warning: negative A coef. " << node->identifier << " " << A_local_node << std::endl;
-        // }
       }
 
       MatSetValue(A, i, i, A_local_node, INSERT_VALUES);
@@ -846,6 +857,9 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     
       // if (main_iter == 0) node->pc_flag = false;
       node->ther_gues->update(CoolProp::HmassP_INPUTS, node->senth_gues, node->spres_gues);
+      if (node->is_tptank) {
+        node->update_sat(node->spres_gues);
+      }
       // if (circuit.flag_tp || dynamic_cast<cont::TPTank*>(&node) != nullptr) {
         // node.ther_gues.update_sat();
       // }
@@ -890,6 +904,9 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       // std::cout << std::defaultfloat << std::setprecision(15) << "flag2 rank " << mpi::rank << " tpres_gues " << node->tpres_gues << " tpres_old " << node->tpres_old << std::endl;
       node->update_staticvar(node->velocity);
       node->ther_gues->update(CoolProp::HmassP_INPUTS, node->senth_gues, node->spres_gues);
+      if (node->is_tptank) {
+        node->update_sat(node->spres_gues);
+      }
     }
 
 
@@ -913,17 +930,18 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     #pragma omp parallel for
     for (size_t i = 0; i < circuit->faces_owned.size(); ++i) {
       auto& face = circuit->faces_owned[i];
-      // if (!face->choked) {
+      if (!face->choked) {
         face->update_statevar();
         face->ther_gues->update();
-        // if (circuit.flag_tp) face->ther_gues->update_sat();
         face->update_heat_input(); //(time, delt)
         face->update_fricfact();
-      // } else {
-        // face->update_Gcr();
-        // face->G = std::copysign(face->Gcr, face->vflow_gues);
-        // face->vflow_gues = face->G * face->cfarea / face->ther_gues.rhomass();
-      // }
+      } else if (auto orifice = std::dynamic_pointer_cast<Orifice>(face)) {
+        orifice->update_Gcr();
+        apply_choked_orifice_state(orifice);
+      } else if (auto pface = std::dynamic_pointer_cast<PFace>(face)) {
+        pface->update_Gcr();
+        apply_choked_pipe_state(pface);
+      }
     }
     simulation::time_pc_update_g.stop();
 
@@ -1008,29 +1026,31 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
       b_local = b_local - node->tenth_old * node->msource * trans_sim;
 
       for (auto& iface : node->ifaces) {
+        const double mflow_gues = face_mass_flow_gues(iface);
+        const double mflow_old = iface->ther_old->rhomass() * iface->vflow_old;
         if (iface->dnode->is_reservoir && iface->dfrac >= 0.0
             && iface->dnode->ther_gues->phase() == 6) {
           b_local -= alpha_ener * iface->downstream->tenth_gues
-                   * std::max(-iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
+                   * std::max(-mflow_gues, 0.0);
         } else {
-          A_local_node = A_local_node + alpha_ener * std::max(-iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
+          A_local_node = A_local_node + alpha_ener * std::max(-mflow_gues, 0.0);
         }
 
         if (iface->unode->is_reservoir && iface->ufrac >= 0.0
             && iface->unode->ther_gues->phase() == 6) {
           b_local += alpha_ener * iface->upstream->tenth_gues
-                   * std::max(iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
+                   * std::max(mflow_gues, 0.0);
         } else {
-          A_local_iface = -alpha_ener * std::max(iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
+          A_local_iface = -alpha_ener * std::max(mflow_gues, 0.0);
 		  int j = circuit->old2new[iface->unode->node_ind];
 		  MatSetValue(Ah, i, j, A_local_iface, INSERT_VALUES);
         }
 		
         b_local = (b_local 
                   - iface->downstream->tenth_old * (1.0 - alpha_ener) 
-                    * std::max(-iface->ther_old->rhomass() * iface->vflow_old, 0.0)
+                    * std::max(-mflow_old, 0.0)
                   + iface->upstream->tenth_old * (1.0 - alpha_ener) 
-                    * std::max(iface->ther_old->rhomass() * iface->vflow_old, 0.0));
+                    * std::max(mflow_old, 0.0));
         
         b_local = (b_local
                   + alpha_ener * (iface->heat_input + std::accumulate(iface->heat_hslab.begin(), iface->heat_hslab.end(), 0.0))
@@ -1039,28 +1059,29 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
                     * (iface->vflow_old > 0.0 ? 1.0 : 0.0));
         
         b_local = (b_local 
-                  - node->tenth_old * alpha_ener * iface->ther_gues->rhomass() 
-                    * iface->vflow_gues * trans_sim
+                  - node->tenth_old * alpha_ener * mflow_gues * trans_sim
                   - node->tenth_old * (1.0 - alpha_ener) 
-                    * iface->ther_old->rhomass() * iface->vflow_old * trans_sim);
+                    * mflow_old * trans_sim);
         
       }
 
       for (auto& oface : node->ofaces) {
+        const double mflow_gues = face_mass_flow_gues(oface);
+        const double mflow_old = oface->ther_old->rhomass() * oface->vflow_old;
         if (oface->unode->is_reservoir && oface->ufrac >= 0.0
             && oface->unode->ther_gues->phase() == 6) {
           b_local -= alpha_ener * oface->upstream->tenth_gues
-                   * std::max(oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
+                   * std::max(mflow_gues, 0.0);
         } else {
-          A_local_node = A_local_node + alpha_ener * std::max(oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
+          A_local_node = A_local_node + alpha_ener * std::max(mflow_gues, 0.0);
         }
 
         if (oface->dnode->is_reservoir && oface->dfrac >= 0.0
             && oface->dnode->ther_gues->phase() == 6) {
           b_local += alpha_ener * oface->downstream->tenth_gues
-                   * std::max(-oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
+                   * std::max(-mflow_gues, 0.0);
         } else {
-          A_local_oface = -alpha_ener * std::max(-oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
+          A_local_oface = -alpha_ener * std::max(-mflow_gues, 0.0);
 		  int j = circuit->old2new[oface->dnode->node_ind];
 		  MatSetValue(Ah, i, j, A_local_oface, INSERT_VALUES);
 
@@ -1069,9 +1090,9 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
         
         b_local = (b_local 
                   - oface->upstream->tenth_old * (1.0 - alpha_ener) 
-                    * std::max(oface->ther_old->rhomass() * oface->vflow_old, 0.0)
+                    * std::max(mflow_old, 0.0)
                   + oface->downstream->tenth_old * (1.0 - alpha_ener) 
-                    * std::max(-oface->ther_old->rhomass() * oface->vflow_old, 0.0));
+                    * std::max(-mflow_old, 0.0));
         
         b_local = (b_local 
                   + alpha_ener * (oface->heat_input + std::accumulate(oface->heat_hslab.begin(), oface->heat_hslab.end(), 0.0))
@@ -1080,10 +1101,9 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
                     * (oface->vflow_old < 0.0 ? 1.0 : 0.0));
         
         b_local = (b_local 
-                  + node->tenth_old * alpha_ener * oface->ther_gues->rhomass() 
-                    * oface->vflow_gues * trans_sim
+                  + node->tenth_old * alpha_ener * mflow_gues * trans_sim
                   + node->tenth_old * (1.0 - alpha_ener) 
-                    * oface->ther_old->rhomass() * oface->vflow_old * trans_sim);
+                    * mflow_old * trans_sim);
         
       }
 	  

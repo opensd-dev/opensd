@@ -1,0 +1,75 @@
+# OpenSD tutorial regression benchmark data.
+# This file is test data, not executable code. Keep metadata with values so the source, units, and tolerance are reviewable.
+# For time_checks, either use parallel times/expected arrays or [[time_checks.points]] rows.
+# Point rows may include enabled = false and reason = "..." to preserve values that are intentionally excluded.
+format_version = 1
+
+[benchmark]
+id = "tutorial16"
+source = "C:\\codes\\PINET\\docs\\tutorials\\tutorial16.py, same-interpreter steady plus transient run capped at 500 s."
+independent_variable = "time"
+independent_units = "s"
+case = "CEP trip simulation with LPH2 feedwater heater and LPH3 drain coupling"
+
+[[checks]]
+quantity = "node10 total pressure at 500 s"
+native_units = "Pa"
+column_note = "PINET node10.tpres_gues"
+columns = ["node10_pressure"]
+expected = [152149.43959044735]
+atol = 5000.0
+comparison_units = "Pa"
+
+[[checks]]
+quantity = "LPH2 shell total pressure at 500 s"
+native_units = "Pa"
+column_note = "PINET LPH2shell.tpres_gues"
+columns = ["lph2shell_pressure"]
+expected = [152010.0172105249]
+atol = 5000.0
+comparison_units = "Pa"
+
+[[checks]]
+quantity = "LPH2 shell specific enthalpy at 500 s"
+native_units = "J/kg"
+column_note = "PINET LPH2shell.tenth_gues"
+columns = ["lph2shell_enthalpy"]
+expected = [479769.5159860377]
+atol = 15000.0
+comparison_units = "J/kg"
+
+[[checks]]
+quantity = "LPH2 shell mass source at 500 s"
+native_units = "kg/s"
+column_note = "PINET LPH2shell.msource"
+columns = ["lph2shell_msource"]
+expected = [0.0]
+atol = 1.0
+comparison_units = "kg/s"
+
+[[checks]]
+quantity = "LPH2 shell energy source at 500 s"
+native_units = "W"
+column_note = "PINET LPH2shell.esource"
+columns = ["lph2shell_esource"]
+expected = [0.0]
+atol = 1.0
+comparison_units = "W"
+
+[[checks]]
+quantity = "node12 mass source at 500 s"
+native_units = "kg/s"
+column_note = "PINET node12.msource"
+columns = ["node12_msource"]
+expected = [-6981.955160899559]
+atol = 150.0
+comparison_units = "kg/s"
+
+[[checks]]
+quantity = "LPH3 shell mass source at 500 s"
+native_units = "kg/s"
+column_note = "PINET LPH3shell.msource"
+columns = ["lph3shell_msource"]
+expected = [6928.762868506223]
+atol = 150.0
+comparison_units = "kg/s"

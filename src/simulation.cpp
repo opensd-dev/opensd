@@ -101,7 +101,6 @@ int opensd_run()
 
         converged = (conv_global != 0);
 		simulation::time_convergence.stop();
-		
         // if (flow_iter == 0) {
           // MPI_Abort(mpi::intracomm, 0);
           // std::exit(0);

@@ -12,8 +12,26 @@
 #include "opensd/face.h"
 #include "opensd/fluid.h"
 #include "opensd/coolprop_adapter.h"
+#include "opensd/orifice.h"
 
 namespace opensd {
+
+namespace {
+
+double face_mass_flow_gues(const std::shared_ptr<Face>& face) {
+  if (face->choked) {
+    if (auto orifice = std::dynamic_pointer_cast<Orifice>(face)) {
+      return orifice->G * orifice->cfarea * orifice->opening;
+    }
+    if (auto pface = std::dynamic_pointer_cast<PFace>(face)) {
+      const double sign = pface->vflow_gues < 0.0 ? -1.0 : 1.0;
+      return sign * pface->Gcr * pface->cfarea;
+    }
+  }
+  return face->ther_gues->rhomass() * face->vflow_gues;
+}
+
+} // namespace
 
 //==============================================================================
 // Global variables
@@ -90,13 +108,13 @@ double Node::eqn_cont(double time, double delt, bool trans_sim, double alpha_mom
   double isum_gues = 0.;
   double isum_old = 0.;
   for (const auto& iface : ifaces) {
-    isum_gues += iface->ther_gues->rhomass()* iface->vflow_gues;
+    isum_gues += face_mass_flow_gues(iface);
     isum_old += iface->ther_old->rhomass() * iface->vflow_old;
   }
   double osum_gues = 0.;
   double osum_old = 0.;
   for (const auto& oface : ofaces) {
-    osum_gues += oface->ther_gues->rhomass() * oface->vflow_gues;
+    osum_gues += face_mass_flow_gues(oface);
     osum_old += oface->ther_old->rhomass() * oface->vflow_old;
   }
 
@@ -117,7 +135,7 @@ double Node::eqn_cont(double time, double delt, bool trans_sim, double alpha_mom
   double trans4 = trans_sim * D * (senth_gues - senth_old) / delt;
 
   double y = (trans3 + trans4 + alpha_mom * (osum_gues - isum_gues) + (1. - alpha_mom) * (osum_old - isum_old) - msource);
-  
+
   return y;
 }
 
@@ -147,17 +165,19 @@ double Node::eqn_ener(double time, double delt, bool trans_sim, double alpha_ene
   double isum_gues2 = 0.0;
   double isum_old2  = 0.0;
   for (const auto& iface : ifaces) {
+    double mflow_gues = face_mass_flow_gues(iface);
+    double mflow_old = iface->ther_old->rhomass() * iface->vflow_old;
 
-    double up_contrib_gues = iface->upstream->tenth_gues * std::max(iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
-    double down_contrib_gues = iface->downstream->tenth_gues * std::max(-iface->ther_gues->rhomass() * iface->vflow_gues, 0.0);
+    double up_contrib_gues = iface->upstream->tenth_gues * std::max(mflow_gues, 0.0);
+    double down_contrib_gues = iface->downstream->tenth_gues * std::max(-mflow_gues, 0.0);
     isum_gues += (up_contrib_gues - down_contrib_gues);
 
-    double up_contrib_old = iface->upstream->tenth_old * std::max(iface->ther_old->rhomass() * iface->vflow_old, 0.0);
-    double down_contrib_old = iface->downstream->tenth_old * std::max(-iface->ther_old->rhomass() * iface->vflow_old, 0.0);
+    double up_contrib_old = iface->upstream->tenth_old * std::max(mflow_old, 0.0);
+    double down_contrib_old = iface->downstream->tenth_old * std::max(-mflow_old, 0.0);
     isum_old += (up_contrib_old - down_contrib_old);
 
-    isum_gues2 += iface->ther_gues->rhomass() * iface->vflow_gues;
-    isum_old2  += iface->ther_old->rhomass() * iface->vflow_old;
+    isum_gues2 += mflow_gues;
+    isum_old2  += mflow_old;
 
   }
 
@@ -168,16 +188,19 @@ double Node::eqn_ener(double time, double delt, bool trans_sim, double alpha_ene
   double osum_old2  = 0.0;
 
   for (const auto& oface : ofaces) {
-    double up_contrib_gues = oface->upstream->tenth_gues * std::max(oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
-    double down_contrib_gues = oface->downstream->tenth_gues * std::max(-oface->ther_gues->rhomass() * oface->vflow_gues, 0.0);
+    double mflow_gues = face_mass_flow_gues(oface);
+    double mflow_old = oface->ther_old->rhomass() * oface->vflow_old;
+
+    double up_contrib_gues = oface->upstream->tenth_gues * std::max(mflow_gues, 0.0);
+    double down_contrib_gues = oface->downstream->tenth_gues * std::max(-mflow_gues, 0.0);
     osum_gues += (up_contrib_gues - down_contrib_gues);
 
-    double up_contrib_old = oface->upstream->tenth_old * std::max(oface->ther_old->rhomass() * oface->vflow_old, 0.0);
-    double down_contrib_old = oface->downstream->tenth_old * std::max(-oface->ther_old->rhomass() * oface->vflow_old, 0.0);
+    double up_contrib_old = oface->upstream->tenth_old * std::max(mflow_old, 0.0);
+    double down_contrib_old = oface->downstream->tenth_old * std::max(-mflow_old, 0.0);
     osum_old += (up_contrib_old - down_contrib_old);
 
-    osum_gues2 += oface->ther_gues->rhomass() * oface->vflow_gues;
-    osum_old2  += oface->ther_old->rhomass() * oface->vflow_old;
+    osum_gues2 += mflow_gues;
+    osum_old2  += mflow_old;
   }
 
   // weighted face convective heat input (alpha_ener weighting)

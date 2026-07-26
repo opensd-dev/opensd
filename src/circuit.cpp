@@ -440,6 +440,13 @@ void Circuit::load_from_hdf5(hid_t group_id) {
   H5Gclose(pipe_group);
 
   apply_transient_bc_mask();
+  if (settings::run_mode == RunMode::TRANSIENT) {
+    for (auto& node : nodes) {
+      if (node && node->is_reservoir) {
+        node->msource = 0.0;
+      }
+    }
+  }
 
   // Load Faces
   hid_t face_group = H5Gopen(group_id, "faces", H5P_DEFAULT);

@@ -172,11 +172,13 @@ void Face::update_old() {
     ttemp_old = ttemp_gues;
     stemp_old = stemp_gues;
 
-    // if (choked) {
-    //   ther_old.update(ther_gues);
-    // } else {
+    if (choked) {
+      ther_old->set_state(ther_gues->rhomass(), ther_gues->cpmass(),
+                          ther_gues->viscosity(), ther_gues->conductivity(),
+                          ther_gues->hmass(), ther_gues->drho_dp_consth());
+    } else {
       ther_old->update();
-    // }
+    }
 
     heat_hslab_old = heat_hslab;
     heat_input_old = heat_input;
