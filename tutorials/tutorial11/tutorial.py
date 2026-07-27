@@ -36,9 +36,10 @@ bc4 = circuit1.add_BC("bc4", "node1", 'P', 70.E5, trans=False)
 
 # heat slab material
 glass = opensd.Solid(name="glass")
+# Match PINET's thinmam glass used by the reference benchmark.
 glass.rhomass = 2500.0
-glass.cpmass = 840.0
-glass.conductivity = 1.05
+glass.cpmass = 0.0
+glass.conductivity = 10.0
 solids = opensd.Solids([glass])
 solids.export_to_xml()
 
@@ -62,6 +63,7 @@ settings.run_mode = "steady"
 settings.conv_crit_flow = 1.E-8
 settings.conv_crit_temp_SS = 1.E-8
 settings.conv_crit_temp_trans = 1.E-6
+settings.conv_crit_ht = 1.E-8
 settings.tim_slot = [[0.0, 0.0]]
 settings.export_to_xml()
 

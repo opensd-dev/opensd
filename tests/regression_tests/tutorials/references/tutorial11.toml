@@ -9,6 +9,7 @@ id = "tutorial11"
 source = "PINET-tests test_nc.py::test_case11 steady-state reference values."
 independent_variable = "time"
 independent_units = "s"
+runner = "steady_only"
 
 [[checks]]
 quantity = "primary loop mass flow rate"

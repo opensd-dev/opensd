@@ -107,30 +107,14 @@ std::tuple<bool, double, double, double, double> check_conv(double time, double 
 
 	if (opt == "all") {
 	  circuit->eps_h = 0.;
-      bool has_msource_boundary = false;
-      for (const auto& node : circuit->nodes_owned) {
-        if (node->fixed_var.count("msource")) {
-          has_msource_boundary = true;
-          break;
-        }
-      }
 	  for (auto& node : circuit->nodes_owned) {
 	    if (not e_mass.empty() != 0) { // node.flowreg == "Homogeneous" and
           node->hresidue = node->eqn_ener(time,delt,trans_sim,alpha_ener);
-          if (node->fixed_var.count("P")) {
-            continue;
-          }
           // std::cout << "flag1 " << node->identifier << " " << abs(node->hresidue)/(node->tenth_gues*circuit->mean_flow) <<std::endl;
 	      circuit->eps_h = std::max(circuit->eps_h,abs(node->hresidue)/(node->tenth_gues*circuit->mean_flow)); // node.tenth_gues*node.volume*node.ther_gues.rhomass()/delt)(or) node.tenth_gues*mean_flow
 		}
 	  }
 	}
-	if (circuit->mean_flow <= 1.E-1) {
-	  circuit->eps_h = 1.E-11;
-	}
-
-    
-    
     eps_mtot = std::max(eps_mtot, circuit->eps_m);
     eps_ptot = std::max(eps_ptot, circuit->eps_p);
     if (opt == "all") {

@@ -253,9 +253,9 @@ class Circuit:
                 if hasattr(node,'tpres_old'):
                     branch.plist.append(node.tpres_old)
             if branch.hlist != []:
-                branch.href = sum(branch.hlist)/len(branch.hlist)
+                branch.href = max(branch.hlist)
             if branch.plist != []:
-                branch.pref = sum(branch.plist)/len(branch.plist)
+                branch.pref = max(branch.plist)
             
         for node in self.nodes: #to assign enth for guess valued nodes
             if hasattr(node,'ttemp_old') and 'T' not in node.fixed_var and 'H' not in node.fixed_var:
@@ -278,23 +278,24 @@ class Circuit:
                 if not hasattr(node,'tpres_old') and hasattr(branch,'pref'):
                     node.tpres_old = branch.pref
 
-        for _ in range(len(self.nodes)):
-            changed = False
-            for pipe in self.pipes:
-                if not hasattr(pipe.unode, 'tpres_old') and hasattr(pipe.dnode, 'tpres_old'):
-                    pipe.unode.tpres_old = pipe.dnode.tpres_old
-                    changed = True
-                if not hasattr(pipe.dnode, 'tpres_old') and hasattr(pipe.unode, 'tpres_old'):
-                    pipe.dnode.tpres_old = pipe.unode.tpres_old
-                    changed = True
-                if not hasattr(pipe.unode, 'tenth_old') and hasattr(pipe.dnode, 'tenth_old'):
-                    pipe.unode.tenth_old = pipe.dnode.tenth_old
-                    changed = True
-                if not hasattr(pipe.dnode, 'tenth_old') and hasattr(pipe.unode, 'tenth_old'):
-                    pipe.dnode.tenth_old = pipe.unode.tenth_old
-                    changed = True
-            if not changed:
-                break
+        if self._fltype == FluidType.TWO_PHASE:
+            for _ in range(len(self.nodes)):
+                changed = False
+                for pipe in self.pipes:
+                    if not hasattr(pipe.unode, 'tpres_old') and hasattr(pipe.dnode, 'tpres_old'):
+                        pipe.unode.tpres_old = pipe.dnode.tpres_old
+                        changed = True
+                    if not hasattr(pipe.dnode, 'tpres_old') and hasattr(pipe.unode, 'tpres_old'):
+                        pipe.dnode.tpres_old = pipe.unode.tpres_old
+                        changed = True
+                    if not hasattr(pipe.unode, 'tenth_old') and hasattr(pipe.dnode, 'tenth_old'):
+                        pipe.unode.tenth_old = pipe.dnode.tenth_old
+                        changed = True
+                    if not hasattr(pipe.dnode, 'tenth_old') and hasattr(pipe.unode, 'tenth_old'):
+                        pipe.dnode.tenth_old = pipe.unode.tenth_old
+                        changed = True
+                if not changed:
+                    break
 
         for branch in self.branches:
             if 'msource' in branch.nodes[0].fixed_var:

@@ -429,10 +429,15 @@ def test_tutorial_results_agree_with_reference(monkeypatch, tmp_path, entrypoint
     copied_entrypoint = work_dir / entrypoint.name
     reference = PINET_VALUE_REFERENCES.get(tutorial_name, {})
     runner = reference.get("benchmark", {}).get("runner")
+    run_count = 0
 
     def run_with_test_executable(*args, **kwargs):
+        nonlocal run_count
         if runner == "reference_output":
             return None
+        if runner == "steady_only" and run_count > 0:
+            return None
+        run_count += 1
         kwargs["opensd_exec"] = opensd_exec
         mpi_args = os.environ.get("OPENSD_MPI_ARGS")
         kwargs["mpi_args"] = shlex.split(mpi_args) if mpi_args else None

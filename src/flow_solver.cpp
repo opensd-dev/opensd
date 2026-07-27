@@ -228,6 +228,11 @@ double solve_face(FaceWrapper& fw, double x_guess) {
 }
 
 void solve_energy_like_pinet(std::shared_ptr<Circuit> circuit, Mat A, Vec b, Vec x) {
+  MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
+  MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
+  VecAssemblyBegin(b);
+  VecAssemblyEnd(b);
+
   const PetscInt n = static_cast<PetscInt>(circuit->nodes.size());
   const double omega = 0.8;
   const double tolerance = 1.0e-8;
@@ -354,12 +359,21 @@ void solve_energy_like_pinet(std::shared_ptr<Circuit> circuit, Mat A, Vec b, Vec
 
 bool solve_energy_with_petsc(std::shared_ptr<Circuit> circuit, Mat A, Vec b, Vec x)
 {
+  PC pc_solver;
   KSPSetOperators(circuit->ksph, A, A);
+  KSPSetType(circuit->ksph, KSPPREONLY);
+  KSPGetPC(circuit->ksph, &pc_solver);
+  PCSetType(pc_solver, PCLU);
+  KSPSetFromOptions(circuit->ksph);
   KSPSolve(circuit->ksph, b, x);
 
   KSPConvergedReason reason;
   KSPGetConvergedReason(circuit->ksph, &reason);
-  return reason >= 0;
+  if (reason < 0) return false;
+
+  PetscReal x_norm = 0.0;
+  VecNorm(x, NORM_INFINITY, &x_norm);
+  return std::isfinite(static_cast<double>(x_norm));
 }
 
 void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int main_iter, std::shared_ptr<Circuit> circuit) {
@@ -682,9 +696,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
 
       // if (node.fixed_var.count("P") && !dynamic_cast<cont.Reservoir*>(node)) {
       if (node->fixed_var.count("P")) {
-        if (!node->is_reservoir || !trans_sim) {
-          node->msource = -b_local;
-        }
+        node->msource = -b_local;
         A_local_node = 1.0;
 		b_local = 0.0;
         
@@ -1250,6 +1262,8 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
           MatGetValues(Ah, 1, &row, 1, &col, &Aii);
           Aii = Aii - node->msource;
           MatSetValue(Ah, row, col, Aii, INSERT_VALUES);
+          MatAssemblyBegin(Ah, MAT_FINAL_ASSEMBLY);
+          MatAssemblyEnd(Ah, MAT_FINAL_ASSEMBLY);
           if (Aii < 0.0) {
             std::cerr << "negative coef. in energy solver. stopping" << std::endl;
             exit(EXIT_FAILURE);
@@ -1338,7 +1352,9 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
     // PCSetType(pc, PCLU);  // direct LU
     // KSPSetFromOptions(ksp);
   
-    if (!solve_energy_with_petsc(circuit, Ah, bh, enth)) {
+    if (!trans_sim) {
+      solve_energy_like_pinet(circuit, Ah, bh, enth);
+    } else if (!solve_energy_with_petsc(circuit, Ah, bh, enth)) {
       solve_energy_like_pinet(circuit, Ah, bh, enth);
     }
   
