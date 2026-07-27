@@ -437,15 +437,6 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
 
     if (auto pface = std::dynamic_pointer_cast<PFace>(circuit->faces_owned[i])) {
       pface->choked = false;
-      if (circuit->fllib == "CoolProp" && circuit->flname != "Air" && circuit->flname != "Nitrogen") {
-        pface->update_Gcr();
-        if (pface->dnode->spres_gues < pface->pcr) {
-          pface->choked = true;
-          apply_choked_pipe_state(pface);
-          pface->update_abcoef(time, delt, trans_sim, alpha_mom);
-          continue;
-        }
-      }
     }
 
     double guess = circuit->faces_owned[i]->vflow_gues;
@@ -794,8 +785,8 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     VecGhostUpdateBegin(pc_local, INSERT_VALUES, SCATTER_FORWARD);
     VecGhostUpdateEnd(pc_local, INSERT_VALUES, SCATTER_FORWARD);
     
-    const PetscScalar* pc_array;
-    VecGetArrayRead(pc_local, &pc_array);
+    PetscScalar* pc_array;
+    VecGetArray(pc_local, &pc_array);
     
     std::unordered_map<PetscInt, PetscInt> global_to_local;
     
@@ -804,6 +795,23 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     
     for (PetscInt j = 0; j < nghost; ++j)
       global_to_local[circuit->ghost_indices_owned[j]] = n_local + j;
+
+    const double min_pressure = 1000.0;
+    for (size_t n = 0; n < circuit->nodes_owned.size(); ++n) {
+      auto& node = circuit->nodes_owned[n];
+      const double relaxed_pressure = node->tpres_gues + settings::relax_pres * pc_array[n];
+      if (relaxed_pressure < min_pressure) {
+        pc_array[n] = (min_pressure - node->tpres_gues) / settings::relax_pres;
+      }
+    }
+    for (size_t i = 0; i < circuit->ghost_nodes_owned1.size(); ++i) {
+      auto& node = circuit->ghost_nodes_owned1[i];
+      const PetscInt local_i = static_cast<PetscInt>(circuit->nodes_owned.size() + i);
+      const double relaxed_pressure = node->tpres_gues + settings::relax_pres * pc_array[local_i];
+      if (relaxed_pressure < min_pressure) {
+        pc_array[local_i] = (min_pressure - node->tpres_gues) / settings::relax_pres;
+      }
+    }
 
     // Flow rate corrections
     for (auto& face : circuit->faces_owned) {
@@ -871,7 +879,6 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       //      << " tpres " << node->tpres_gues << "\n";
       if (node->tpres_gues < 0.0) {
         std::cerr << "Negative tpres " << node->identifier << " " << node->tpres_gues << " " << node->tpres_old << std::endl;
-        std::cerr << pc << std::endl;
         std::exit(EXIT_FAILURE);
       }
     
@@ -945,7 +952,7 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       fout1.close();
     }
 
-    VecRestoreArrayRead(pc_local, &pc_array);
+    VecRestoreArray(pc_local, &pc_array);
     simulation::time_pc_update_ef.stop();
 
     simulation::time_pc_update_g.start();

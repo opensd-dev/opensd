@@ -319,7 +319,6 @@ void PFace::update_abcoef(double time, double delt, double trans_sim, double alp
       // std::exit(EXIT_FAILURE);
     // }
   } else {
-    aplus = bplus = 0.0;
     const double delta = 0.1;
     try {
       auto flstate = std::unique_ptr<CoolProp::AbstractState>(
