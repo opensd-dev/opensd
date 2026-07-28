@@ -13,6 +13,7 @@
 #include "opensd/fluid.h"
 #include "opensd/coolprop_adapter.h"
 #include "opensd/orifice.h"
+#include "opensd/settings.h"
 
 namespace opensd {
 
@@ -394,6 +395,16 @@ void Node::update_staticvar(std::optional<double> velocity_in) {
   // if (pressure < 0) {
     double pressure = tpres_gues;
   // }
+  if (!std::isfinite(pressure)) {
+    if (std::isfinite(tpres_old)) {
+      pressure = tpres_old;
+    } else if (std::isfinite(spres_old)) {
+      pressure = spres_old;
+    } else {
+      pressure = 1000.0;
+    }
+    tpres_gues = pressure;
+  }
 
   if (velocity_in.has_value()) {
     // directly use provided velocity
@@ -421,14 +432,35 @@ void Node::update_staticvar(std::optional<double> velocity_in) {
     }
   }
   }
-  spres_gues = pressure - 0.5 * ther_gues->rhomass() * velocity * velocity;
-  stemp_gues = ttemp_gues - 0.5 * velocity * velocity / ther_gues->cpmass();
+  double rhomass = 0.0;
+  try {
+    rhomass = ther_gues->rhomass();
+  } catch (const CoolProp::CoolPropBaseError&) {
+    try {
+      rhomass = ther_old->rhomass();
+    } catch (const CoolProp::CoolPropBaseError&) {
+      rhomass = 0.0;
+    }
+  }
+  spres_gues = pressure - 0.5 * rhomass * velocity * velocity;
+  double cpmass = 0.0;
+  try {
+    cpmass = ther_gues->cpmass();
+  } catch (const CoolProp::CoolPropBaseError&) {
+    cpmass = 0.0;
+  }
+  stemp_gues = cpmass > 0.0
+             ? ttemp_gues - 0.5 * velocity * velocity / cpmass
+             : ttemp_gues;
   senth_gues = tenth_gues - 0.5 * velocity * velocity;
 
-  if (spres_gues < 0.0) {
-    std::cerr << "Warning: negative spres in flow_components in update_staticvar. Zero velocity assumed: "
-              << identifier << " " << tpres_gues << " " << velocity << " "
-              << ther_gues->rhomass() << " " << 0.5 * ther_gues->rhomass() * velocity * velocity << std::endl;
+  if (!std::isfinite(spres_gues) || spres_gues < 1000.0) {
+    if (settings::verbosity >= 3) {
+      std::cerr << "Warning: low spres in flow_components in update_staticvar. Zero velocity assumed: "
+                << identifier << " " << tpres_gues << " " << velocity << " "
+                << rhomass << " " << 0.5 * rhomass * velocity * velocity << std::endl;
+    }
+    velocity = 0.0;
     spres_gues = pressure;
     stemp_gues = ttemp_gues;
     senth_gues = tenth_gues;
@@ -468,6 +500,13 @@ void Node::update_sat(double pressure) {
   }
   if (pressure < 0.0) {
     pressure = spres_gues;
+  }
+  if (!std::isfinite(pressure)) {
+    if (std::isfinite(spres_old)) {
+      pressure = spres_old;
+    } else {
+      return;
+    }
   }
 
   try {

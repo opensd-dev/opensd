@@ -280,9 +280,16 @@ void discretize_pipes() {
       for (int i = 0; i < pipe->ncell - 1; ++i) {
         auto node = std::make_shared<Node>();
         node->identifier = pipe->identifier + "_node" + std::to_string(i);
-        node->tpres_old = pipe->unode->tpres_old+(pipe->dnode->tpres_old-pipe->unode->tpres_old)*(i+1)/pipe->ncell;
-        node->ttemp_old = settings::T_ambient;
-        node->tenth_old = std::max(pipe->unode->tenth_old,pipe->dnode->tenth_old);
+        if (circuit->fltype == FluidType::TWO_PHASE) {
+          node->tpres_old = std::max(pipe->unode->tpres_old, pipe->dnode->tpres_old);
+          node->tenth_old = std::max(pipe->unode->tenth_old, pipe->dnode->tenth_old);
+          node->ttemp_old = pipe->unode->tpres_old >= pipe->dnode->tpres_old
+                            ? pipe->unode->ttemp_old : pipe->dnode->ttemp_old;
+        } else {
+          node->tpres_old = pipe->unode->tpres_old+(pipe->dnode->tpres_old-pipe->unode->tpres_old)*(i+1)/pipe->ncell;
+          node->ttemp_old = settings::T_ambient;
+          node->tenth_old = std::max(pipe->unode->tenth_old,pipe->dnode->tenth_old);
+        }
         node->volume = delx*pipe->cfarea;
         node->msource = 0.;
         node->mresidue = 0.;

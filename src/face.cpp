@@ -156,13 +156,7 @@ void Face::assign_prop() {
   // }
   downstream->update_old();
   aplus = aminus = bplus = bminus = 0.;
-  // if (choked) {
-    // auto flstate = circuit->flstate;
-    // flstate.update(CoolProp::PSmass_INPUTS, spres_gues, s0);
-    // ther_old->update(flstate);
-  // } else {
-    ther_old->update();
-  // }
+  ther_old->update();
 }
 
 void Face::update_old() {
@@ -472,6 +466,12 @@ void PFace::save_to_hdf5(hid_t group_id) const {
   write_scalar(group_id, "presidue", presidue);
   write_scalar(group_id, "Gcr", Gcr);
   write_scalar(group_id, "pcr", pcr);
+  write_scalar(group_id, "rhocr", rhocr);
+  write_scalar(group_id, "cr_ttemp", cr_ttemp);
+  write_scalar(group_id, "cr_hmass", cr_hmass);
+  write_scalar(group_id, "cr_cpmass", cr_cpmass);
+  write_scalar(group_id, "cr_viscosity", cr_viscosity);
+  write_scalar(group_id, "cr_conductivity", cr_conductivity);
 
   write_scalar(group_id, "tpres_old", tpres_old);
   write_scalar(group_id, "spres_old", spres_old);
@@ -519,6 +519,12 @@ void PFace::load_from_hdf5(hid_t group_id) {
   presidue = read_scalar(group_id, "presidue");
   Gcr = read_scalar(group_id, "Gcr");
   pcr = read_scalar(group_id, "pcr");
+  rhocr = H5Aexists(group_id, "rhocr") > 0 ? read_scalar(group_id, "rhocr") : rhocr;
+  cr_ttemp = H5Aexists(group_id, "cr_ttemp") > 0 ? read_scalar(group_id, "cr_ttemp") : cr_ttemp;
+  cr_hmass = H5Aexists(group_id, "cr_hmass") > 0 ? read_scalar(group_id, "cr_hmass") : cr_hmass;
+  cr_cpmass = H5Aexists(group_id, "cr_cpmass") > 0 ? read_scalar(group_id, "cr_cpmass") : cr_cpmass;
+  cr_viscosity = H5Aexists(group_id, "cr_viscosity") > 0 ? read_scalar(group_id, "cr_viscosity") : cr_viscosity;
+  cr_conductivity = H5Aexists(group_id, "cr_conductivity") > 0 ? read_scalar(group_id, "cr_conductivity") : cr_conductivity;
 
   tpres_old = read_scalar(group_id, "tpres_old");
   spres_old = read_scalar(group_id, "spres_old");

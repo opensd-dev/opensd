@@ -173,6 +173,10 @@ double solve_face_unbracketed(FaceWrapper& fw, double x_guess) {
     }
   }
 
+  if (!std::isfinite(best.first)) {
+    return x_guess;
+  }
+
   return best.first;
 }
 
@@ -399,7 +403,16 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
     for (auto face_it = pipe->faces.rbegin(); face_it != pipe->faces.rend(); ++face_it) {
       auto& pface = *face_it;
       pface->choked = false;
-      if (pipe_choked) continue;
+      if (pipe_choked) {
+        FaceWrapper fw {pface, time, delt, trans_sim, alpha_mom, main_iter};
+        pface->vflow_gues = solve_face(fw, pface->vflow_gues);
+        if (std::abs(pface->vflow_gues) < 1.E-8 && main_iter == 0) {
+          pface->vflow_gues = 1.E-8 * std::copysign(1.0, pface->vflow_gues);
+          if (pface->vflow_gues == 0.0) pface->vflow_gues = 1.E-8;
+        }
+        pface->update_abcoef(time, delt, trans_sim, alpha_mom);
+        continue;
+      }
 
       const bool fixed_pressure_discharge = pface->dnode->fixed_var.count("P");
       const bool fixed_pressure_source_to_tank =
@@ -419,6 +432,15 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
           apply_choked_pipe_state(pface);
         }
       }
+      if (!pface->choked) {
+        FaceWrapper fw {pface, time, delt, trans_sim, alpha_mom, main_iter};
+        pface->vflow_gues = solve_face(fw, pface->vflow_gues);
+        if (std::abs(pface->vflow_gues) < 1.E-8 && main_iter == 0) {
+          pface->vflow_gues = 1.E-8 * std::copysign(1.0, pface->vflow_gues);
+          if (pface->vflow_gues == 0.0) pface->vflow_gues = 1.E-8;
+        }
+      }
+      pface->update_abcoef(time, delt, trans_sim, alpha_mom);
     }
   }
   // for (auto& branch : circuit->branches) { // Guess flow rate calculation
@@ -457,6 +479,9 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
   #pragma omp parallel for
   for (PetscInt i = 0; i < n_faces_owned; ++i) {
     FaceWrapper fw {circuit->faces_owned[i], time, delt, trans_sim, alpha_mom,main_iter};
+    if (std::dynamic_pointer_cast<PFace>(circuit->faces_owned[i])) {
+      continue;
+    }
     if (circuit->faces_owned[i]->choked) {
       circuit->faces_owned[i]->update_abcoef(time, delt, trans_sim, alpha_mom);
       continue;
@@ -682,14 +707,12 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
           A_local_iface = -alpha_mom * (iface->aminus * iface->ther_gues->rhomass() + iface->bminus * iface->vflow_gues);
           int j = circuit->old2new[iface->unode->node_ind];
           MatSetValue(A, i, j, A_local_iface, INSERT_VALUES);
-          if (A_local_iface > 0.0) {
-            // if ((show_warn && trans_sim) || !trans_sim) {
-              std::cout << "Warning: upstream coef negative. " << node->identifier << std::endl;
-            // }
+          if (A_local_iface > 0.0 && settings::verbosity >= 3) {
+            std::cout << "Warning: upstream coef negative. " << node->identifier << std::endl;
           }
           A_local_node = A_local_node - alpha_mom * (-iface->aplus * iface->ther_gues->rhomass() + iface->bplus * iface->vflow_gues);
         }
-        b_local += alpha_mom * (iface->ther_gues->rhomass() * iface->vflow_gues) + (1.0 - alpha_mom) * (iface->ther_old->rhomass() * iface->vflow_old);
+        b_local += alpha_mom * face_mass_flow_gues(iface) + (1.0 - alpha_mom) * (iface->ther_old->rhomass() * iface->vflow_old);
         // std::cout << "b_local " << iface->faceno << " " << iface->vflow_gues << std::endl;
       }
 
@@ -698,14 +721,12 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
           A_local_oface = -alpha_mom * (oface->aplus * oface->ther_gues->rhomass() - oface->bplus * oface->vflow_gues);
           int j = circuit->old2new[oface->dnode->node_ind];
           MatSetValue(A, i, j, A_local_oface, INSERT_VALUES);
-          if (A_local_oface > 1.E-6) { // Pending check if 0
-            // if ((show_warn && trans_sim) || !trans_sim) {
-              std::cout << "Warning: downstream coef negative. " << node->identifier << std::endl;
-            // }
+          if (A_local_oface > 1.E-6 && settings::verbosity >= 3) { // Pending check if 0
+            std::cout << "Warning: downstream coef negative. " << node->identifier << std::endl;
           }
           A_local_node = A_local_node + alpha_mom * (oface->aminus * oface->ther_gues->rhomass() + oface->bminus * oface->vflow_gues);
         }
-        b_local = b_local - alpha_mom * (oface->ther_gues->rhomass() * oface->vflow_gues) - (1.0 - alpha_mom) * (oface->ther_old->rhomass() * oface->vflow_old);
+        b_local = b_local - alpha_mom * face_mass_flow_gues(oface) - (1.0 - alpha_mom) * (oface->ther_old->rhomass() * oface->vflow_old);
       }
 
       // if (node.fixed_var.count("P") && !dynamic_cast<cont.Reservoir*>(node)) {
@@ -741,9 +762,21 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     
     VecAssemblyBegin(b);
     VecAssemblyEnd(b);
+
+    if (!circuit->Pbound_ind.empty()) {
+      std::vector<PetscInt> pbound_rows;
+      pbound_rows.reserve(circuit->Pbound_ind.size());
+      for (int node_ind : circuit->Pbound_ind) {
+        pbound_rows.push_back(static_cast<PetscInt>(circuit->old2new[node_ind]));
+      }
+      MatZeroRowsColumns(A, static_cast<PetscInt>(pbound_rows.size()),
+                         pbound_rows.data(), 1.0, nullptr, b);
+      MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
+      MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
+      VecAssemblyBegin(b);
+      VecAssemblyEnd(b);
+    }
     simulation::time_pc_assembly.stop();
-
-
 
      // Print matrix A
     // PetscViewer viewerA;
