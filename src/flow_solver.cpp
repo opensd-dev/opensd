@@ -393,6 +393,34 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
       }
     }
   }
+
+  for (auto& pipe : circuit->pipes) {
+    bool pipe_choked = false;
+    for (auto face_it = pipe->faces.rbegin(); face_it != pipe->faces.rend(); ++face_it) {
+      auto& pface = *face_it;
+      pface->choked = false;
+      if (pipe_choked) continue;
+
+      const bool fixed_pressure_discharge = pface->dnode->fixed_var.count("P");
+      const bool fixed_pressure_source_to_tank =
+          pface->unode->fixed_var.count("P") && pface->dnode->is_tptank;
+      const bool multi_pressure_circuit = circuit->Pbound_ind.size() > 1;
+
+      if (circuit->fllib == "CoolProp"
+          && circuit->flname != "Air"
+          && circuit->flname != "Nitrogen"
+          && (multi_pressure_circuit
+              || fixed_pressure_discharge
+              || fixed_pressure_source_to_tank)) {
+        pface->update_Gcr();
+        if (pface->dnode->spres_gues < pface->pcr) {
+          pipe_choked = true;
+          pface->choked = true;
+          apply_choked_pipe_state(pface);
+        }
+      }
+    }
+  }
   // for (auto& branch : circuit->branches) { // Guess flow rate calculation
   // for (auto& face : circuit->faces_owned) {
     // branch.choked = false;
@@ -429,14 +457,9 @@ void guess_flow(double time, double delt, bool trans_sim, double alpha_mom, int 
   #pragma omp parallel for
   for (PetscInt i = 0; i < n_faces_owned; ++i) {
     FaceWrapper fw {circuit->faces_owned[i], time, delt, trans_sim, alpha_mom,main_iter};
-    if (std::dynamic_pointer_cast<Orifice>(circuit->faces_owned[i])
-        && circuit->faces_owned[i]->choked) {
+    if (circuit->faces_owned[i]->choked) {
       circuit->faces_owned[i]->update_abcoef(time, delt, trans_sim, alpha_mom);
       continue;
-    }
-
-    if (auto pface = std::dynamic_pointer_cast<PFace>(circuit->faces_owned[i])) {
-      pface->choked = false;
     }
 
     double guess = circuit->faces_owned[i]->vflow_gues;
@@ -797,19 +820,28 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
       global_to_local[circuit->ghost_indices_owned[j]] = n_local + j;
 
     const double min_pressure = 1000.0;
+    const double max_pressure = 1.0e8;
     for (size_t n = 0; n < circuit->nodes_owned.size(); ++n) {
       auto& node = circuit->nodes_owned[n];
       const double relaxed_pressure = node->tpres_gues + settings::relax_pres * pc_array[n];
-      if (relaxed_pressure < min_pressure) {
+      if (!std::isfinite(relaxed_pressure)) {
+        pc_array[n] = 0.0;
+      } else if (relaxed_pressure < min_pressure) {
         pc_array[n] = (min_pressure - node->tpres_gues) / settings::relax_pres;
+      } else if (relaxed_pressure > max_pressure) {
+        pc_array[n] = (max_pressure - node->tpres_gues) / settings::relax_pres;
       }
     }
     for (size_t i = 0; i < circuit->ghost_nodes_owned1.size(); ++i) {
       auto& node = circuit->ghost_nodes_owned1[i];
       const PetscInt local_i = static_cast<PetscInt>(circuit->nodes_owned.size() + i);
       const double relaxed_pressure = node->tpres_gues + settings::relax_pres * pc_array[local_i];
-      if (relaxed_pressure < min_pressure) {
+      if (!std::isfinite(relaxed_pressure)) {
+        pc_array[local_i] = 0.0;
+      } else if (relaxed_pressure < min_pressure) {
         pc_array[local_i] = (min_pressure - node->tpres_gues) / settings::relax_pres;
+      } else if (relaxed_pressure > max_pressure) {
+        pc_array[local_i] = (max_pressure - node->tpres_gues) / settings::relax_pres;
       }
     }
 
@@ -1532,6 +1564,9 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
         if (orifice && orifice->choked) {
           orifice->update_Gcr();
           apply_choked_orifice_state(orifice);
+        } else if (auto pface = std::dynamic_pointer_cast<PFace>(face)) {
+          pface->update_Gcr();
+          apply_choked_pipe_state(pface);
         }
       }
       // std::cout << "face " << face->faceno << " " << std::setprecision(8) << std::fixed << face->stemp_gues << "\n";

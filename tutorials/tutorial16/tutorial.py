@@ -151,10 +151,11 @@ post = opensd.Post([
 post.export_to_xml()
 
 settings = opensd.Settings()
-settings.verbosity = 3
+settings.verbosity = 0
 settings.temp_solve = True
 settings.no_flow_iter = 1000
-settings.conv_crit_temp_trans = 1.0e-8
+settings.conv_crit_temp_trans = 1.0e-5
+settings.conv_crit_ht = 1.0e-5
 settings.run_mode = "steady"
 settings.tim_slot = [[0.0, 0.0]]
 settings.export_to_xml()
@@ -175,7 +176,7 @@ actions = opensd.Actions([
 actions.export_to_xml()
 
 settings.run_mode = "transient"
-settings.tim_slot = [[1.0, 10.0], [10.0, 100.0], [1.0, 300.0], [2.0, 500.0]]
+settings.tim_slot = [[1.0, 10.0], [10.0, 100.0], [1.0, 110.0]]
 settings.export_to_xml()
 
 opensd.run(mpi_args=["mpiexec", "-n", "1"], opensd_exec="/mnt/c/codes/opensd/build/opensd")

@@ -440,7 +440,8 @@ def test_tutorial_results_agree_with_reference(monkeypatch, tmp_path, entrypoint
         run_count += 1
         kwargs["opensd_exec"] = opensd_exec
         mpi_args = os.environ.get("OPENSD_MPI_ARGS")
-        kwargs["mpi_args"] = shlex.split(mpi_args) if mpi_args else None
+        if mpi_args:
+            kwargs["mpi_args"] = shlex.split(mpi_args)
         return executor.run(*args, **kwargs)
 
     monkeypatch.setattr(opensd, "run", run_with_test_executable)

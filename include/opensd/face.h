@@ -3,6 +3,8 @@
 #ifndef OPENSD_FACE_H
 #define OPENSD_FACE_H
 
+#include <memory>
+
 #include "pugixml.hpp"
 
 #include "opensd/node.h"
@@ -10,6 +12,10 @@
 #include "opensd/facether.h"
 #include "opensd/connection.h"
 #include "opensd/vector.h"
+
+namespace CoolProp {
+class AbstractState;
+}
 
 namespace opensd {
 
@@ -113,6 +119,7 @@ public:
   double cr_cpmass = 0.0;
   double cr_viscosity = 0.0;
   double cr_conductivity = 0.0;
+  std::unique_ptr<CoolProp::AbstractState> flstate;
   std::shared_ptr<Circuit> circuit;
   std::shared_ptr<Wall> wall;
   

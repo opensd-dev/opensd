@@ -148,17 +148,11 @@ double Node::eqn_ener(double time, double delt, bool trans_sim, double alpha_ene
   if (fixed_var.count("T") || fixed_var.count("H")) {
     _heat_input_esource = esource;
   } 
-/*  else if (fixed_var.find("msource") != std::string::npos || fixed_var.find('P') != std::string::npos) {
-     if (this->msource > 1.e-6) {
-      // assume there is a boolean flag has_tenth_msrc; if not, replace with an appropriate check
-      if (this->has_tenth_msrc) {
-        this->_heat_input_msource = this->msource * this->tenth_msrc;
-      } else {
-        this->_heat_input_msource = this->msource * this->tenth_old;
-      }
+  else if (fixed_var.count("msource") || fixed_var.count("P")) {
+    if (msource > 1.e-6) {
+      _heat_input_msource = msource * tenth_old;
     }
-   }
-*/
+  }
 
   double isum_gues = 0.0;
   double isum_old  = 0.0;

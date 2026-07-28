@@ -319,10 +319,12 @@ void PFace::update_abcoef(double time, double delt, double trans_sim, double alp
       // std::exit(EXIT_FAILURE);
     // }
   } else {
+    aplus = bplus = 0.0;
     const double delta = 0.1;
     try {
-      auto flstate = std::unique_ptr<CoolProp::AbstractState>(
-        CoolProp::AbstractState::factory("BICUBIC&HEOS", circuit->flname));
+      if (!flstate) {
+        flstate.reset(CoolProp::AbstractState::factory("BICUBIC&HEOS", circuit->flname));
+      }
       flstate->update(CoolProp::HmassP_INPUTS, upstream->tenth_gues, upstream->tpres_gues + delta);
       const auto cr2 = GcrHEM(*flstate);
       aminus = ((cr2.Gcr / cr2.rhocr) - (Gcr / rhocr)) / delta * 0.1;
@@ -352,8 +354,9 @@ void PFace::update_Gcr() {
   upstream->update_gues();
 
   try {
-    auto flstate = std::unique_ptr<CoolProp::AbstractState>(
-      CoolProp::AbstractState::factory("BICUBIC&HEOS", circuit->flname));
+    if (!flstate) {
+      flstate.reset(CoolProp::AbstractState::factory("BICUBIC&HEOS", circuit->flname));
+    }
     flstate->update(CoolProp::HmassP_INPUTS, upstream->tenth_gues, upstream->tpres_gues);
     const auto cr = GcrHEM(*flstate);
     Gcr = cr.Gcr;
