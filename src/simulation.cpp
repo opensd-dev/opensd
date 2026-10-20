@@ -620,10 +620,14 @@ std::cout << "Global rank " << mpi::rank
     
     idx_t objval;
     if (nparts > 1) {
+        idx_t options[METIS_NOPTIONS];
+        METIS_SetDefaultOptions(options);
+        options[METIS_OPTION_CONTIG] = 1;
+
         int status = METIS_PartGraphKway(&nvtxs, &ncon,
                                          xadj.data(), adjncy.data(),
                                          NULL, NULL, NULL,
-                                         &nparts, NULL, NULL, NULL,
+                                         &nparts, NULL, NULL, options,
                                          &objval, part.data());
     
         if (status != METIS_OK) {
