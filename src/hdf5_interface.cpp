@@ -41,7 +41,6 @@ double read_scalar(hid_t loc_id, const std::string& name) {
 
 void write_vector(hid_t loc_id, const std::string& name, const std::vector<int>& vec) {
   if (vec.empty()) {
-    std::cerr << "Warning: vector '" << name << "' is empty; skipping write.\n";
     return;
   }
   hsize_t dim = vec.size();
@@ -63,7 +62,6 @@ std::vector<int> read_vector_int(hid_t loc_id, const std::string& name) {
 
 void write_vector(hid_t loc_id, const std::string& name, const std::vector<double>& vec) {
   if (vec.empty()) {
-    std::cerr << "Warning: vector '" << name << "' is empty; skipping write.\n";
     return;
   }
   hsize_t dim = vec.size();

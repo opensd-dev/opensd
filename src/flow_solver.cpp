@@ -530,6 +530,20 @@ void exec_massmom(double time, double delt, bool trans_sim, double alpha_mom, in
     
     VecAssemblyBegin(b);
     VecAssemblyEnd(b);
+
+    if (!circuit->Pbound_ind.empty()) {
+      std::vector<PetscInt> pbound_rows;
+      pbound_rows.reserve(circuit->Pbound_ind.size());
+      for (int node_ind : circuit->Pbound_ind) {
+        pbound_rows.push_back(static_cast<PetscInt>(circuit->old2new[node_ind]));
+      }
+      MatZeroRowsColumns(A, static_cast<PetscInt>(pbound_rows.size()),
+                         pbound_rows.data(), 1.0, nullptr, b);
+      MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
+      MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
+      VecAssemblyBegin(b);
+      VecAssemblyEnd(b);
+    }
     simulation::time_pc_assembly.stop();
 
 

@@ -185,6 +185,7 @@ int opensd_run()
     std::cout << "Execution time = " << (std::clock() - start_time) / (double)CLOCKS_PER_SEC << std::endl;
   }
 
+  if (mpi::rank == 0) {
   try {
     std::string fname = "circuits.h5";
     hid_t file_id = opensd::create_or_open_file(fname.c_str());
@@ -223,10 +224,12 @@ int opensd_run()
     }
    
     opensd::close_file(file_id);
-    std::cout << "Circuits and HSlabs saved to HDF5 successfully.\n";
+    if (settings::verbosity >= 1)
+      std::cout << "Circuits and HSlabs saved to HDF5 successfully.\n";
   
   } catch (const std::exception& e) {
     std::cerr << "HDF5 error during save: " << e.what() << std::endl;
+  }
   }
 
   opensd_simulation_finalize();
@@ -499,11 +502,13 @@ int key   = 0;
 MPI_Comm circuit_comm = MPI_COMM_NULL;
 MPI_Comm_split(mpi::intracomm, color, key, &circuit_comm);
 
+if (settings::verbosity >= 6) {
 std::cout << "Rank " << world_rank
           << " checking circuit " << circuit->identifier
           << " lo=" << lo << " hi=" << hi
           << " color=" << color << " key=" << key
           << std::endl;
+}
 
 // if this process is NOT part of this circuit, skip it entirely
     if (circuit_comm == MPI_COMM_NULL) {
@@ -520,12 +525,14 @@ std::cout << "Rank " << world_rank
   circuit->rank_in_comm = cir_rank;
   circuit->comm_size    = cir_size;
 
+if (settings::verbosity >= 6) {
 std::cout << "Global rank " << mpi::rank
           << " -> Circuit " << circuit->identifier
           << " | circuit rank: " << circuit->rank_in_comm
           << " / " << (circuit->comm_size - 1)
           << " (comm_size=" << circuit->comm_size << ")"
           << std::endl;
+}
  model::circuits_owned.push_back(circuit);
   }
 
@@ -609,10 +616,14 @@ std::cout << "Global rank " << mpi::rank
     
     idx_t objval;
     if (nparts > 1) {
+        idx_t options[METIS_NOPTIONS];
+        METIS_SetDefaultOptions(options);
+        options[METIS_OPTION_CONTIG] = 1;
+
         int status = METIS_PartGraphKway(&nvtxs, &ncon,
                                          xadj.data(), adjncy.data(),
                                          NULL, NULL, NULL,
-                                         &nparts, NULL, NULL, NULL,
+                                         &nparts, NULL, NULL, options,
                                          &objval, part.data());
     
         if (status != METIS_OK) {
@@ -655,7 +666,8 @@ for (PetscInt i = 0; i < nvtxs; ++i) {
     
     MPI_Barrier(circuit_comm);
     if (cir_rank == 0) {
-        std::cerr << "METIS partition debug print complete.\n";
+        if (settings::verbosity >= 6)
+          std::cerr << "METIS partition debug print complete.\n";
     }
     
     size_t i = 0;

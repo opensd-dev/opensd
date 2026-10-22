@@ -109,7 +109,8 @@ if (loaded_restart) {
   }
 }
 
-// Print to verify
+// Detailed model dump for diagnostics.
+if (settings::verbosity >= 6) {
 for (size_t i = 0; i < model::circuits.size(); ++i) {
   const auto& circuit = model::circuits[i];
   std::cout << "Circuit [" << i << "] ID: " << circuit->identifier << "\n";
@@ -194,6 +195,7 @@ for (size_t i = 0; i < model::circuits.size(); ++i) {
     std::cout << "  mean_ht: " << hslab->mean_ht << "\n";
     // std::cout << "  eps_h: " << circuit->eps_h << "\n";
   }
+}
 	
   return 0;
 }
