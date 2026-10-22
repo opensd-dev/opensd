@@ -43,7 +43,7 @@ times  = [0.0, 1.E-8, 50.0]
 values = [-12.37, 0.0, 0.0]
 tdist = opensd.Tabular(times, values)
 values2 = [-11.61, 0.0, 0.0]
-tdist2 = opensd.Tabular(times, values)
+tdist2 = opensd.Tabular(times, values2)
 
 a1 = opensd.Action("ramp_bc4", "bc4", "bval", tdist)
 a2 = opensd.Action("ramp_bc5", "bc5", "bval", tdist2)
