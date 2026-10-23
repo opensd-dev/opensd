@@ -41,7 +41,7 @@ extern Timer time_solid_energy;
 
 class Timer {
 public:
-  using clock = std::chrono::high_resolution_clock;
+  using clock = std::chrono::steady_clock;
 
   Timer() {};
 
