@@ -210,6 +210,20 @@ void print_runtime()
 {
   using namespace simulation;
 
+  double local[] = {
+    time_finalize.elapsed(), time_total.elapsed(), time_massmom.elapsed(),
+    time_pressure_correction.elapsed(), time_pc_assembly.elapsed(),
+    time_pc_solve.elapsed(), time_pc_update.elapsed(), time_pc_update_a.elapsed(),
+    time_pc_update_b.elapsed(), time_pc_update_cd.elapsed(),
+    time_pc_update_ef.elapsed(), time_pc_update_g.elapsed(),
+    time_pc_update_h.elapsed(), time_guess_flow.elapsed(),
+    time_convergence.elapsed(), time_conv_mass.elapsed(),
+    time_conv_mom.elapsed(), time_update_old.elapsed()
+  };
+  double global[18];
+  MPI_Reduce(local, global, 18, MPI_DOUBLE, MPI_MAX, 0, mpi::intracomm);
+  if (!mpi::master) return;
+
   // display header block
   header("Timing Statistics", 6);
   // if (settings::verbosity < 6)
@@ -219,24 +233,24 @@ void print_runtime()
   // show_time("Total time for initialization", time_initialize.elapsed());
   // show_time("Total time in simulation", time_inactive.elapsed() + time_active.elapsed());
   // show_time("Time writing statepoints", time_statepoint.elapsed(), 1);
-  show_time("Total time for finalization", time_finalize.elapsed());
-  show_time("Total time elapsed", time_total.elapsed());
-  show_time("Total time for mass momentum", time_massmom.elapsed());
-  show_time("Total time for pressure correction", time_pressure_correction.elapsed());
-  show_time("Total time for pc assembly", time_pc_assembly.elapsed());
-  show_time("Total time for pc solve", time_pc_solve.elapsed());
-  show_time("Total time for pc update", time_pc_update.elapsed());
-  show_time("Total time for pc update a", time_pc_update_a.elapsed());
-  show_time("Total time for pc update b", time_pc_update_b.elapsed());
-  show_time("Total time for pc update cd", time_pc_update_cd.elapsed());
-  show_time("Total time for pc update ef", time_pc_update_ef.elapsed());
-  show_time("Total time for pc update g", time_pc_update_g.elapsed());
-  show_time("Total time for pc update h", time_pc_update_h.elapsed());
-  show_time("Total time for guess flow", time_guess_flow.elapsed());
-  show_time("Total time for convergence", time_convergence.elapsed());
-  show_time("Total time for convergence mass", time_conv_mass.elapsed());
-  show_time("Total time for convergence momentum", time_conv_mom.elapsed());
-  show_time("Total time for update old", time_update_old.elapsed());
+  show_time("Total time for finalization", global[0]);
+  show_time("Total time elapsed", global[1]);
+  show_time("Total time for mass momentum", global[2]);
+  show_time("Total time for pressure correction", global[3]);
+  show_time("Total time for pc assembly", global[4]);
+  show_time("Total time for pc solve", global[5]);
+  show_time("Total time for pc update", global[6]);
+  show_time("Total time for pc update a", global[7]);
+  show_time("Total time for pc update b", global[8]);
+  show_time("Total time for pc update cd", global[9]);
+  show_time("Total time for pc update ef", global[10]);
+  show_time("Total time for pc update g", global[11]);
+  show_time("Total time for pc update h", global[12]);
+  show_time("Total time for guess flow", global[13]);
+  show_time("Total time for convergence", global[14]);
+  show_time("Total time for convergence mass", global[15]);
+  show_time("Total time for convergence momentum", global[16]);
+  show_time("Total time for update old", global[17]);
 
 }
 

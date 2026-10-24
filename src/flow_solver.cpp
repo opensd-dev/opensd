@@ -836,6 +836,9 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
     MatZeroEntries(Ah);
     VecZeroEntries(bh);
     VecZeroEntries(enth);
+    std::vector<PetscInt> fixed_energy_rows;
+    std::vector<PetscScalar> fixed_energy_values;
+
     for (auto& node : circuit->nodes_owned) {
       int i = circuit->old2new[node->node_ind];  // global row index
 	  // bool pbound = node->fixed_var.count("P");
@@ -984,15 +987,8 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
           node->brow = bi;
         }
     
-        // Apply Dirichlet BC
-        PetscInt row = i;
-        PetscScalar diag = 1.0;
-        MatZeroRows(Ah, 1, &row, diag, bh, nullptr);
-        VecSetValue(bh, row, node->tenth_gues, INSERT_VALUES);
-        MatAssemblyBegin(Ah, MAT_FINAL_ASSEMBLY);
-        MatAssemblyEnd(Ah, MAT_FINAL_ASSEMBLY);
-        VecAssemblyBegin(bh);
-        VecAssemblyEnd(bh);
+        fixed_energy_rows.push_back(i);
+        fixed_energy_values.push_back(node->tenth_gues);
       }
     
       // --- Case 2: Enthalpy fixed ---
@@ -1037,15 +1033,8 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
           node->brow = bi;
         }
     
-        // Apply Dirichlet BC
-        PetscInt row = i;
-        PetscScalar diag = 1.0;
-        MatZeroRows(Ah, 1, &row, diag, bh, nullptr);
-        VecSetValue(bh, row, node->tenth_gues, INSERT_VALUES);
-        MatAssemblyBegin(Ah, MAT_FINAL_ASSEMBLY);
-        MatAssemblyEnd(Ah, MAT_FINAL_ASSEMBLY);
-        VecAssemblyBegin(bh);
-        VecAssemblyEnd(bh);
+        fixed_energy_rows.push_back(i);
+        fixed_energy_values.push_back(node->tenth_gues);
       }
 	  else if (node->fixed_var.count("msource") || node->fixed_var.count("P")) {
 		if (node->msource > 0.0) {
@@ -1077,8 +1066,16 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
     MatAssemblyBegin(Ah, MAT_FINAL_ASSEMBLY);
     MatAssemblyEnd(Ah, MAT_FINAL_ASSEMBLY);
 
-    // VecAssemblyBegin(bh);
-    // VecAssemblyEnd(bh);
+    MatZeroRows(Ah, static_cast<PetscInt>(fixed_energy_rows.size()),
+                fixed_energy_rows.empty() ? nullptr : fixed_energy_rows.data(),
+                1.0, nullptr, nullptr);
+    if (!fixed_energy_rows.empty()) {
+      VecSetValues(bh, static_cast<PetscInt>(fixed_energy_rows.size()),
+                   fixed_energy_rows.data(), fixed_energy_values.data(),
+                   INSERT_VALUES);
+    }
+    VecAssemblyBegin(bh);
+    VecAssemblyEnd(bh);
 
 
     

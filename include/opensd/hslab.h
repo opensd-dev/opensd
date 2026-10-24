@@ -66,6 +66,10 @@ public:
   vector<std::shared_ptr<Layer>> layers;
   vector<std::shared_ptr<SNode>> uwnodes;
   vector<std::shared_ptr<SNode>> dwnodes;
+  MPI_Comm comm = MPI_COMM_NULL;
+  int rank_in_comm = -1;
+  int comm_size = 0;
+  int root_world_rank = -1;
   // vector<std::shared_ptr<Node>> nodes_owned;
   // vector<std::shared_ptr<Node>> ghost_nodes_owned1;
   // std::map<int, std::vector<std::shared_ptr<Node>>> ghost_nodes_owned;

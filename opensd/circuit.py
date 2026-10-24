@@ -366,7 +366,7 @@ class Circuit:
         return element
 
     def calc_enth(self,input_pair,val1,val2):
-        if input_pair == 9:
+        if input_pair == 17:
             self.flstate.update(input_pair,val1,val2)
             return self.flstate.hmass()
         else:

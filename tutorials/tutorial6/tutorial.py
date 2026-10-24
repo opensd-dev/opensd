@@ -98,7 +98,8 @@ initial_guess.export_to_xml('initial_guess.xml')
 settings = opensd.Settings()
 settings.verbosity = 6
 settings.temp_solve = True
-settings.run_mode = "transient"
+settings.flag_write = True
+settings.run_mode = "steady"
 settings.no_main_iter = 200
 settings.alpha_ener = 0.6
 settings.alpha_heat = 0.6
@@ -113,6 +114,14 @@ a1 = opensd.Action("ramp_bc2", "bc2", "bval", tdist)
 actions = opensd.Actions([a1])
 actions.export_to_xml()
 
+
+opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/c/codes/opensd/build/opensd',threads=1)
+
+settings.run_mode = "transient"
+settings.no_main_iter = 500
+settings.tim_slot = [[1.0, 50.0]]
+settings.flag_write = False
+settings.export_to_xml()
 
 opensd.run(mpi_args=['mpiexec', '-n', '1'],opensd_exec='/mnt/c/codes/opensd/build/opensd',threads=1)
 

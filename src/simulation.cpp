@@ -138,6 +138,21 @@ int opensd_run()
         // std::exit(1);
 
         std::tie(converged, eps_m, eps_p, eps_h, eps_t) = check_conv(simulation::current_time, simulation::delt, trans_sim, alpha_mom, alpha_ener, "all", alpha_heat);
+
+        double eps_local[] = {eps_m, eps_p, eps_h, eps_t};
+        double eps_global[4];
+        MPI_Allreduce(eps_local, eps_global, 4, MPI_DOUBLE, MPI_MAX,
+                      mpi::intracomm);
+        eps_m = eps_global[0];
+        eps_p = eps_global[1];
+        eps_h = eps_global[2];
+        eps_t = eps_global[3];
+
+        int converged_local = converged ? 1 : 0;
+        int converged_global = 0;
+        MPI_Allreduce(&converged_local, &converged_global, 1, MPI_INT,
+                      MPI_LAND, mpi::intracomm);
+        converged = converged_global != 0;
       }
 
       if (converged) {
@@ -416,10 +431,20 @@ Allocation allocate_circuits(int P, const std::vector<long long>& work) {
 
     if (sum < P) {
       std::sort(rem.begin(), rem.end(), [](auto& a, auto& b){ return a.frac > b.frac; });
-      for (int t = 0; t < P - sum; ++t) alloc.ranks_for_c[rem[t].i] += 1;
+      for (int t = 0; t < P - sum; ++t)
+        alloc.ranks_for_c[rem[t % C].i] += 1;
     } else if (sum > P) {
       std::sort(rem.begin(), rem.end(), [](auto& a, auto& b){ return a.frac < b.frac; });
-      for (int t = 0; t < sum - P; ++t) alloc.ranks_for_c[rem[t].i] -= 1;
+      int excess = sum - P;
+      while (excess > 0) {
+        for (const auto& r : rem) {
+          if (alloc.ranks_for_c[r.i] > 1) {
+            --alloc.ranks_for_c[r.i];
+            --excess;
+            if (excess == 0) break;
+          }
+        }
+      }
     }
 
     // prefix sums -> [lo,hi) ranges
@@ -466,11 +491,22 @@ void calculate_work()
 
   // build work metric
 std::vector<long long> work;
-work.reserve(model::circuits.size());
+work.reserve(model::circuits.size() + model::hslabs.size());
 for (auto& c : model::circuits) {
-  long long nodes = (long long)c->nodes.size();
-  long long faces = (long long)c->faces.size();
-  work.push_back(10LL*faces + 2LL*nodes); //arbitrary
+  work.push_back(static_cast<long long>(c->nodes.size()));
+}
+
+double solid_node_weight = 1.0;
+if (const char* value = std::getenv("OPENSD_SOLID_NODE_WEIGHT")) {
+  solid_node_weight = std::max(0.01, std::atof(value));
+}
+for (auto& hslab : model::hslabs) {
+  long long solid_nodes = 0;
+  for (auto& layer : hslab->layers) {
+    solid_nodes += static_cast<long long>(layer->snodes.size());
+  }
+  work.push_back(std::max(1LL, static_cast<long long>(
+      std::llround(solid_node_weight * solid_nodes))));
 }
 
 // allocate
@@ -480,6 +516,7 @@ auto& start       = alloc.start;
 
 
 model::circuits_owned.clear();
+model::hslabs_owned.clear();
 
   for (size_t cidx = 0; cidx < model::circuits.size(); ++cidx) {
     auto& circuit = model::circuits[cidx];
@@ -534,6 +571,25 @@ std::cout << "Global rank " << mpi::rank
           << std::endl;
 }
  model::circuits_owned.push_back(circuit);
+  }
+
+  for (size_t hidx = 0; hidx < model::hslabs.size(); ++hidx) {
+    auto& hslab = model::hslabs[hidx];
+    const size_t aidx = model::circuits.size() + hidx;
+    const int lo = start[aidx];
+    const int hi = lo + ranks_for_c[aidx];
+    const int color = mpi::rank >= lo && mpi::rank < hi
+                        ? static_cast<int>(aidx) : MPI_UNDEFINED;
+    MPI_Comm_split(mpi::intracomm, color, mpi::rank - lo, &hslab->comm);
+    hslab->root_world_rank = lo;
+    if (hslab->comm != MPI_COMM_NULL) {
+      MPI_Comm_rank(hslab->comm, &hslab->rank_in_comm);
+      MPI_Comm_size(hslab->comm, &hslab->comm_size);
+      model::hslabs_owned.push_back(hslab);
+    } else {
+      hslab->rank_in_comm = -1;
+      hslab->comm_size = 0;
+    }
   }
 
 

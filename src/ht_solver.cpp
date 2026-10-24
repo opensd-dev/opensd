@@ -8,7 +8,7 @@
 #include <Eigen/Dense>   // For matrix manipulations
 #include <cstdlib>
 // #include "opensd/vector.h"
-// #include "opensd/message_passing.h"
+#include "opensd/message_passing.h"
 #include "opensd/simulation.h"
 // #include "opensd/settings.h"
 #include "opensd/timer.h"
@@ -41,6 +41,31 @@ namespace opensd {
 void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, int main_iter) {
   
   simulation::time_solid_energy.start();
+
+  if (mpi::n_procs > 1 && !model::hslabs.empty()) {
+    std::vector<double> local_state;
+    for (auto& circuit : model::circuits) {
+      for (auto& face : circuit->faces) {
+        const bool owned = circuit->comm != MPI_COMM_NULL &&
+                           face->owner == circuit->rank_in_comm;
+        local_state.push_back(owned ? face->stemp_gues : 0.0);
+        local_state.push_back(owned ? face->velocity : 0.0);
+      }
+    }
+
+    std::vector<double> global_state(local_state.size());
+    MPI_Allreduce(local_state.data(), global_state.data(),
+                  static_cast<int>(local_state.size()), MPI_DOUBLE, MPI_SUM,
+                  mpi::intracomm);
+
+    size_t i = 0;
+    for (auto& circuit : model::circuits) {
+      for (auto& face : circuit->faces) {
+        face->stemp_gues = global_state[i++];
+        face->velocity = global_state[i++];
+      }
+    }
+  }
 
   for (auto& circuit : model::circuits) {
     for (auto& pipe : circuit->pipes) {
@@ -185,19 +210,44 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
     } // end building A, b
 
     // Solve linear system A * temp = b
-    Eigen::VectorXd tempVec(n);
-    bool solved = true;
-    if (A.cols() == 0 || A.rows() == 0) {
-      solved = false;
-    } else {
-      // Try LDLT (symmetric PD) first, fallback to full-pivot QR if it fails.
-      Eigen::LDLT<Eigen::MatrixXd> ldlt(A);
-      if (ldlt.info() == Eigen::Success) {
-        tempVec = ldlt.solve(b);
-      } else {
-        tempVec = A.colPivHouseholderQr().solve(b);
+    Eigen::VectorXd tempVec = Eigen::VectorXd::Zero(n);
+    if (hslab->comm != MPI_COMM_NULL) {
+      const int ninc = hslab->ninc;
+      const int radial_nodes = n / ninc;
+      const int first_inc = hslab->rank_in_comm * ninc / hslab->comm_size;
+      const int last_inc = (hslab->rank_in_comm + 1) * ninc /
+                           hslab->comm_size;
+      Eigen::VectorXd local_temp = Eigen::VectorXd::Zero(n);
+
+      for (int inc = first_inc; inc < last_inc; ++inc) {
+        Eigen::MatrixXd block(radial_nodes, radial_nodes);
+        Eigen::VectorXd rhs(radial_nodes);
+        for (int row = 0; row < radial_nodes; ++row) {
+          const int global_row = row * ninc + inc;
+          rhs(row) = b(global_row);
+          for (int col = 0; col < radial_nodes; ++col) {
+            block(row, col) = A(global_row, col * ninc + inc);
+          }
+        }
+
+        Eigen::LDLT<Eigen::MatrixXd> ldlt(block);
+        Eigen::VectorXd solution(radial_nodes);
+        if (ldlt.info() == Eigen::Success) {
+          solution = ldlt.solve(rhs);
+        } else {
+          solution = block.colPivHouseholderQr().solve(rhs);
+        }
+        for (int row = 0; row < radial_nodes; ++row) {
+          local_temp(row * ninc + inc) = solution(row);
+        }
       }
+
+      MPI_Allreduce(local_temp.data(), tempVec.data(), n, MPI_DOUBLE, MPI_SUM,
+                    hslab->comm);
     }
+
+    MPI_Bcast(tempVec.data(), n, MPI_DOUBLE, hslab->root_world_rank,
+              mpi::intracomm);
     // std::cout<<A<<std::endl<<std::endl;
     // std::cout<<b<<std::endl<<std::endl;
     // std::cout<<tempVec<<std::endl;
