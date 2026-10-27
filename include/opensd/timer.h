@@ -33,6 +33,10 @@ extern Timer time_pc_update_g;
 extern Timer time_pc_update_h;
 extern Timer time_fluid_energy;
 extern Timer time_solid_energy;
+extern Timer time_hslab_sync;
+extern Timer time_hslab_assembly;
+extern Timer time_hslab_solve;
+extern Timer time_hslab_update;
 } // namespace simulation
 
 //==============================================================================

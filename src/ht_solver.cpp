@@ -43,12 +43,21 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
   simulation::time_solid_energy.start();
 
   if (mpi::n_procs > 1 && !model::hslabs.empty()) {
+    simulation::time_hslab_sync.start();
     std::vector<double> local_state;
     for (auto& circuit : model::circuits) {
+      std::vector<bool> node_owned(circuit->nodes.size(), false);
+      if (circuit->comm != MPI_COMM_NULL) {
+        for (auto& node : circuit->nodes_owned) node_owned[node->node_ind] = true;
+      }
+      for (auto& node : circuit->nodes) {
+        const bool owned = node_owned[node->node_ind];
+        local_state.push_back(owned ? node->senth_gues : 0.0);
+        local_state.push_back(owned ? node->spres_gues : 0.0);
+      }
       for (auto& face : circuit->faces) {
         const bool owned = circuit->comm != MPI_COMM_NULL &&
                            face->owner == circuit->rank_in_comm;
-        local_state.push_back(owned ? face->stemp_gues : 0.0);
         local_state.push_back(owned ? face->velocity : 0.0);
       }
     }
@@ -60,11 +69,20 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
 
     size_t i = 0;
     for (auto& circuit : model::circuits) {
+      for (auto& node : circuit->nodes) {
+        node->senth_gues = global_state[i++];
+        node->spres_gues = global_state[i++];
+        node->ther_gues->update(CoolProp::HmassP_INPUTS,
+                                node->senth_gues, node->spres_gues);
+        node->stemp_gues = node->ther_gues->T();
+      }
       for (auto& face : circuit->faces) {
-        face->stemp_gues = global_state[i++];
         face->velocity = global_state[i++];
+        face->update_statevar();
+        face->ther_gues->update();
       }
     }
+    simulation::time_hslab_sync.stop();
   }
 
   for (auto& circuit : model::circuits) {
@@ -137,13 +155,16 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
     n *= hslab->ninc;
     if (n <= 0) continue;
 
-    Eigen::MatrixXd A = Eigen::MatrixXd::Zero(n, n);
-    Eigen::VectorXd b = Eigen::VectorXd::Zero(n);
-
+    Eigen::VectorXd tempVec = Eigen::VectorXd::Zero(n);
     int i = -1;
-    for (auto &layer : hslab->layers) {
-      for (auto &node : layer->snodes) {
-        ++i;
+    if (mpi::rank == hslab->root_world_rank) {
+      simulation::time_hslab_assembly.start();
+      Eigen::MatrixXd A = Eigen::MatrixXd::Zero(n, n);
+      Eigen::VectorXd b = Eigen::VectorXd::Zero(n);
+
+      for (auto &layer : hslab->layers) {
+        for (auto &node : layer->snodes) {
+          ++i;
         // East face
         if (node->eface != nullptr) {
           double aE  = alpha_heat * node->eface->A * node->eface->ther_gues->conductivity() / node->eface->delx;
@@ -206,53 +227,29 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
           b(i) = b(i) + alpha_heat * binc - (1.0 - alpha_heat) * node->heat_transfer_old;
           A(i, i) = A(i, i) + alpha_heat * Ainc;
         }
+        }
+      } // end building A, b
+      simulation::time_hslab_assembly.stop();
+
+      // Solve the complete HSLAB system on its owner rank. Keeping the full
+      // matrix here preserves axial couplings when they are enabled.
+      simulation::time_hslab_solve.start();
+      Eigen::LDLT<Eigen::MatrixXd> ldlt(A);
+      if (ldlt.info() == Eigen::Success) {
+        tempVec = ldlt.solve(b);
+      } else {
+        tempVec = A.colPivHouseholderQr().solve(b);
       }
-    } // end building A, b
-
-    // Solve linear system A * temp = b
-    Eigen::VectorXd tempVec = Eigen::VectorXd::Zero(n);
-    if (hslab->comm != MPI_COMM_NULL) {
-      const int ninc = hslab->ninc;
-      const int radial_nodes = n / ninc;
-      const int first_inc = hslab->rank_in_comm * ninc / hslab->comm_size;
-      const int last_inc = (hslab->rank_in_comm + 1) * ninc /
-                           hslab->comm_size;
-      Eigen::VectorXd local_temp = Eigen::VectorXd::Zero(n);
-
-      for (int inc = first_inc; inc < last_inc; ++inc) {
-        Eigen::MatrixXd block(radial_nodes, radial_nodes);
-        Eigen::VectorXd rhs(radial_nodes);
-        for (int row = 0; row < radial_nodes; ++row) {
-          const int global_row = row * ninc + inc;
-          rhs(row) = b(global_row);
-          for (int col = 0; col < radial_nodes; ++col) {
-            block(row, col) = A(global_row, col * ninc + inc);
-          }
-        }
-
-        Eigen::LDLT<Eigen::MatrixXd> ldlt(block);
-        Eigen::VectorXd solution(radial_nodes);
-        if (ldlt.info() == Eigen::Success) {
-          solution = ldlt.solve(rhs);
-        } else {
-          solution = block.colPivHouseholderQr().solve(rhs);
-        }
-        for (int row = 0; row < radial_nodes; ++row) {
-          local_temp(row * ninc + inc) = solution(row);
-        }
-      }
-
-      MPI_Allreduce(local_temp.data(), tempVec.data(), n, MPI_DOUBLE, MPI_SUM,
-                    hslab->comm);
+      simulation::time_hslab_solve.stop();
     }
 
+    simulation::time_hslab_sync.start();
     MPI_Bcast(tempVec.data(), n, MPI_DOUBLE, hslab->root_world_rank,
               mpi::intracomm);
-    // std::cout<<A<<std::endl<<std::endl;
-    // std::cout<<b<<std::endl<<std::endl;
-    // std::cout<<tempVec<<std::endl;
+    simulation::time_hslab_sync.stop();
 
     // Assign temp_gues back to nodes (with relaxation where applied)
+    simulation::time_hslab_update.start();
     i = -1;
     for (auto& layer : hslab->layers) {
       double relax = 1.0;
@@ -269,9 +266,11 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
         // std::cout<<snode->identifier<< " " << snode->temp_gues<<std::endl;
       }
     }
+    simulation::time_hslab_update.stop();
   } // end first pass over HSlabs
 
   // Second pass: compute heat transfers and update thermo states
+  simulation::time_hslab_update.start();
   for (auto& hslab : model::hslabs) {
     int n = 0;
     for (auto& layer : hslab->layers) n += layer->nnodes;
@@ -319,6 +318,7 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
       }
     }
   } // end second pass over HSlabs
+  simulation::time_hslab_update.stop();
 
   simulation::time_solid_energy.stop();
   

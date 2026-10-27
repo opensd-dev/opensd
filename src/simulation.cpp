@@ -357,14 +357,7 @@ VecDestroy(&circuit->rhomass_local);
   // Stop timers and show timing statistics
   simulation::time_finalize.stop();
   simulation::time_total.stop();
-  if (mpi::master) {
-    // if (settings::solver_type != SolverType::RANDOM_RAY) {
-      // if (settings::verbosity >= 6)
-        print_runtime();
-      // if (settings::verbosity >= 4)
-        // print_results();
-    // }
-  }
+  print_runtime();
 
   // Reset flags
   simulation::initialized = false;
@@ -513,6 +506,29 @@ for (auto& hslab : model::hslabs) {
 Allocation alloc = allocate_circuits(mpi::n_procs, work);
 auto& ranks_for_c = alloc.ranks_for_c;
 auto& start       = alloc.start;
+
+// Treat each HSLAB as an atomic model component. This keeps its complete
+// matrix on one rank, including any present or future axial-conduction terms.
+int excess_ranks = 0;
+for (size_t hidx = 0; hidx < model::hslabs.size(); ++hidx) {
+  const size_t aidx = model::circuits.size() + hidx;
+  if (ranks_for_c[aidx] > 1) {
+    excess_ranks += ranks_for_c[aidx] - 1;
+    ranks_for_c[aidx] = 1;
+  }
+}
+if (excess_ranks > 0 && !model::circuits.empty()) {
+  while (excess_ranks-- > 0) {
+    size_t best = 0;
+    for (size_t i = 1; i < model::circuits.size(); ++i) {
+      if (work[i] * ranks_for_c[best] > work[best] * ranks_for_c[i]) best = i;
+    }
+    ++ranks_for_c[best];
+  }
+  start[0] = 0;
+  for (size_t i = 1; i < start.size(); ++i)
+    start[i] = start[i - 1] + ranks_for_c[i - 1];
+}
 
 
 model::circuits_owned.clear();

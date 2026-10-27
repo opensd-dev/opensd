@@ -218,10 +218,13 @@ void print_runtime()
     time_pc_update_ef.elapsed(), time_pc_update_g.elapsed(),
     time_pc_update_h.elapsed(), time_guess_flow.elapsed(),
     time_convergence.elapsed(), time_conv_mass.elapsed(),
-    time_conv_mom.elapsed(), time_update_old.elapsed()
+    time_conv_mom.elapsed(), time_update_old.elapsed(),
+    time_fluid_energy.elapsed(), time_solid_energy.elapsed(),
+    time_hslab_sync.elapsed(), time_hslab_assembly.elapsed(),
+    time_hslab_solve.elapsed(), time_hslab_update.elapsed()
   };
-  double global[18];
-  MPI_Reduce(local, global, 18, MPI_DOUBLE, MPI_MAX, 0, mpi::intracomm);
+  double global[24];
+  MPI_Reduce(local, global, 24, MPI_DOUBLE, MPI_MAX, 0, mpi::intracomm);
   if (!mpi::master) return;
 
   // display header block
@@ -251,6 +254,12 @@ void print_runtime()
   show_time("Total time for convergence mass", global[15]);
   show_time("Total time for convergence momentum", global[16]);
   show_time("Total time for update old", global[17]);
+  show_time("Total time for fluid energy", global[18]);
+  show_time("Total time for solid energy", global[19]);
+  show_time("Total time for HSLAB sync", global[20]);
+  show_time("Total time for HSLAB assembly", global[21]);
+  show_time("Total time for HSLAB solve", global[22]);
+  show_time("Total time for HSLAB update", global[23]);
 
 }
 

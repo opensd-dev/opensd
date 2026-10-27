@@ -1191,16 +1191,16 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
   // }
   
 
-    PetscViewer viewer;
-    PetscViewerASCIIOpen(PETSC_COMM_WORLD, "enth_output.txt", &viewer);
-    VecView(enth, viewer);
-    PetscViewerDestroy(&viewer);
+    //PetscViewer viewer;
+    //PetscViewerASCIIOpen(PETSC_COMM_WORLD, "enth_output.txt", &viewer);
+    //VecView(enth, viewer);
+    //PetscViewerDestroy(&viewer);
 	
 
 
-    std::ofstream fout;
-    if (settings::verbosity >= 6)
-      std::ofstream fout2("tenth_rank_" + std::to_string(mpi::rank) + ".txt");
+    //std::ofstream fout;
+    //if (settings::verbosity >= 6)
+      //std::ofstream fout2("tenth_rank_" + std::to_string(mpi::rank) + ".txt");
     
     // Create ghost vector
     // PetscInt n_local = circuit->indices_owned.size();

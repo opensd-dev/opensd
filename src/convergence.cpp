@@ -115,7 +115,7 @@ std::tuple<bool, double, double, double, double> check_conv(double time, double 
 
   if (opt == "all") {
 
-    for (auto& hslab : model::hslabs) {
+    for (auto& hslab : model::hslabs_owned) {
 
       // if (!trans_sim && HSlab->solveSS == false)
       //   continue;
