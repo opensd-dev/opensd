@@ -75,8 +75,7 @@ int opensd_run()
         exec_massmom(simulation::current_time, simulation::delt, trans_sim, alpha_mom, main_iter, flow_iter);
 		simulation::time_convergence.start();
         // if (mpi::rank == 0) {
-		  bool converged_local;
-          std::tie(converged_local, eps_m, eps_p, std::ignore, std::ignore) = check_conv(simulation::current_time, simulation::delt, trans_sim, alpha_mom, 0.0, "massmom");
+          std::tie(std::ignore, eps_m, eps_p, std::ignore, std::ignore) = check_conv(simulation::current_time, simulation::delt, trans_sim, alpha_mom, 0.0, "massmom");
 		// }
 
 		if (settings::verbosity >= 6) {
@@ -85,21 +84,14 @@ int opensd_run()
           fout.close();
 		}
 
-        PetscReal eps_m_local = eps_m;
-        PetscReal eps_p_local = eps_p;
-        PetscReal eps_m_global, eps_p_global;
-
-        MPI_Allreduce(&eps_m_local, &eps_m_global, 1, MPIU_REAL, MPIU_MAX, mpi::intracomm);
-        MPI_Allreduce(&eps_p_local, &eps_p_global, 1, MPIU_REAL, MPIU_MAX, mpi::intracomm);
-
-        eps_m = eps_m_global;
-        eps_p = eps_p_global;
-
-        int conv_local  = converged_local ? 1 : 0;
-        int conv_global = 0;
-        MPI_Allreduce(&conv_local, &conv_global, 1, MPI_INT, MPI_LAND, mpi::intracomm);
-
-        converged = (conv_global != 0);
+        PetscReal eps_local[] = {eps_m, eps_p};
+        PetscReal eps_global[2];
+        MPI_Allreduce(eps_local, eps_global, 2, MPIU_REAL, MPIU_MAX,
+                      mpi::intracomm);
+        eps_m = eps_global[0];
+        eps_p = eps_global[1];
+        converged = eps_m < settings::conv_crit_flow &&
+                    eps_p < settings::conv_crit_flow;
 		simulation::time_convergence.stop();
 		
         // if (flow_iter == 0) {
@@ -148,11 +140,13 @@ int opensd_run()
         eps_h = eps_global[2];
         eps_t = eps_global[3];
 
-        int converged_local = converged ? 1 : 0;
-        int converged_global = 0;
-        MPI_Allreduce(&converged_local, &converged_global, 1, MPI_INT,
-                      MPI_LAND, mpi::intracomm);
-        converged = converged_global != 0;
+        const double conv_crit_temp = trans_sim
+          ? settings::conv_crit_temp_trans
+          : settings::conv_crit_temp_SS;
+        converged = eps_m < settings::conv_crit_flow &&
+                    eps_p < settings::conv_crit_flow &&
+                    eps_h < conv_crit_temp &&
+                    eps_t < settings::conv_crit_ht;
       }
 
       if (converged) {
