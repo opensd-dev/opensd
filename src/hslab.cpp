@@ -94,6 +94,11 @@ HSlab::HSlab(pugi::xml_node hslab_node)
     std::cout << "[HSlab] uval read successfully (function): "
               << fname << std::endl;
 
+    if (!py::hasattr(f, "batch")) {
+      py::object batch = py::module::import("opensd.vectorize").attr("make_batch")(f);
+      if (!batch.is_none()) f.attr("batch") = batch;
+    }
+
     uval.py_callable = f;
 
   } else {
@@ -128,6 +133,11 @@ HSlab::HSlab(pugi::xml_node hslab_node)
     }
     std::cout << "[HSlab] dval read successfully (function): "
               << fname << std::endl;
+
+    if (!py::hasattr(f, "batch")) {
+      py::object batch = py::module::import("opensd.vectorize").attr("make_batch")(f);
+      if (!batch.is_none()) f.attr("batch") = batch;
+    }
 
     dval.py_callable = f;
 

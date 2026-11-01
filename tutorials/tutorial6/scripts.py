@@ -1,35 +1,11 @@
-import numpy as np
-
 def script1(flow_elem,wall_node):
     Pe = flow_elem.ther_gues.rhomass()*flow_elem.velocity*flow_elem.diameter*flow_elem.ther_gues.cpmass()/flow_elem.ther_gues.conductivity()
     Nu = 6 + 0.006*Pe
     h = Nu * flow_elem.ther_gues.conductivity() / flow_elem.diameter
     return h
 
-def script1_batch(rhomass, velocity, diameter, cpmass, conductivity):
-    rhomass = np.asarray(rhomass)
-    velocity = np.asarray(velocity)
-    diameter = np.asarray(diameter)
-    cpmass = np.asarray(cpmass)
-    conductivity = np.asarray(conductivity)
-    Pe = rhomass*velocity*diameter*cpmass/conductivity
-    return (6 + 0.006*Pe)*conductivity/diameter
-
-script1.batch = script1_batch
-
 def script2(flow_elem,wall_node):
     Pe = flow_elem.ther_gues.rhomass()*flow_elem.velocity*flow_elem.diameter*flow_elem.ther_gues.cpmass()/flow_elem.ther_gues.conductivity()
     Nu = 4.82 + 0.0185*Pe**0.827
     h = Nu * flow_elem.ther_gues.conductivity() / flow_elem.diameter
     return h
-
-def script2_batch(rhomass, velocity, diameter, cpmass, conductivity):
-    rhomass = np.asarray(rhomass)
-    velocity = np.asarray(velocity)
-    diameter = np.asarray(diameter)
-    cpmass = np.asarray(cpmass)
-    conductivity = np.asarray(conductivity)
-    Pe = rhomass*velocity*diameter*cpmass/conductivity
-    return (4.82 + 0.0185*Pe**0.827)*conductivity/diameter
-
-script2.batch = script2_batch
