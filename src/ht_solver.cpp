@@ -6,7 +6,11 @@
 // #include <iostream>
 // #include <iomanip>
 #include <Eigen/Dense>   // For matrix manipulations
+#include <Eigen/Sparse>
+#include <Eigen/SparseCholesky>
+#include <Eigen/SparseLU>
 #include <cstdlib>
+#include <unordered_set>
 // #include "opensd/vector.h"
 #include "opensd/message_passing.h"
 #include "opensd/simulation.h"
@@ -104,6 +108,13 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
 
   for (auto& hslab : model::hslabs) {
 
+    std::unordered_set<const SNode*> uwnodes;
+    std::unordered_set<const SNode*> dwnodes;
+    uwnodes.reserve(hslab->uwnodes.size());
+    dwnodes.reserve(hslab->dwnodes.size());
+    for (const auto& node : hslab->uwnodes) uwnodes.insert(node.get());
+    for (const auto& node : hslab->dwnodes) dwnodes.insert(node.get());
+
   //   if (!trans_sim && HSlab->solveSS == false) continue;
 
   //   const double relax_spl_nb = 0.6;
@@ -159,7 +170,51 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
     int i = -1;
     if (mpi::rank == hslab->root_world_rank) {
       simulation::time_hslab_assembly.start();
-      Eigen::MatrixXd A = Eigen::MatrixXd::Zero(n, n);
+      auto pipe_htc = [](const std::string& bvar, const Input& bval,
+                         const vector<std::shared_ptr<Face>>& faces,
+                         const vector<std::shared_ptr<SNode>>& wall_nodes) {
+        std::vector<double> values;
+        if (bvar != "pipe") return values;
+        values.resize(wall_nodes.size());
+        if (bval.type == InputType::CONSTANT) {
+          std::fill(values.begin(), values.end(), bval.constant_value);
+        } else {
+          py::gil_scoped_acquire gil;
+          if (py::hasattr(bval.py_callable, "batch")) {
+            py::list density, velocity, diameter, cpmass, conductivity;
+            for (const auto& face : faces) {
+              density.append(face->ther_gues->rhomass());
+              velocity.append(face->velocity);
+              const auto* pface = dynamic_cast<const PFace*>(face.get());
+              if (!pface) {
+                throw std::runtime_error("Batch pipe heat-transfer function requires pipe faces.");
+              }
+              diameter.append(pface->diameter);
+              cpmass.append(face->ther_gues->cpmass());
+              conductivity.append(face->ther_gues->conductivity());
+            }
+            py::sequence result = bval.py_callable.attr("batch")(
+              density, velocity, diameter, cpmass, conductivity);
+            if (py::len(result) != static_cast<py::ssize_t>(values.size())) {
+              throw std::runtime_error("Batch heat-transfer function returned the wrong number of values.");
+            }
+            for (size_t j = 0; j < values.size(); ++j) {
+              values[j] = result[j].cast<double>();
+            }
+          } else {
+            for (size_t j = 0; j < wall_nodes.size(); ++j) {
+              values[j] = bval.py_callable(faces[j], wall_nodes[j].get()).cast<double>();
+            }
+          }
+        }
+        return values;
+      };
+      const auto uhtc = pipe_htc(hslab->uvar, hslab->uval,
+                                 hslab->uval1, hslab->uwnodes);
+      const auto dhtc = pipe_htc(hslab->dvar, hslab->dval,
+                                 hslab->dval1, hslab->dwnodes);
+      Eigen::SparseMatrix<double> A(n, n);
+      A.reserve(Eigen::VectorXi::Constant(n, 5));
       Eigen::VectorXd b = Eigen::VectorXd::Zero(n);
 
       for (auto &layer : hslab->layers) {
@@ -171,8 +226,8 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
           double aE0 = (1.0 - alpha_heat) * node->eface->A * node->eface->ther_old->conductivity() / node->eface->delx;
           b(i) -= (node->temp_old - node->eface->dnode->temp_old) * aE0;
           int col = i + hslab->ninc;
-          if (col >= 0 && col < n) A(i, col) = -aE;
-          A(i, i) = A(i, i) + aE;
+          if (col >= 0 && col < n) A.coeffRef(i, col) = -aE;
+          A.coeffRef(i, i) += aE;
         }
   
         // West face
@@ -181,8 +236,8 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
           double aW0 = (1.0 - alpha_heat) * node->wface->A * node->wface->ther_old->conductivity() / node->wface->delx;
           b(i) -= (node->temp_old - node->wface->unode->temp_old) * aW0;
           int col = i - hslab->ninc;
-          if (col >= 0 && col < n) A(i, col) = -aW;
-          A(i, i) = A(i, i) + aW;
+          if (col >= 0 && col < n) A.coeffRef(i, col) = -aW;
+          A.coeffRef(i, i) += aW;
         }
   
 /*         // North face (note: multiplied by 0. in Python — kept as in original)
@@ -210,35 +265,44 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
         b(i) = b(i) + alpha_heat * node->heat_input + (1.0 - alpha_heat) * node->heat_input_old;
         if (trans_sim) {
           b(i) = b(i) + node->ther_old->cpmass() * node->ther_old->rhomass() * node->vol / delt * node->temp_old;
-          A(i, i) = A(i, i) + node->ther_gues->cpmass() * node->ther_gues->rhomass() * node->vol / delt;
+          A.coeffRef(i, i) += node->ther_gues->cpmass() * node->ther_gues->rhomass() * node->vol / delt;
         }
   
         // Boundary conditions (uwnodes)
-        if (std::find(hslab->uwnodes.begin(), hslab->uwnodes.end(), node) != hslab->uwnodes.end()) {
-          auto [Ainc, binc] = exec_bc(hslab->uvar, hslab->uval, hslab->uval1, node->Ai, node, i); // exec_bc returns pair (Ainc,binc) - adapt to your implementation
+        if (uwnodes.count(node.get()) != 0) {
+          const double* htc = uhtc.empty() ? nullptr : &uhtc[i];
+          auto [Ainc, binc] = exec_bc(hslab->uvar, hslab->uval, hslab->uval1, node->Ai, node, i, htc);
           b(i) = b(i) + alpha_heat * binc - (1.0 - alpha_heat) * node->heat_transfer_old;
-          A(i, i) = A(i, i) + alpha_heat * Ainc;
+          A.coeffRef(i, i) += alpha_heat * Ainc;
         }
 
         // Boundary conditions (dwnodes) - note Python used i-n+HSlab.ninc index for bc call
-        if (std::find(hslab->dwnodes.begin(), hslab->dwnodes.end(), node) != hslab->dwnodes.end()) {
+        if (dwnodes.count(node.get()) != 0) {
           int bc_index = i - n + hslab->ninc; // as in Python
-          auto [Ainc, binc] = exec_bc(hslab->dvar, hslab->dval, hslab->dval1, node->Ai, node, bc_index);
+          const double* htc = dhtc.empty() ? nullptr : &dhtc[bc_index];
+          auto [Ainc, binc] = exec_bc(hslab->dvar, hslab->dval, hslab->dval1, node->Ai, node, bc_index, htc);
           b(i) = b(i) + alpha_heat * binc - (1.0 - alpha_heat) * node->heat_transfer_old;
-          A(i, i) = A(i, i) + alpha_heat * Ainc;
+          A.coeffRef(i, i) += alpha_heat * Ainc;
         }
         }
       } // end building A, b
+      A.makeCompressed();
       simulation::time_hslab_assembly.stop();
 
       // Solve the complete HSLAB system on its owner rank. Keeping the full
       // matrix here preserves axial couplings when they are enabled.
       simulation::time_hslab_solve.start();
-      Eigen::LDLT<Eigen::MatrixXd> ldlt(A);
+      Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> ldlt(A);
       if (ldlt.info() == Eigen::Success) {
         tempVec = ldlt.solve(b);
       } else {
-        tempVec = A.colPivHouseholderQr().solve(b);
+        Eigen::SparseLU<Eigen::SparseMatrix<double>> lu;
+        lu.compute(A);
+        if (lu.info() == Eigen::Success) {
+          tempVec = lu.solve(b);
+        } else {
+          tempVec = Eigen::MatrixXd(A).colPivHouseholderQr().solve(b);
+        }
       }
       simulation::time_hslab_solve.stop();
     }
@@ -257,8 +321,7 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
       if (!trans_sim) relax = 1.0;
       for (auto& snode : layer->snodes) {
         ++i;
-        if (std::find(hslab->dwnodes.begin(), hslab->dwnodes.end(), snode) != hslab->dwnodes.end() ||
-            std::find(hslab->uwnodes.begin(), hslab->uwnodes.end(), snode) != hslab->uwnodes.end()) {
+        if (dwnodes.count(snode.get()) != 0 || uwnodes.count(snode.get()) != 0) {
           snode->temp_gues = relax * tempVec(i) + (1.0 - relax) * snode->temp_gues;
         } else {
           snode->temp_gues = tempVec(i);
@@ -272,6 +335,12 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
   // Second pass: compute heat transfers and update thermo states
   simulation::time_hslab_update.start();
   for (auto& hslab : model::hslabs) {
+    std::unordered_set<const SNode*> uwnodes;
+    std::unordered_set<const SNode*> dwnodes;
+    uwnodes.reserve(hslab->uwnodes.size());
+    dwnodes.reserve(hslab->dwnodes.size());
+    for (const auto& node : hslab->uwnodes) uwnodes.insert(node.get());
+    for (const auto& node : hslab->dwnodes) dwnodes.insert(node.get());
     int n = 0;
     for (auto& layer : hslab->layers) n += layer->nnodes;
     n *= hslab->ninc;
@@ -284,12 +353,12 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
     for (auto& layer : hslab->layers) {
       for (auto& snode : layer->snodes) {
         ++i;
-        if (std::find(hslab->dwnodes.begin(), hslab->dwnodes.end(), snode) != hslab->dwnodes.end()) {
+        if (dwnodes.count(snode.get()) != 0) {
           snode->heat_transfer = exec_ht(hslab->dvar, hslab->dval, hslab->dval1, snode->Ai, snode, i - n + hslab->ninc);
           hslab->dheat_transfer += snode->heat_transfer;
         }
 
-        if (std::find(hslab->uwnodes.begin(), hslab->uwnodes.end(), snode) != hslab->uwnodes.end()) {
+        if (uwnodes.count(snode.get()) != 0) {
           snode->heat_transfer = exec_ht(hslab->uvar, hslab->uval, hslab->uval1, snode->Ai, snode, i);
           hslab->uheat_transfer += snode->heat_transfer;
         }
@@ -328,11 +397,12 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
 // Return (Ainc, binc)
 std::pair<double, double>
 exec_bc(const std::string& bvar,
-        Input bval, //const auto& bval,
-		vector<std::shared_ptr<Face>> bval1,
+        const Input& bval,
+		const vector<std::shared_ptr<Face>>& bval1,
         double A,
-        std::shared_ptr<SNode> wall_node,
-        int bound_ind)
+        const std::shared_ptr<SNode>& wall_node,
+        int bound_ind,
+        const double* pipe_htc)
 {
   double Ainc = 0.0;
   double binc = 0.0;
@@ -372,7 +442,7 @@ exec_bc(const std::string& bvar,
     if (bvar == "pipe") {
 
       // h = calc_value(bval[0], flow_elem, wall_node);
-	  double h = eval(bval,flow_elem,wall_node.get());
+      double h = pipe_htc ? *pipe_htc : eval(bval, flow_elem, wall_node.get());
 
       // double relax = 1.0;
       // wall_node->htc = relax * h + (1.0 - relax) * wall_node->htc;
@@ -412,10 +482,10 @@ exec_bc(const std::string& bvar,
 
 
 double exec_ht(const std::string& bvar,
-               Input bval,
-               vector<std::shared_ptr<Face>> bval1,
+               const Input& bval,
+               const vector<std::shared_ptr<Face>>& bval1,
                double A,
-               std::shared_ptr<SNode> wall_node,
+               const std::shared_ptr<SNode>& wall_node,
                int bound_ind)
 {
     double heat_transfer = 0.0;

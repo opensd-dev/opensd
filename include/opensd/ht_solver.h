@@ -20,17 +20,18 @@ namespace solid {
 void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, int main_iter);
 std::pair<double, double>
 exec_bc(const std::string& bvar,
-        Input bval, //const auto& bval,
-		vector<std::shared_ptr<Face>> bval1,
+        const Input& bval,
+		const vector<std::shared_ptr<Face>>& bval1,
         double A,
-        std::shared_ptr<SNode> wall_node,
-        int bound_ind);
+        const std::shared_ptr<SNode>& wall_node,
+        int bound_ind,
+        const double* pipe_htc=nullptr);
 
 double exec_ht(const std::string& bvar,
-               Input bval,
-               vector<std::shared_ptr<Face>> bval1,
+               const Input& bval,
+               const vector<std::shared_ptr<Face>>& bval1,
                double A,
-               std::shared_ptr<SNode> wall_node,
+               const std::shared_ptr<SNode>& wall_node,
                int bound_ind);
 }
 } // namespace opensd

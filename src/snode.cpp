@@ -71,7 +71,7 @@ double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_he
       if (dvar == "pipe") {
         // direct call mapping
         // h = calc_value(hslab->dval[0], flow_elem, this);
-        h = eval(hslab->dval, flow_elem, this);
+        h = htc;
       }
   //     else if (dvar == "pipenl") {
   //       // pipenl: dval[0] is callable that returns (Sc, Sp, h)
@@ -134,7 +134,7 @@ double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_he
       double h = 0.0;
       if (uvar == "pipe") {
         // h = calc_value(hslab->uval[0], flow_elem, this);
-        h = eval(hslab->uval, flow_elem, this);
+        h = htc;
       }
   //     else if (uvar == "pipenl") {
   //       auto tup = hslab->uval[0](flow_elem, this); // adjust signature
