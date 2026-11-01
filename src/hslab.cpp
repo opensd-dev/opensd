@@ -237,6 +237,7 @@ void discretize_layers() {
 	  }
 	  	  
 	  double dely = thk_cros/ninc;
+      layer->dely = dely;
 
       std::vector<double> AFF = layer->AFF;
       if (AFF.empty()) {

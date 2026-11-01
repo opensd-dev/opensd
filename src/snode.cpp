@@ -171,23 +171,23 @@ double SNode::eqn_ener(double time, double delt, bool trans_sim, double alpha_he
     }
   } // end wface branch
 
-  // // North face conduction (if present)
-  // if (this->nface != nullptr) {
-  //   y = y
-  //       - alpha_heat * this->nface->A * this->nface->ther_gues.conductivity()
-  //           * ( this->nface->dnode->temp_gues - this->temp_gues ) / this->layer->dely
-  //       - (1.0 - alpha_heat) * this->nface->A * this->nface->ther_old.conductivity()
-  //           * ( this->nface->dnode->temp_old - this->temp_old ) / this->layer->dely;
-  // }
-  //
-  // // South face conduction (if present)
-  // if (this->sface != nullptr) {
-  //   y = y
-  //       + alpha_heat * this->sface->A * this->sface->ther_gues.conductivity()
-  //           * ( this->temp_gues - this->sface->unode->temp_gues ) / this->layer->dely
-  //       + (1.0 - alpha_heat) * this->sface->A * this->sface->ther_old.conductivity()
-  //           * ( this->temp_old - this->sface->unode->temp_old ) / this->layer->dely;
-  // }
+  // North face conduction (if present)
+  if (this->nface != nullptr) {
+    y = y
+        - alpha_heat * this->nface->A * this->nface->ther_gues->conductivity()
+            * (this->nface->dnode->temp_gues - this->temp_gues) / this->layer->dely
+        - (1.0 - alpha_heat) * this->nface->A * this->nface->ther_old->conductivity()
+            * (this->nface->dnode->temp_old - this->temp_old) / this->layer->dely;
+  }
+
+  // South face conduction (if present)
+  if (this->sface != nullptr) {
+    y = y
+        + alpha_heat * this->sface->A * this->sface->ther_gues->conductivity()
+            * (this->temp_gues - this->sface->unode->temp_gues) / this->layer->dely
+        + (1.0 - alpha_heat) * this->sface->A * this->sface->ther_old->conductivity()
+            * (this->temp_old - this->sface->unode->temp_old) / this->layer->dely;
+  }
 
   return y;
 }

@@ -10,6 +10,8 @@
 #include <Eigen/SparseCholesky>
 #include <Eigen/SparseLU>
 #include <cstdlib>
+#include <memory>
+#include <unordered_map>
 #include <unordered_set>
 // #include "opensd/vector.h"
 #include "opensd/message_passing.h"
@@ -240,26 +242,25 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
           A.coeffRef(i, i) += aW;
         }
   
-/*         // North face (note: multiplied by 0. in Python — kept as in original)
+        // North face
         if (node->nface != nullptr) {
-          double aN  = alpha_heat * node->nface->A * node->nface->ther_gues->conductivity() / layer->dely * 0.0;
-          // double aN0 = (1.0 - alpha_heat) * node->nface->A * node->nface->ther_old.conductivity() / layer->dely * 0.0;
-          // b(i) -= (node->temp_old - node->nface->dnode->temp_old) * aN0;
+          double aN  = alpha_heat * node->nface->A * node->nface->ther_gues->conductivity() / layer->dely;
+          double aN0 = (1.0 - alpha_heat) * node->nface->A * node->nface->ther_old->conductivity() / layer->dely;
+          b(i) -= (node->temp_old - node->nface->dnode->temp_old) * aN0;
           int col = i + 1;
-          if (col >= 0 && col < n) A(i, col) = -aN;
-          A(i, i) = A(i, i) + aN;
+          if (col >= 0 && col < n) A.coeffRef(i, col) = -aN;
+          A.coeffRef(i, i) += aN;
         }
   
-        // South face (also multiplied by 0.)
+        // South face
         if (node->sface != nullptr) {
-          double aS  = alpha_heat * node->sface->A * node->sface->ther_gues->conductivity() / layer->dely * 0.0;
-          // double aS0 = (1.0 - alpha_heat) * node->sface->A * node->sface->ther_old.conductivity() / layer->dely * 0.0;
-          // b(i) -= (node->temp_old - node->sface->unode->temp_old) * aS0;
+          double aS  = alpha_heat * node->sface->A * node->sface->ther_gues->conductivity() / layer->dely;
+          double aS0 = (1.0 - alpha_heat) * node->sface->A * node->sface->ther_old->conductivity() / layer->dely;
+          b(i) -= (node->temp_old - node->sface->unode->temp_old) * aS0;
           int col = i - 1;
-          if (col >= 0 && col < n) A(i, col) = -aS;
-          A(i, i) = A(i, i) + aS;
+          if (col >= 0 && col < n) A.coeffRef(i, col) = -aS;
+          A.coeffRef(i, i) += aS;
         }
- */  
 
         // Heat input and transient contribution
         b(i) = b(i) + alpha_heat * node->heat_input + (1.0 - alpha_heat) * node->heat_input_old;
@@ -292,9 +293,24 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
       // Solve the complete HSLAB system on its owner rank. Keeping the full
       // matrix here preserves axial couplings when they are enabled.
       simulation::time_hslab_solve.start();
-      Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> ldlt(A);
-      if (ldlt.info() == Eigen::Success) {
-        tempVec = ldlt.solve(b);
+      using LDLT = Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>>;
+      struct LDLTCache {
+        int rows = 0;
+        Eigen::Index nonzeros = 0;
+        std::unique_ptr<LDLT> solver;
+      };
+      static std::unordered_map<const HSlab*, LDLTCache> ldlt_cache;
+      auto& cache = ldlt_cache[hslab.get()];
+      if (!cache.solver || cache.rows != n ||
+          cache.nonzeros != A.nonZeros()) {
+        cache.rows = n;
+        cache.nonzeros = A.nonZeros();
+        cache.solver = std::make_unique<LDLT>();
+        cache.solver->analyzePattern(A);
+      }
+      cache.solver->factorize(A);
+      if (cache.solver->info() == Eigen::Success) {
+        tempVec = cache.solver->solve(b);
       } else {
         Eigen::SparseLU<Eigen::SparseMatrix<double>> lu;
         lu.compute(A);

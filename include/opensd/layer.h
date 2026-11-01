@@ -36,6 +36,7 @@ public:
   double darea;
   double heat_input;
   double delx;
+  double dely;
   vector<double> AFF;
 
   // double mresidue;
