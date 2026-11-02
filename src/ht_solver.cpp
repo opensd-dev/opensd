@@ -44,52 +44,95 @@ namespace opensd {
 // Non-member functions
 //==============================================================================
 
+void sync_fluid_state() {
+  if (mpi::n_procs <= 1 || model::hslabs.empty()) return;
+
+  simulation::time_hslab_sync.start();
+  std::unordered_set<const Face*> faces_owned;
+  for (const auto& circuit : model::circuits_owned) {
+    for (const auto& face : circuit->faces_owned) faces_owned.insert(face.get());
+  }
+
+  enum BoundaryStateField {
+    BoundaryStaticTemperature,
+    BoundaryVelocity,
+    BoundaryDensity,
+    BoundarySpecificHeat,
+    BoundaryConductivity,
+    BoundaryFieldCount
+  };
+  constexpr size_t stride = BoundaryFieldCount;
+  for (const auto& hslab : model::hslabs) {
+    const size_t count = hslab->uval1.size() + hslab->dval1.size();
+    std::vector<double> local(count * stride, 0.0), global(local.size());
+    size_t i = 0;
+    auto pack = [&](const std::shared_ptr<Face>& face) {
+      if (faces_owned.count(face.get()) != 0) {
+        local[i + BoundaryStaticTemperature] = face->stemp_gues;
+        local[i + BoundaryVelocity] = face->velocity;
+        local[i + BoundaryDensity] = face->ther_gues->rhomass();
+        local[i + BoundarySpecificHeat] = face->ther_gues->cpmass();
+        local[i + BoundaryConductivity] = face->ther_gues->conductivity();
+      }
+      i += stride;
+    };
+    for (const auto& face : hslab->uval1) pack(face);
+    for (const auto& face : hslab->dval1) pack(face);
+    MPI_Reduce(local.data(), global.data(), static_cast<int>(global.size()),
+               MPI_DOUBLE, MPI_SUM, hslab->root_world_rank, mpi::intracomm);
+
+    if (mpi::rank == hslab->root_world_rank) {
+      i = 0;
+      auto unpack = [&](const std::shared_ptr<Face>& face) {
+        face->stemp_gues = global[i + BoundaryStaticTemperature];
+        face->velocity = global[i + BoundaryVelocity];
+        face->ther_gues->set_rhomass(global[i + BoundaryDensity]);
+        face->ther_gues->set_cpmass(global[i + BoundarySpecificHeat]);
+        face->ther_gues->set_conductivity(global[i + BoundaryConductivity]);
+        i += stride;
+      };
+      for (const auto& face : hslab->uval1) unpack(face);
+      for (const auto& face : hslab->dval1) unpack(face);
+    }
+  }
+  simulation::time_hslab_sync.stop();
+}
+
+void sync_boundary_temperatures() {
+  if (mpi::n_procs <= 1 || model::hslabs.empty()) return;
+
+  std::unordered_set<const Face*> faces_owned;
+  for (const auto& circuit : model::circuits_owned) {
+    for (const auto& face : circuit->faces_owned) faces_owned.insert(face.get());
+  }
+
+  for (const auto& hslab : model::hslabs) {
+    const size_t count = hslab->uval1.size() + hslab->dval1.size();
+    std::vector<double> local(count, 0.0), global(count);
+    size_t i = 0;
+    for (const auto& face : hslab->uval1) {
+      if (faces_owned.count(face.get()) != 0) local[i] = face->stemp_gues;
+      ++i;
+    }
+    for (const auto& face : hslab->dval1) {
+      if (faces_owned.count(face.get()) != 0) local[i] = face->stemp_gues;
+      ++i;
+    }
+    MPI_Reduce(local.data(), global.data(), static_cast<int>(count), MPI_DOUBLE,
+               MPI_SUM, hslab->root_world_rank, mpi::intracomm);
+    if (mpi::rank == hslab->root_world_rank) {
+      i = 0;
+      for (const auto& face : hslab->uval1) face->stemp_gues = global[i++];
+      for (const auto& face : hslab->dval1) face->stemp_gues = global[i++];
+    }
+  }
+}
+
 void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, int main_iter) {
-  
+
   simulation::time_solid_energy.start();
 
-  if (mpi::n_procs > 1 && !model::hslabs.empty()) {
-    simulation::time_hslab_sync.start();
-    std::vector<double> local_state;
-    for (auto& circuit : model::circuits) {
-      std::vector<bool> node_owned(circuit->nodes.size(), false);
-      if (circuit->comm != MPI_COMM_NULL) {
-        for (auto& node : circuit->nodes_owned) node_owned[node->node_ind] = true;
-      }
-      for (auto& node : circuit->nodes) {
-        const bool owned = node_owned[node->node_ind];
-        local_state.push_back(owned ? node->senth_gues : 0.0);
-        local_state.push_back(owned ? node->spres_gues : 0.0);
-      }
-      for (auto& face : circuit->faces) {
-        const bool owned = circuit->comm != MPI_COMM_NULL &&
-                           face->owner == circuit->rank_in_comm;
-        local_state.push_back(owned ? face->velocity : 0.0);
-      }
-    }
-
-    std::vector<double> global_state(local_state.size());
-    MPI_Allreduce(local_state.data(), global_state.data(),
-                  static_cast<int>(local_state.size()), MPI_DOUBLE, MPI_SUM,
-                  mpi::intracomm);
-
-    size_t i = 0;
-    for (auto& circuit : model::circuits) {
-      for (auto& node : circuit->nodes) {
-        node->senth_gues = global_state[i++];
-        node->spres_gues = global_state[i++];
-        node->ther_gues->update(CoolProp::HmassP_INPUTS,
-                                node->senth_gues, node->spres_gues);
-        node->stemp_gues = node->ther_gues->T();
-      }
-      for (auto& face : circuit->faces) {
-        face->velocity = global_state[i++];
-        face->update_statevar();
-        face->ther_gues->update();
-      }
-    }
-    simulation::time_hslab_sync.stop();
-  }
+  sync_fluid_state();
 
   for (auto& circuit : model::circuits) {
     for (auto& pipe : circuit->pipes) {
@@ -326,6 +369,23 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
     simulation::time_hslab_sync.start();
     MPI_Bcast(tempVec.data(), n, MPI_DOUBLE, hslab->root_world_rank,
               mpi::intracomm);
+    std::vector<double> htc_values(n, 0.0);
+    i = -1;
+    for (auto& layer : hslab->layers) {
+      for (auto& snode : layer->snodes) {
+        htc_values[++i] = snode->htc;
+      }
+    }
+    MPI_Bcast(htc_values.data(), n, MPI_DOUBLE, hslab->root_world_rank,
+              mpi::intracomm);
+    if (mpi::rank != hslab->root_world_rank) {
+      i = -1;
+      for (auto& layer : hslab->layers) {
+        for (auto& snode : layer->snodes) {
+          snode->htc = htc_values[++i];
+        }
+      }
+    }
     simulation::time_hslab_sync.stop();
 
     // Assign temp_gues back to nodes (with relaxation where applied)

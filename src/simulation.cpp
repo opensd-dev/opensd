@@ -127,6 +127,7 @@ int opensd_run()
       if (settings::temp_solve) {
         solid::exec_energy(simulation::current_time, simulation::delt, trans_sim, alpha_heat, main_iter);
         exec_energy(simulation::current_time, simulation::delt, trans_sim, alpha_ener, main_iter);
+        solid::sync_boundary_temperatures();
         // std::exit(1);
 
         std::tie(converged, eps_m, eps_p, eps_h, eps_t) = check_conv(simulation::current_time, simulation::delt, trans_sim, alpha_mom, alpha_ener, "all", alpha_heat);
@@ -192,6 +193,147 @@ int opensd_run()
   }
   if (mpi::rank == 0) {
     std::cout << "Execution time = " << (std::clock() - start_time) / (double)CLOCKS_PER_SEC << std::endl;
+  }
+
+  // Collect distributed circuit state before rank 0 writes the restart file.
+  for (auto& circuit : model::circuits) {
+    enum NodeStateField {
+      NodeHeatInput,
+      NodeTotalPressure,
+      NodeStaticPressure,
+      NodeTotalTemperature,
+      NodeStaticTemperature,
+      NodeTotalEnthalpy,
+      NodeStaticEnthalpy,
+      NodeVelocity,
+      NodeMassSource,
+      NodeFieldCount
+    };
+    constexpr size_t node_stride = NodeFieldCount;
+    std::vector<double> local_nodes(circuit->nodes.size() * node_stride, 0.0);
+    for (const auto& node : circuit->nodes_owned) {
+      const size_t i = static_cast<size_t>(node->node_ind) * node_stride;
+      local_nodes[i + NodeHeatInput] = node->heat_input;
+      local_nodes[i + NodeTotalPressure] = node->tpres_gues;
+      local_nodes[i + NodeStaticPressure] = node->spres_gues;
+      local_nodes[i + NodeTotalTemperature] = node->ttemp_gues;
+      local_nodes[i + NodeStaticTemperature] = node->stemp_gues;
+      local_nodes[i + NodeTotalEnthalpy] = node->tenth_gues;
+      local_nodes[i + NodeStaticEnthalpy] = node->senth_gues;
+      local_nodes[i + NodeVelocity] = node->velocity;
+      local_nodes[i + NodeMassSource] = node->msource;
+    }
+    std::vector<double> global_nodes(local_nodes.size());
+    MPI_Reduce(local_nodes.data(), global_nodes.data(),
+               static_cast<int>(local_nodes.size()), MPI_DOUBLE, MPI_SUM, 0,
+               mpi::intracomm);
+
+    enum FaceStateField {
+      FaceVolumeFlowOld,
+      FaceVolumeFlowGuess,
+      FaceMassFlow,
+      FaceVelocity,
+      FaceHeatInputOld,
+      FaceHeatInput,
+      FaceChoked,
+      FacePressureResidual,
+      FaceCriticalMassFlux,
+      FaceCriticalPressure,
+      FaceTotalPressureOld,
+      FaceStaticPressureOld,
+      FaceTotalTemperatureOld,
+      FaceStaticTemperatureOld,
+      FaceTotalPressureGuess,
+      FaceStaticPressureGuess,
+      FaceTotalTemperatureGuess,
+      FaceStaticTemperatureGuess,
+      FaceAplus,
+      FaceAminus,
+      FaceBplus,
+      FaceBminus,
+      FaceFrictionFactor,
+      FaceFieldCount
+    };
+    constexpr size_t face_stride = FaceFieldCount;
+    std::vector<double> local_faces(circuit->faces.size() * face_stride, 0.0);
+    for (size_t j = 0; j < circuit->faces_owned.size(); ++j) {
+      const auto& face = circuit->faces_owned[j];
+      const size_t i = static_cast<size_t>(circuit->face_indices_owned[j]) * face_stride;
+      local_faces[i + FaceVolumeFlowOld] = face->vflow_old;
+      local_faces[i + FaceVolumeFlowGuess] = face->vflow_gues;
+      local_faces[i + FaceMassFlow] = face->mflow;
+      local_faces[i + FaceVelocity] = face->velocity;
+      local_faces[i + FaceHeatInputOld] = face->heat_input_old;
+      local_faces[i + FaceHeatInput] = face->heat_input;
+      local_faces[i + FaceChoked] = face->choked ? 1.0 : 0.0;
+      local_faces[i + FacePressureResidual] = face->presidue;
+      local_faces[i + FaceCriticalMassFlux] = face->Gcr;
+      local_faces[i + FaceCriticalPressure] = face->pcr;
+      local_faces[i + FaceTotalPressureOld] = face->tpres_old;
+      local_faces[i + FaceStaticPressureOld] = face->spres_old;
+      local_faces[i + FaceTotalTemperatureOld] = face->ttemp_old;
+      local_faces[i + FaceStaticTemperatureOld] = face->stemp_old;
+      local_faces[i + FaceTotalPressureGuess] = face->tpres_gues;
+      local_faces[i + FaceStaticPressureGuess] = face->spres_gues;
+      local_faces[i + FaceTotalTemperatureGuess] = face->ttemp_gues;
+      local_faces[i + FaceStaticTemperatureGuess] = face->stemp_gues;
+      local_faces[i + FaceAplus] = face->aplus;
+      local_faces[i + FaceAminus] = face->aminus;
+      local_faces[i + FaceBplus] = face->bplus;
+      local_faces[i + FaceBminus] = face->bminus;
+      if (const auto pface = std::dynamic_pointer_cast<PFace>(face)) {
+        local_faces[i + FaceFrictionFactor] = pface->fricfact_gues;
+      }
+    }
+    std::vector<double> global_faces(local_faces.size());
+    MPI_Reduce(local_faces.data(), global_faces.data(),
+               static_cast<int>(local_faces.size()), MPI_DOUBLE, MPI_SUM, 0,
+               mpi::intracomm);
+
+    if (mpi::rank == 0) {
+      for (size_t j = 0; j < circuit->nodes.size(); ++j) {
+        auto& node = circuit->nodes[j];
+        const size_t i = j * node_stride;
+        node->heat_input = global_nodes[i + NodeHeatInput];
+        node->tpres_gues = global_nodes[i + NodeTotalPressure];
+        node->spres_gues = global_nodes[i + NodeStaticPressure];
+        node->ttemp_gues = global_nodes[i + NodeTotalTemperature];
+        node->stemp_gues = global_nodes[i + NodeStaticTemperature];
+        node->tenth_gues = global_nodes[i + NodeTotalEnthalpy];
+        node->senth_gues = global_nodes[i + NodeStaticEnthalpy];
+        node->velocity = global_nodes[i + NodeVelocity];
+        node->msource = global_nodes[i + NodeMassSource];
+      }
+      for (size_t j = 0; j < circuit->faces.size(); ++j) {
+        auto& face = circuit->faces[j];
+        const size_t i = j * face_stride;
+        face->vflow_old = global_faces[i + FaceVolumeFlowOld];
+        face->vflow_gues = global_faces[i + FaceVolumeFlowGuess];
+        face->mflow = global_faces[i + FaceMassFlow];
+        face->velocity = global_faces[i + FaceVelocity];
+        face->heat_input_old = global_faces[i + FaceHeatInputOld];
+        face->heat_input = global_faces[i + FaceHeatInput];
+        face->choked = global_faces[i + FaceChoked] != 0.0;
+        face->presidue = global_faces[i + FacePressureResidual];
+        face->Gcr = global_faces[i + FaceCriticalMassFlux];
+        face->pcr = global_faces[i + FaceCriticalPressure];
+        face->tpres_old = global_faces[i + FaceTotalPressureOld];
+        face->spres_old = global_faces[i + FaceStaticPressureOld];
+        face->ttemp_old = global_faces[i + FaceTotalTemperatureOld];
+        face->stemp_old = global_faces[i + FaceStaticTemperatureOld];
+        face->tpres_gues = global_faces[i + FaceTotalPressureGuess];
+        face->spres_gues = global_faces[i + FaceStaticPressureGuess];
+        face->ttemp_gues = global_faces[i + FaceTotalTemperatureGuess];
+        face->stemp_gues = global_faces[i + FaceStaticTemperatureGuess];
+        face->aplus = global_faces[i + FaceAplus];
+        face->aminus = global_faces[i + FaceAminus];
+        face->bplus = global_faces[i + FaceBplus];
+        face->bminus = global_faces[i + FaceBminus];
+        if (const auto pface = std::dynamic_pointer_cast<PFace>(face)) {
+          pface->fricfact_gues = global_faces[i + FaceFrictionFactor];
+        }
+      }
+    }
   }
 
   if (mpi::rank == 0) {

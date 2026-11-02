@@ -36,6 +36,8 @@ public:
   void update();
   // void update_sat(double p=nullptr);
   void set_rhomass(double val) { _rhomass = val; }
+  void set_cpmass(double val) { _cpmass = val; }
+  void set_conductivity(double val) { _conductivity = val; }
   double rhomass();
   double cpmass();
   double viscosity();

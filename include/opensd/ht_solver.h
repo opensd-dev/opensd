@@ -17,6 +17,8 @@
 
 namespace opensd {
 namespace solid {
+void sync_fluid_state();
+void sync_boundary_temperatures();
 void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, int main_iter);
 std::pair<double, double>
 exec_bc(const std::string& bvar,
