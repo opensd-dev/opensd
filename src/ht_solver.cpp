@@ -128,22 +128,103 @@ void sync_boundary_temperatures() {
   }
 }
 
-void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, int main_iter) {
+namespace {
 
-  simulation::time_solid_energy.start();
-
-  sync_fluid_state();
-
+void update_hslab_coupling() {
   for (auto& circuit : model::circuits) {
     for (auto& pipe : circuit->pipes) {
-      for (auto& face : pipe->faces) {
-        face->heat_hslab.clear();
+      for (auto& face : pipe->faces) face->heat_hslab.clear();
+    }
+    for (auto& node : circuit->nodes) node->heat_hslab.clear();
+  }
+
+  simulation::time_hslab_update.start();
+  for (auto& hslab : model::hslabs) {
+    std::unordered_set<const SNode*> uwnodes;
+    std::unordered_set<const SNode*> dwnodes;
+    for (const auto& node : hslab->uwnodes) uwnodes.insert(node.get());
+    for (const auto& node : hslab->dwnodes) dwnodes.insert(node.get());
+    int n = 0;
+    for (auto& layer : hslab->layers) n += layer->nnodes;
+    n *= hslab->ninc;
+    hslab->dheat_transfer = 0.0;
+    hslab->uheat_transfer = 0.0;
+    int i = -1;
+    for (auto& layer : hslab->layers) {
+      for (auto& snode : layer->snodes) {
+        ++i;
+        if (dwnodes.count(snode.get()) != 0) {
+          snode->heat_transfer = exec_ht(hslab->dvar, hslab->dval,
+              hslab->dval1, snode->Ai, snode, i - n + hslab->ninc);
+          hslab->dheat_transfer += snode->heat_transfer;
+        }
+        if (uwnodes.count(snode.get()) != 0) {
+          snode->heat_transfer = exec_ht(hslab->uvar, hslab->uval,
+              hslab->uval1, snode->Ai, snode, i);
+          hslab->uheat_transfer += snode->heat_transfer;
+        }
+        snode->ther_gues->update(snode->temp_gues);
+      }
+      for (auto& iface : layer->ifaces) {
+        iface->ther_gues->update();
+        iface->update_temp();
+      }
+      for (auto& jface : layer->jfaces) {
+        jface->ther_gues->update();
+        jface->update_temp();
       }
     }
-    for (auto& node : circuit->nodes) {
-      node->heat_hslab.clear();
+    for (auto& layer : hslab->layers) {
+      for (auto& snode : layer->snodes) {
+        snode->heat_input = snode->heat_frac * layer->heat_input;
+      }
     }
   }
+  simulation::time_hslab_update.stop();
+}
+
+} // namespace
+
+void sync_solid_state() {
+  if (mpi::n_procs <= 1 || model::hslabs.empty()) return;
+
+  simulation::time_hslab_sync.start();
+  for (auto& hslab : model::hslabs) {
+    int n = 0;
+    for (auto& layer : hslab->layers) n += layer->nnodes;
+    n *= hslab->ninc;
+    std::vector<double> temperatures(n, 0.0), htc_values(n, 0.0);
+    int i = -1;
+    if (mpi::rank == hslab->root_world_rank) {
+      for (auto& layer : hslab->layers) {
+        for (auto& snode : layer->snodes) {
+          temperatures[++i] = snode->temp_gues;
+          htc_values[i] = snode->htc;
+        }
+      }
+    }
+    MPI_Bcast(temperatures.data(), n, MPI_DOUBLE, hslab->root_world_rank,
+              mpi::intracomm);
+    MPI_Bcast(htc_values.data(), n, MPI_DOUBLE, hslab->root_world_rank,
+              mpi::intracomm);
+    if (mpi::rank != hslab->root_world_rank) {
+      i = -1;
+      for (auto& layer : hslab->layers) {
+        for (auto& snode : layer->snodes) {
+          snode->temp_gues = temperatures[++i];
+          snode->htc = htc_values[i];
+        }
+      }
+    }
+  }
+  simulation::time_hslab_sync.stop();
+  update_hslab_coupling();
+}
+
+void exec_energy(double time, double delt, bool trans_sim, double alpha_heat,
+                 int main_iter, bool synchronize) {
+
+  simulation::time_solid_energy.start();
 
 // Assumptions:
 // - Classes/types: comp::Circuit, vof_comp::Circuit, HTcomp::HSlab, Layer, Node, Face, Iface, Jface, Therm (with methods conductivity(), cpmass(), rhomass(), update(...))
@@ -152,6 +233,8 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
 // - Use -> for pointer access (user preference).
 
   for (auto& hslab : model::hslabs) {
+
+    if (!synchronize && mpi::rank != hslab->root_world_rank) continue;
 
     std::unordered_set<const SNode*> uwnodes;
     std::unordered_set<const SNode*> dwnodes;
@@ -366,27 +449,25 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
       simulation::time_hslab_solve.stop();
     }
 
-    simulation::time_hslab_sync.start();
-    MPI_Bcast(tempVec.data(), n, MPI_DOUBLE, hslab->root_world_rank,
-              mpi::intracomm);
-    std::vector<double> htc_values(n, 0.0);
-    i = -1;
-    for (auto& layer : hslab->layers) {
-      for (auto& snode : layer->snodes) {
-        htc_values[++i] = snode->htc;
-      }
-    }
-    MPI_Bcast(htc_values.data(), n, MPI_DOUBLE, hslab->root_world_rank,
-              mpi::intracomm);
-    if (mpi::rank != hslab->root_world_rank) {
+    if (synchronize) {
+      simulation::time_hslab_sync.start();
+      MPI_Bcast(tempVec.data(), n, MPI_DOUBLE, hslab->root_world_rank,
+                mpi::intracomm);
+      std::vector<double> htc_values(n, 0.0);
       i = -1;
       for (auto& layer : hslab->layers) {
-        for (auto& snode : layer->snodes) {
-          snode->htc = htc_values[++i];
+        for (auto& snode : layer->snodes) htc_values[++i] = snode->htc;
+      }
+      MPI_Bcast(htc_values.data(), n, MPI_DOUBLE, hslab->root_world_rank,
+                mpi::intracomm);
+      if (mpi::rank != hslab->root_world_rank) {
+        i = -1;
+        for (auto& layer : hslab->layers) {
+          for (auto& snode : layer->snodes) snode->htc = htc_values[++i];
         }
       }
+      simulation::time_hslab_sync.stop();
     }
-    simulation::time_hslab_sync.stop();
 
     // Assign temp_gues back to nodes (with relaxation where applied)
     simulation::time_hslab_update.start();
@@ -408,62 +489,7 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat, in
     simulation::time_hslab_update.stop();
   } // end first pass over HSlabs
 
-  // Second pass: compute heat transfers and update thermo states
-  simulation::time_hslab_update.start();
-  for (auto& hslab : model::hslabs) {
-    std::unordered_set<const SNode*> uwnodes;
-    std::unordered_set<const SNode*> dwnodes;
-    uwnodes.reserve(hslab->uwnodes.size());
-    dwnodes.reserve(hslab->dwnodes.size());
-    for (const auto& node : hslab->uwnodes) uwnodes.insert(node.get());
-    for (const auto& node : hslab->dwnodes) dwnodes.insert(node.get());
-    int n = 0;
-    for (auto& layer : hslab->layers) n += layer->nnodes;
-    n *= hslab->ninc;
-    // if (!trans_sim && hslab->solveSS == false) continue;
-
-    hslab->dheat_transfer = 0.0;
-    hslab->uheat_transfer = 0.0;
-    int i = -1;
-
-    for (auto& layer : hslab->layers) {
-      for (auto& snode : layer->snodes) {
-        ++i;
-        if (dwnodes.count(snode.get()) != 0) {
-          snode->heat_transfer = exec_ht(hslab->dvar, hslab->dval, hslab->dval1, snode->Ai, snode, i - n + hslab->ninc);
-          hslab->dheat_transfer += snode->heat_transfer;
-        }
-
-        if (uwnodes.count(snode.get()) != 0) {
-          snode->heat_transfer = exec_ht(hslab->uvar, hslab->uval, hslab->uval1, snode->Ai, snode, i);
-          hslab->uheat_transfer += snode->heat_transfer;
-        }
-
-        // update guessed thermodynamic state for node
-        snode->ther_gues->update(snode->temp_gues);
-      } // end nodes in layer
-      // update interfaces in this layer
-      for (auto iface : layer->ifaces) {
-        iface->ther_gues->update();
-        iface->update_temp();
-        // std::cout << iface->temp_gues<<std::endl;
-      }
-      for (auto jface : layer->jfaces) {
-        jface->ther_gues->update();
-        jface->update_temp();
-        // std::cout << jface->temp_gues<<std::endl;
-      }
-    } // end layers loop
-
-    // final per-node updates for condensate efficiency and heat input
-    for (auto& layer : hslab->layers) {
-      for (auto& snode : layer->snodes) {
-  //       node->update_condeff();
-        snode->heat_input = snode->heat_frac * layer->heat_input;
-      }
-    }
-  } // end second pass over HSlabs
-  simulation::time_hslab_update.stop();
+  update_hslab_coupling();
 
   simulation::time_solid_energy.stop();
   
