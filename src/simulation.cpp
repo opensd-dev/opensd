@@ -35,8 +35,7 @@ int opensd_run()
 {
   using namespace opensd;
 
-  std::clock_t start_time;
-  start_time = std::clock();
+  const double start_time = MPI_Wtime();
 
   opensd::simulation::time_total.start();
   opensd_simulation_init();
@@ -203,7 +202,7 @@ int opensd_run()
     }
   }
   if (mpi::rank == 0) {
-    std::cout << "Execution time = " << (std::clock() - start_time) / (double)CLOCKS_PER_SEC << std::endl;
+    std::cout << "Execution time = " << MPI_Wtime() - start_time << std::endl;
   }
 
   // Collect distributed circuit state before rank 0 writes the restart file.
@@ -866,10 +865,12 @@ for (int r = 1; r < cir_size; ++r) {
 }
 // 3. Map old index → new contiguous index
 circuit->old2new.resize(nvtxs);
+circuit->new2old.resize(nvtxs);
 std::vector<PetscInt> position = offsets; // running positions
 for (PetscInt i = 0; i < nvtxs; ++i) {
     PetscInt r = part[i];
     circuit->old2new[i] = position[r]++;
+    circuit->new2old[circuit->old2new[i]] = i;
 }
 
 
@@ -916,6 +917,11 @@ for (PetscInt i = 0; i < nvtxs; ++i) {
               circuit->ghost_nodes_owned[v_rank].push_back(face->dnode);
               circuit->ghost_nodes_owned1.push_back(face->dnode);
               circuit->ghost_indices_owned.push_back(circuit->old2new[face->dnode->node_ind]); // convert face->dnode->node_ind (old vertex index) to circuit-local index via old2new
+          }
+    if (u_rank != cir_rank && v_rank == cir_rank) {
+              circuit->ghost_nodes_owned[u_rank].push_back(face->unode);
+              circuit->ghost_nodes_owned1.push_back(face->unode);
+              circuit->ghost_indices_owned.push_back(circuit->old2new[face->unode->node_ind]);
           }
       ++i;
   	}
@@ -1108,6 +1114,9 @@ PetscInt n_faces_ghost = circuit->ghost_face_global_indices.size();
 
     VecCreateGhost(circuit_comm, n_local, PETSC_DECIDE, nghost,
                circuit->ghost_indices_owned.data(), &circuit->velocity_local);
+
+    VecCreateGhost(circuit_comm, n_local, PETSC_DECIDE, nghost,
+               circuit->ghost_indices_owned.data(), &circuit->enth_local);
    
   }
 

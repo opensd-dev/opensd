@@ -189,6 +189,12 @@ void sync_solid_state() {
   if (mpi::n_procs <= 1 || model::hslabs.empty()) return;
 
   simulation::time_hslab_sync.start();
+  for (auto& circuit : model::circuits) {
+    for (auto& pipe : circuit->pipes) {
+      for (auto& face : pipe->faces) face->heat_hslab.clear();
+    }
+    for (auto& node : circuit->nodes) node->heat_hslab.clear();
+  }
   for (auto& hslab : model::hslabs) {
     int n = 0;
     for (auto& layer : hslab->layers) n += layer->nnodes;
@@ -216,9 +222,27 @@ void sync_solid_state() {
         }
       }
     }
+
+    const size_t boundary_count = hslab->uwnodes.size() + hslab->dwnodes.size();
+    std::vector<double> heat_transfer(boundary_count, 0.0);
+    if (mpi::rank == hslab->root_world_rank) {
+      size_t j = 0;
+      for (const auto& snode : hslab->uwnodes) heat_transfer[j++] = snode->heat_transfer;
+      for (const auto& snode : hslab->dwnodes) heat_transfer[j++] = snode->heat_transfer;
+    }
+    MPI_Bcast(heat_transfer.data(), static_cast<int>(heat_transfer.size()),
+              MPI_DOUBLE, hslab->root_world_rank, mpi::intracomm);
+    size_t j = 0;
+    for (size_t k = 0; k < hslab->uwnodes.size(); ++k) {
+      hslab->uwnodes[k]->heat_transfer = heat_transfer[j];
+      hslab->uval1[k]->heat_hslab.push_back(heat_transfer[j++]);
+    }
+    for (size_t k = 0; k < hslab->dwnodes.size(); ++k) {
+      hslab->dwnodes[k]->heat_transfer = heat_transfer[j];
+      hslab->dval1[k]->heat_hslab.push_back(heat_transfer[j++]);
+    }
   }
   simulation::time_hslab_sync.stop();
-  update_hslab_coupling();
 }
 
 void exec_energy(double time, double delt, bool trans_sim, double alpha_heat,
@@ -489,7 +513,11 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat,
     simulation::time_hslab_update.stop();
   } // end first pass over HSlabs
 
-  update_hslab_coupling();
+  bool owns_hslab_root = false;
+  for (const auto& hslab : model::hslabs_owned) {
+    owns_hslab_root = owns_hslab_root || hslab->rank_in_comm == 0;
+  }
+  if (synchronize || owns_hslab_root) update_hslab_coupling();
 
   simulation::time_solid_energy.stop();
   

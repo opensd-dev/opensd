@@ -55,6 +55,7 @@ public:
   vector<PetscInt> ghost_face_indices_owned;
   vector<PetscInt> ghost_face_global_indices;
   vector<PetscInt> old2new;
+  vector<PetscInt> new2old;
   vector<PetscInt> face_old2new;
   vector<std::shared_ptr<Pipe>> pipes;
   vector<std::shared_ptr<GER>> gers;
@@ -68,6 +69,7 @@ public:
   Mat Ah;
   Vec bh;
   Vec enth;
+  Vec enth_local;
   KSP ksp;
   KSP ksph;
   Vec vflow_gues_local, aminus_local, aplus_local, bplus_local, bminus_local;

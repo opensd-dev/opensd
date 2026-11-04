@@ -5,6 +5,7 @@
 #include <cmath>         // For std::isinf and other math functions
 #include <iostream>
 #include <iomanip>
+#include <stdexcept>
 #include <Eigen/Dense>   // For matrix manipulations
 #include <cstdlib>
 #include "opensd/hslab.h"
@@ -872,9 +873,9 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
         // }
 		
         b_local = (b_local 
-                  - iface->downstream->tenth_old * (1.0 - alpha_ener) 
+                  - iface->dnode->tenth_old * (1.0 - alpha_ener)
                     * std::max(-iface->ther_old->rhomass() * iface->vflow_old, 0.0)
-                  + iface->upstream->tenth_old * (1.0 - alpha_ener) 
+                  + iface->unode->tenth_old * (1.0 - alpha_ener)
                     * std::max(iface->ther_old->rhomass() * iface->vflow_old, 0.0));
         
         b_local = (b_local
@@ -911,9 +912,9 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
 
         
         b_local = (b_local 
-                  - oface->upstream->tenth_old * (1.0 - alpha_ener) 
+                  - oface->unode->tenth_old * (1.0 - alpha_ener)
                     * std::max(oface->ther_old->rhomass() * oface->vflow_old, 0.0)
-                  + oface->downstream->tenth_old * (1.0 - alpha_ener) 
+                  + oface->dnode->tenth_old * (1.0 - alpha_ener)
                     * std::max(-oface->ther_old->rhomass() * oface->vflow_old, 0.0));
         
         b_local = (b_local 
@@ -1053,8 +1054,6 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
           MatGetValues(Ah, 1, &row, 1, &col, &Aii);
           Aii = Aii - node->msource;
 		  MatSetValue(Ah, row, col, Aii, INSERT_VALUES);
-          MatAssemblyBegin(Ah, MAT_FINAL_ASSEMBLY);
-          MatAssemblyEnd(Ah, MAT_FINAL_ASSEMBLY);
           if (Aii < 0.0) {
             std::cerr << "negative coef. in energy solver. stopping" << std::endl;
             exit(EXIT_FAILURE);
@@ -1154,12 +1153,31 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
     // Refresh the KSP operator after rebuilding Ah. The energy matrix changes
     // every nonlinear iteration; PINET solves this freshly assembled system.
     KSPSetOperators(circuit->ksph, Ah, Ah);
-    KSPSetType(circuit->ksph, KSPPREONLY);
     PC pc;
     KSPGetPC(circuit->ksph, &pc);
-    PCSetType(pc, PCLU);
+    if (circuit->comm_size > 1) {
+      KSPSetType(circuit->ksph, KSPBCGS);
+      PCSetType(pc, PCBJACOBI);
+      KSPSetTolerances(circuit->ksph, 1.0e-12, 1.0e-12,
+                       PETSC_DEFAULT, 100);
+    } else {
+      KSPSetType(circuit->ksph, KSPPREONLY);
+      PCSetType(pc, PCLU);
+    }
     KSPSetUp(circuit->ksph);
     KSPSolve(circuit->ksph, bh, enth);
+
+    KSPConvergedReason reason;
+    KSPGetConvergedReason(circuit->ksph, &reason);
+    if (reason < 0) {
+      throw std::runtime_error("PETSc fluid-energy solve did not converge");
+    }
+
+    if (circuit->comm_size > 1) {
+      VecCopy(enth, circuit->enth_local);
+      VecGhostUpdateBegin(circuit->enth_local, INSERT_VALUES, SCATTER_FORWARD);
+      VecGhostUpdateEnd(circuit->enth_local, INSERT_VALUES, SCATTER_FORWARD);
+    }
   
   // } else {
     // (3) Else -> fallback to SOR iteration
@@ -1229,6 +1247,28 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
 	  // if (settings::verbosity >= 6)
 	  // fout2 << "node " << node->identifier << " " << std::setprecision(8) << std::fixed << node->tenth_gues << "\n";
     }
+
+    if (circuit->comm_size > 1) {
+      Vec enth_local_form;
+      VecGhostGetLocalForm(circuit->enth_local, &enth_local_form);
+      const PetscScalar* enth_local_array;
+      VecGetArrayRead(enth_local_form, &enth_local_array);
+      const PetscInt n_owned = static_cast<PetscInt>(circuit->nodes_owned.size());
+      for (size_t j = 0; j < circuit->ghost_nodes_owned1.size(); ++j) {
+        auto& node = circuit->ghost_nodes_owned1[j];
+        node->tenth_gues = enth_local_array[n_owned + j];
+        if (!node->fixed_var.count("T") && !node->fixed_var.count("H")) {
+          node->update_staticenth();
+          node->ther_gues->update(CoolProp::HmassP_INPUTS,
+                                  node->senth_gues, node->spres_gues);
+          node->stemp_gues = node->ther_gues->T();
+          node->update_totaltemp();
+        }
+      }
+      VecRestoreArrayRead(enth_local_form, &enth_local_array);
+      VecGhostRestoreLocalForm(circuit->enth_local, &enth_local_form);
+    }
+
 	
 	
 	for (auto& node : circuit->nodes_owned) {
@@ -1239,7 +1279,8 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_ener, in
         double sum_A_tenth = 0.0;
         for (size_t k = 0; k < node->Avals.size(); ++k) {
           int col = node->Acols[k];
-          sum_A_tenth += node->Avals[k] * circuit->nodes[col]->tenth_gues;
+          sum_A_tenth += node->Avals[k]
+                       * circuit->nodes[circuit->new2old[col]]->tenth_gues;
 //          std::cout << "flag4 " << node->identifier << " " << sum_A_tenth << std::endl;
         }
       
