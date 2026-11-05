@@ -321,10 +321,12 @@ void discretize_layers() {
           // ---- Upwind/downwind registration ----
           if (i == 0 && layer->layerno == 0) {
             snode->AFF = AFF[j];
+			snode->u_boundary_index = hslab->uwnodes.size();
 			hslab->uwnodes.push_back(snode);
           }
       
           if (i == nnodes - 1) {
+            snode->d_boundary_index = hslab->dwnodes.size();
             hslab->dwnodes.push_back(snode);
             snode->AFF = AFF[j];
             hslab->darea = darea;

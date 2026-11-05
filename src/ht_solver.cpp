@@ -140,30 +140,12 @@ void update_hslab_coupling() {
 
   simulation::time_hslab_update.start();
   for (auto& hslab : model::hslabs) {
-    std::unordered_set<const SNode*> uwnodes;
-    std::unordered_set<const SNode*> dwnodes;
-    for (const auto& node : hslab->uwnodes) uwnodes.insert(node.get());
-    for (const auto& node : hslab->dwnodes) dwnodes.insert(node.get());
-    int n = 0;
-    for (auto& layer : hslab->layers) n += layer->nnodes;
-    n *= hslab->ninc;
     hslab->dheat_transfer = 0.0;
     hslab->uheat_transfer = 0.0;
-    int i = -1;
     for (auto& layer : hslab->layers) {
       for (auto& snode : layer->snodes) {
-        ++i;
-        if (dwnodes.count(snode.get()) != 0) {
-          snode->heat_transfer = exec_ht(hslab->dvar, hslab->dval,
-              hslab->dval1, snode->Ai, snode, i - n + hslab->ninc);
-          hslab->dheat_transfer += snode->heat_transfer;
-        }
-        if (uwnodes.count(snode.get()) != 0) {
-          snode->heat_transfer = exec_ht(hslab->uvar, hslab->uval,
-              hslab->uval1, snode->Ai, snode, i);
-          hslab->uheat_transfer += snode->heat_transfer;
-        }
         snode->ther_gues->update(snode->temp_gues);
+        snode->heat_input = snode->heat_frac * layer->heat_input;
       }
       for (auto& iface : layer->ifaces) {
         iface->ther_gues->update();
@@ -174,10 +156,17 @@ void update_hslab_coupling() {
         jface->update_temp();
       }
     }
-    for (auto& layer : hslab->layers) {
-      for (auto& snode : layer->snodes) {
-        snode->heat_input = snode->heat_frac * layer->heat_input;
-      }
+    for (const auto& snode : hslab->uwnodes) {
+      const int i = snode->u_boundary_index;
+      snode->heat_transfer = exec_ht(hslab->uvar, hslab->uval,
+          hslab->uval1, snode->Ai, snode, i);
+      hslab->uheat_transfer += snode->heat_transfer;
+    }
+    for (const auto& snode : hslab->dwnodes) {
+      const int i = snode->d_boundary_index;
+      snode->heat_transfer = exec_ht(hslab->dvar, hslab->dval,
+          hslab->dval1, snode->Ai, snode, i);
+      hslab->dheat_transfer += snode->heat_transfer;
     }
   }
   simulation::time_hslab_update.stop();
@@ -259,13 +248,6 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat,
   for (auto& hslab : model::hslabs) {
 
     if (!synchronize && mpi::rank != hslab->root_world_rank) continue;
-
-    std::unordered_set<const SNode*> uwnodes;
-    std::unordered_set<const SNode*> dwnodes;
-    uwnodes.reserve(hslab->uwnodes.size());
-    dwnodes.reserve(hslab->dwnodes.size());
-    for (const auto& node : hslab->uwnodes) uwnodes.insert(node.get());
-    for (const auto& node : hslab->dwnodes) dwnodes.insert(node.get());
 
   //   if (!trans_sim && HSlab->solveSS == false) continue;
 
@@ -365,13 +347,39 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat,
                                  hslab->uval1, hslab->uwnodes);
       const auto dhtc = pipe_htc(hslab->dvar, hslab->dval,
                                  hslab->dval1, hslab->dwnodes);
-      Eigen::SparseMatrix<double> A(n, n);
-      A.reserve(Eigen::VectorXi::Constant(n, 5));
+      struct MatrixCache {
+        int ninc = 0;
+        Eigen::SparseMatrix<double> matrix;
+      };
+      static std::unordered_map<const HSlab*, MatrixCache> matrix_cache;
+      auto& cached_matrix = matrix_cache[hslab.get()];
+      auto& A = cached_matrix.matrix;
+      if (A.rows() != n || cached_matrix.ninc != hslab->ninc) {
+        std::vector<Eigen::Triplet<double>> pattern;
+        pattern.reserve(5 * n);
+        for (int row = 0; row < n; ++row) {
+          pattern.emplace_back(row, row, 1.0);
+          if (row >= hslab->ninc)
+            pattern.emplace_back(row, row - hslab->ninc, 1.0);
+          if (row + hslab->ninc < n)
+            pattern.emplace_back(row, row + hslab->ninc, 1.0);
+          if (row % hslab->ninc != 0)
+            pattern.emplace_back(row, row - 1, 1.0);
+          if ((row + 1) % hslab->ninc != 0)
+            pattern.emplace_back(row, row + 1, 1.0);
+        }
+        A.resize(n, n);
+        A.setFromTriplets(pattern.begin(), pattern.end());
+        A.makeCompressed();
+        cached_matrix.ninc = hslab->ninc;
+      }
+      std::fill(A.valuePtr(), A.valuePtr() + A.nonZeros(), 0.0);
       Eigen::VectorXd b = Eigen::VectorXd::Zero(n);
 
       for (auto &layer : hslab->layers) {
         for (auto &node : layer->snodes) {
           ++i;
+          double diagonal = 0.0;
         // East face
         if (node->eface != nullptr) {
           double aE  = alpha_heat * node->eface->A * node->eface->ther_gues->conductivity() / node->eface->delx;
@@ -379,7 +387,7 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat,
           b(i) -= (node->temp_old - node->eface->dnode->temp_old) * aE0;
           int col = i + hslab->ninc;
           if (col >= 0 && col < n) A.coeffRef(i, col) = -aE;
-          A.coeffRef(i, i) += aE;
+          diagonal += aE;
         }
   
         // West face
@@ -389,7 +397,7 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat,
           b(i) -= (node->temp_old - node->wface->unode->temp_old) * aW0;
           int col = i - hslab->ninc;
           if (col >= 0 && col < n) A.coeffRef(i, col) = -aW;
-          A.coeffRef(i, i) += aW;
+          diagonal += aW;
         }
   
         // North face
@@ -399,7 +407,7 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat,
           b(i) -= (node->temp_old - node->nface->dnode->temp_old) * aN0;
           int col = i + 1;
           if (col >= 0 && col < n) A.coeffRef(i, col) = -aN;
-          A.coeffRef(i, i) += aN;
+          diagonal += aN;
         }
   
         // South face
@@ -409,35 +417,36 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat,
           b(i) -= (node->temp_old - node->sface->unode->temp_old) * aS0;
           int col = i - 1;
           if (col >= 0 && col < n) A.coeffRef(i, col) = -aS;
-          A.coeffRef(i, i) += aS;
+          diagonal += aS;
         }
 
         // Heat input and transient contribution
         b(i) = b(i) + alpha_heat * node->heat_input + (1.0 - alpha_heat) * node->heat_input_old;
         if (trans_sim) {
           b(i) = b(i) + node->ther_old->cpmass() * node->ther_old->rhomass() * node->vol / delt * node->temp_old;
-          A.coeffRef(i, i) += node->ther_gues->cpmass() * node->ther_gues->rhomass() * node->vol / delt;
+          diagonal += node->ther_gues->cpmass() * node->ther_gues->rhomass() * node->vol / delt;
         }
   
         // Boundary conditions (uwnodes)
-        if (uwnodes.count(node.get()) != 0) {
-          const double* htc = uhtc.empty() ? nullptr : &uhtc[i];
-          auto [Ainc, binc] = exec_bc(hslab->uvar, hslab->uval, hslab->uval1, node->Ai, node, i, htc);
+        if (node->u_boundary_index >= 0) {
+          const int bc_index = node->u_boundary_index;
+          const double* htc = uhtc.empty() ? nullptr : &uhtc[bc_index];
+          auto [Ainc, binc] = exec_bc(hslab->uvar, hslab->uval, hslab->uval1, node->Ai, node, bc_index, htc);
           b(i) = b(i) + alpha_heat * binc - (1.0 - alpha_heat) * node->heat_transfer_old;
-          A.coeffRef(i, i) += alpha_heat * Ainc;
+          diagonal += alpha_heat * Ainc;
         }
 
         // Boundary conditions (dwnodes) - note Python used i-n+HSlab.ninc index for bc call
-        if (dwnodes.count(node.get()) != 0) {
-          int bc_index = i - n + hslab->ninc; // as in Python
+        if (node->d_boundary_index >= 0) {
+          const int bc_index = node->d_boundary_index;
           const double* htc = dhtc.empty() ? nullptr : &dhtc[bc_index];
           auto [Ainc, binc] = exec_bc(hslab->dvar, hslab->dval, hslab->dval1, node->Ai, node, bc_index, htc);
           b(i) = b(i) + alpha_heat * binc - (1.0 - alpha_heat) * node->heat_transfer_old;
-          A.coeffRef(i, i) += alpha_heat * Ainc;
+          diagonal += alpha_heat * Ainc;
         }
+        A.coeffRef(i, i) = diagonal;
         }
       } // end building A, b
-      A.makeCompressed();
       simulation::time_hslab_assembly.stop();
 
       // Solve the complete HSLAB system on its owner rank. Keeping the full
@@ -497,16 +506,8 @@ void exec_energy(double time, double delt, bool trans_sim, double alpha_heat,
     simulation::time_hslab_update.start();
     i = -1;
     for (auto& layer : hslab->layers) {
-      double relax = 1.0;
-       // The original python toggles relax for some cases — kept simple here:
-      if (!trans_sim) relax = 1.0;
       for (auto& snode : layer->snodes) {
-        ++i;
-        if (dwnodes.count(snode.get()) != 0 || uwnodes.count(snode.get()) != 0) {
-          snode->temp_gues = relax * tempVec(i) + (1.0 - relax) * snode->temp_gues;
-        } else {
-          snode->temp_gues = tempVec(i);
-        }
+        snode->temp_gues = tempVec(++i);
         // std::cout<<snode->identifier<< " " << snode->temp_gues<<std::endl;
       }
     }

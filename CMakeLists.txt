@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.10)
 
 project(OpenSD)
 
+include(CTest)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -179,3 +181,39 @@ target_link_libraries(${EXENAME}
 # endif()
 
 install(TARGETS ${EXENAME})
+
+if(BUILD_TESTING)
+  execute_process(
+    COMMAND ${Python_EXECUTABLE} -m pytest --version
+    RESULT_VARIABLE OPENSD_PYTEST_STATUS
+    OUTPUT_QUIET
+    ERROR_QUIET
+  )
+
+  if(OPENSD_PYTEST_STATUS EQUAL 0)
+    if(EXISTS "${CMAKE_SOURCE_DIR}/tests/test_geometry.py")
+      add_test(
+        NAME python_geometry
+        COMMAND ${Python_EXECUTABLE} -m pytest -q
+                ${CMAKE_SOURCE_DIR}/tests/test_geometry.py
+      )
+      set_tests_properties(python_geometry PROPERTIES
+        ENVIRONMENT "PYTHONPATH=${CMAKE_SOURCE_DIR}"
+        LABELS "unit;python;hslab"
+      )
+    endif()
+
+    add_test(
+      NAME python_hslab_tutorial
+      COMMAND ${Python_EXECUTABLE} -m pytest -q -k tutorial6
+              ${CMAKE_SOURCE_DIR}/tests/regression_tests/tutorials/test_tutorials.py
+    )
+    set_tests_properties(python_hslab_tutorial PROPERTIES
+      ENVIRONMENT "PYTHONPATH=${CMAKE_SOURCE_DIR}"
+      LABELS "regression;python;tutorials;hslab"
+      TIMEOUT 120
+    )
+  else()
+    message(WARNING "pytest is unavailable; Python CTests will not be registered")
+  endif()
+endif()

@@ -37,6 +37,8 @@ public:
   std::shared_ptr<SFace> sface;
   Layer* layer;
   int node_ind;
+  int u_boundary_index = -1;
+  int d_boundary_index = -1;
   double Ai, Aj, vol, heat_frac;
   double AFF;
   std::string solname;
