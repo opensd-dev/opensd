@@ -124,6 +124,7 @@ int opensd_run()
       }
 
       if (settings::temp_solve) {
+        bool fluid_energy_predicted = false;
         solid::sync_fluid_state();
         if (mpi::n_procs > 1 && trans_sim) {
           // Overlap the HSLAB solve with a fluid predictor, then correct the
@@ -131,12 +132,16 @@ int opensd_run()
           solid::exec_energy(simulation::current_time, simulation::delt,
                              trans_sim, alpha_heat, main_iter, false);
           exec_energy(simulation::current_time, simulation::delt, trans_sim, alpha_ener, main_iter);
+          fluid_energy_predicted = true;
           solid::sync_solid_state();
         } else {
           solid::exec_energy(simulation::current_time, simulation::delt,
                              trans_sim, alpha_heat, main_iter);
         }
-        exec_energy(simulation::current_time, simulation::delt, trans_sim, alpha_ener, main_iter);
+        if (!fluid_energy_predicted ||
+            std::getenv("OPENSD_LAGGED_COUPLING") == nullptr)
+          exec_energy(simulation::current_time, simulation::delt, trans_sim,
+                      alpha_ener, main_iter);
         solid::sync_boundary_temperatures();
         // std::exit(1);
 
